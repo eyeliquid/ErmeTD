@@ -22,8 +22,8 @@ function runFree(lx,lz){if(lx<0||lz<0||lx>RUN.L||lz>RUN.W)return false;for(const
 // vrij zicht tussen twee punten op het parcours: elke muur ertussen moet bij zijn opening gekruist worden
 function runLos(ax,az,cx,cz){for(const[wx,sd]of RUN.walls){if((ax-wx)*(cx-wx)>=0)continue;const z=az+(cz-az)*(wx-ax)/(cx-ax),g=runGap(sd);if(z<g[0]||z>g[1])return false;}return true;}
 let hero={x:0,z:0,a:0,hp:100,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false},orders=[];
-let camMode='hero',arena=null,arSeq=0,armour=0,myPeer=null,akCount=0,myDn=0,lastAtk=null,heroObj=null,heroSig='';
-const hcam={yaw:0,pitch:.5,d:9},joy={x:0,y:0},dmOut={},dmSeen=new Map(),dnSeen=new Map(),rheroes=new Map();
+let camMode='hero',arena=null,arSeq=0,armour=0,myPeer=null,akCount=0,heroObj=null,heroSig='';
+const hcam={yaw:0,pitch:.5,d:9},joy={x:0,y:0},rheroes=new Map();
 const HEROES=[
  {id:'commando',n:'Commando',role:'Afstand · twee pistolen',d:'Snelle schoten op middellange afstand.',hp:100,spd:5.2,range:4.5,dmg:7,rate:4,k:'gun'},
  {id:'shinobi',n:'Shinobi',role:'Melee · katana',d:'Razendsnel van dichtbij, maar kwetsbaar.',hp:90,spd:6.4,range:1.5,dmg:16,rate:3,k:'blade'},
@@ -653,7 +653,7 @@ function endGame(){ended=true;const won=G.phase==='won';
   setText($('#rText'),won?`Alle ${ROUNDS} golven afgeslagen en de Titaan is geveld. Het hoofdkwartier staat nog.`:G.final?`Alle ${ROUNDS} golven afgeslagen, maar de Titaan bleef overeind.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`:`Je hield stand tot en met ronde ${G.cleared}.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`);
   setText($('#rRound'),G.cleared+'/'+ROUNDS);setText($('#rScore'),fmt(G.score));setText($('#rXp'),'+'+gamePts);$('#result').hidden=false;}
 function toLobby(){if(arena&&arena.g&&arena.g.obj)scene.remove(arena.g.obj);arena=null;G=null;myState='lobby';ready=false;$('#result').hidden=true;$('#game').hidden=true;$('#home').hidden=false;
-  if(room)room.presence({st:'lobby',rd:false,tw:null,en:null,b:null,go:null,sl:null,p:null,ar:null,dm:null,mt:null,bd:null,ps:null,cl:null,nx:null,sw:null,pa:null,am:null,bm:null,bh:null,bp:null,ba:null,ms:null,mg:null,wn:null}).catch(()=>{});renderHome();renderLobby();}
+  if(room)room.presence({st:'lobby',rd:false,tw:null,en:null,b:null,go:null,sl:null,p:null,ar:null,dm:null,mt:null,bd:null,ps:null,cl:null,nx:null,sw:null,pa:null,am:null,bm:null,bh:null,bp:null,ba:null,ms:null,mg:null,sd:null,sc:null,dn:null,kb:null,wn:null}).catch(()=>{});renderHome();renderLobby();}
 function events(){const[ox,oz]=slotO(mySlot);for(const e of G.ev){
     if(e.k==='clear'){award(E.pointsFor(e.r));toast(`Ronde ${e.r} afgeslagen · +${fmt(e.bonus)} credits`);}
     else if(e.k==='wave'&&e.r%10===0)toast('Een luchtschip nadert de vesting');
@@ -716,7 +716,7 @@ function updHero(dt){const h=hero,H=HEROES[save.hero],sp=H.spd*HM.hSpd*(armour>=
   heroAttack(dt);}
 const heroScale=()=>Math.pow(E.hpMul(G.round)/E.hpMul(1),.75);
 function heroAttack(dt){const h=hero,H=HEROES[save.hero],HR=H.range*HM.hRange,rate=H.rate*HM.hRate;h.cd-=dt*(arena?1:speed);if(h.cd>0)return;const ts=[];
-  if(arena){const a=arena;if(a.pvp)for(const r of rheroes.values())if(r.ar>0&&r.hp>0&&(a.mode!=='run'||runLos(h.x-RUN.x,h.z-RUN.z,r.x-RUN.x,r.z-RUN.z)))ts.push({x:r.x,z:r.z,r});
+  if(arena){const a=arena; // helden kunnen elkaar niet raken: alleen de baas, monsters en torens zijn een doelwit
     if(a.g&&a.g.hp>0)ts.push({x:a.g.x,z:a.g.z,g:a.g,big:a.B?a.B.big:0});
     if(a.mobs)for(const m of a.mobs)if(m.hp>0)ts.push({x:m.x,z:m.z,mob:m,big:m.big?.5:0});
     if(a.tw)for(const t of a.tw)if(t.hp>0&&runLos(h.x-RUN.x,h.z-RUN.z,t.x,t.z))ts.push({x:RUN.x+t.x,z:RUN.z+t.z,tw:t});}
@@ -726,7 +726,7 @@ function heroAttack(dt){const h=hero,H=HEROES[save.hero],HR=H.range*HM.hRange,ra
   if(!best){h.cd=0;return;}
   h.cd=1/rate;if(HM.leech&&h.hp>0)h.hp=Math.min(maxHp(),h.hp+maxHp()*HM.leech/rate);h.atk=1;akCount++;const ta=Math.atan2(best.z-h.z,best.x-h.x);if(!h.moving)h.a=ta;
   const base=H.dmg*HM.hDmg*(armour>=3?1.3:1)*(Math.random()<HM.hCrit?2+HM.hCritDmg:1),cs=arena?1:heroScale();
-  const hit=(t,d,pierce)=>{if(t.e){const was=t.e.dead;E.hit(G,t.e,d*cs*(t.e.boss?HM.hBoss:1),1-(1-(pierce||0))*(1-HM.hAp));if(t.e.dead&&!was&&HM.hGold)G.gold+=Math.round(t.e.b*HM.hGold);}else if(t.g){if(arena&&arena.mode==='boss')d*=HM.hBoss;t.g.hp-=d;if(arena&&arena.mode==='boss')myBh+=d;}else if(t.tw)runHit(t.tw,d);else if(t.mob)mobHit(t.mob,d);else if(t.r){d*=HM.hPvp;const k=t.r.peer+'|'+t.r.ar;dmOut[k]=Math.round(((dmOut[k]||0)+d)*10)/10;}};
+  const hit=(t,d,pierce)=>{if(t.e){const was=t.e.dead;E.hit(G,t.e,d*cs*(t.e.boss?HM.hBoss:1),1-(1-(pierce||0))*(1-HM.hAp));if(t.e.dead&&!was&&HM.hGold)G.gold+=Math.round(t.e.b*HM.hGold);}else if(t.g){if(arena&&arena.mode==='boss')d*=HM.hBoss;t.g.hp-=d;if(arena&&arena.mode==='boss')myBh+=d;}else if(t.tw)runHit(t.tw,d*HM.hMini);else if(t.mob)mobHit(t.mob,d*HM.hMini);};
   const A=V(h.x,.8,h.z),B=t=>V(t.x,t.e&&t.e.boss?1.8:.5,t.z);
   switch(H.k){
     case'gun':hit(best,base);if(gl3){fxBeam(A,B(best),'#ffd98a',.04,.08);fxBall(B(best),'#ffb060',.04,.14,.1,.8);}break;
@@ -740,48 +740,46 @@ function heroAttack(dt){const h=hero,H=HEROES[save.hero],HR=H.range*HM.hRange,ra
   }}
 /* --- arena: na elke tiende ronde --- */
 function applyArmour(n){if(n===1)G.m.dmg*=1.1;else if(n===2){G.lives+=5;G.maxLives+=5;}else if(n===3)G.m.rate*=1.08;else if(n===4)G.m.gold*=1.1;E.recalc(G);}
-// Na elke tiende ronde volgt een minigame. Level 10 is de baas, level 20 het doolhof, level 30 tot en met 90 zijn PvP en PvE tegelijk, level 100 is het eindmonster.
-const MINI={10:'boss',20:'run',30:'gems',40:'hill',50:'race',60:'hunt',70:'cores',80:'storm',90:'duel',100:'titan'};
-// m: spelvorm, T: duur in seconden, goal: score die je alleen spelend moet halen, pk: punten voor het uitschakelen van een andere held
+// Na elke tiende ronde volgt een minigame. Level 10 is de baas, level 20 het doolhof, level 30 en 50 de stoelendans, level 100 het eindmonster.
+// Helden kunnen elkaar nergens raken: je wint op score, of door als laatste over te blijven.
+const MINI={10:'boss',20:'run',30:'chairs',40:'hill',50:'chairs',60:'hunt',70:'cores',80:'storm',90:'duel',100:'titan'};
+// m: spelvorm, T: duur in seconden, goal: score die je alleen spelend moet halen
 const KIND={
  boss:{m:'boss',T:120,n:'Missie: de Kolos',go:'Missie: versla samen de Kolos en win een stuk harnas'},
  run:{m:'run',T:90,n:'Doolhof',go:'Doolhof: haal de overkant. F zet je schild op'},
- gems:{m:'mini',T:75,n:'Kristalkoorts',goal:22,pk:5,go:'Kristalkoorts: raap de meeste kristallen. Drones jagen op je, en je mag andere helden uitschakelen'},
- hill:{m:'mini',T:80,n:'Heuvelkoning',goal:35,pk:5,go:'Heuvelkoning: sta alleen op de gouden plek om te scoren. Mechs en andere helden willen hem ook'},
- race:{m:'run',T:90,n:'Doolhofrace',go:'Doolhofrace: wie het eerst de overkant haalt wint. De torens schieten, en de andere helden ook'},
- hunt:{m:'mini',T:80,n:'Premiejacht',goal:40,pk:8,go:'Premiejacht: elk monster is premie waard, het gouden het meest. Een andere held uitschakelen telt ook'},
- cores:{m:'mini',T:90,n:'Kernroof',goal:7,pk:2,go:'Kernroof: haal een kern aan de rand en breng hem naar het midden. Wie draagt loopt trager en ligt onder vuur'},
- storm:{m:'mini',T:75,n:'Vuurstorm',goal:74,pk:10,go:'Vuurstorm: blijf in de groene kring en ontwijk de inslagen. Wie het langst overeind blijft wint'},
- duel:{m:'boss',T:150,n:'Kolosjacht',go:'Kolosjacht: de Kolos is terug. Wie hem de meeste schade toebrengt wint, en helden kunnen elkaar raken'},
- titan:{m:'boss',T:300,n:'De Titaan',go:'De Titaan is ontwaakt. Bij elke 10% levens die hij verliest volgt een speciale aanval'},
- pvp:{m:'pvp',T:60,n:'Arena',go:'Arena! Versla de andere helden en win een stuk harnas'}};
+ chairs:{m:'chairs',T:1,n:'Stoelendans',go:'Stoelendans: er is één groen veld minder dan er spelers zijn. Sta op een veld als de tijd stopt'},
+ hill:{m:'mini',T:80,n:'Heuvelkoning',goal:35,go:'Heuvelkoning: sta alleen op de gouden plek om te scoren. Mechs bewaken hem'},
+ hunt:{m:'mini',T:80,n:'Premiejacht',goal:40,go:'Premiejacht: elk monster is premie waard, het gouden het meest'},
+ cores:{m:'mini',T:90,n:'Kernroof',goal:7,go:'Kernroof: haal een kern aan de rand en breng hem naar het midden. Wie draagt loopt trager en ligt onder vuur'},
+ storm:{m:'mini',T:75,n:'Vuurstorm',goal:74,go:'Vuurstorm: blijf in de groene kring en ontwijk de inslagen. Wie het langst overeind blijft wint'},
+ duel:{m:'boss',T:150,n:'Kolosjacht',go:'Kolosjacht: de Kolos is terug. Wie hem de meeste schade toebrengt wint'},
+ titan:{m:'boss',T:300,n:'De Titaan',go:'De Titaan is ontwaakt. Bij elke 10% levens die hij verliest volgt een speciale aanval'}};
 // th: levensdrempels waarop een speciale aanval volgt, mv: de aanvallen die dan om de beurt komen
 const BOSS={
  boss:{N:'De Kolos',hp:2200,sc:2.6,by:3.3,bw:3,big:1.3,th:[.75,.5],mv:['safe'],z0:38,z1:30,xk:0,ct:15,cr:1.5,stop:2.4,sp:2.5,cd:2.4,cd2:8},
  duel:{N:'De Kolos',hp:3400,sc:2.9,by:3.7,bw:3.2,big:1.4,th:[.7,.4],mv:['safe'],z0:44,z1:34,xk:2,ct:18,cr:1.6,stop:2.5,sp:2.9,cd:2.2,cd2:7},
  titan:{N:'De Titaan',hp:7000,sc:4.6,by:5.7,bw:5,big:2.3,th:[.9,.8,.7,.6,.5,.4,.3,.2,.1],mv:['safe','rings','beams'],z0:48,z1:38,xk:4,ct:22,cr:2.6,stop:3.3,sp:2.7,cd:2,cd2:6}};
 const TAU=6.2832;
-function enterArena(kind,r){if(arena||!G||ended)return;if(!KIND[kind])kind='pvp';const K=KIND[kind],mode=K.m;arSeq++;const an=Math.random()*6.28;hero.tx=null;orders=[];buildSel=null;sel=null;roadMode=false;hero.hp=maxHp();shieldT=0;shieldCd=0;msLast=null;
-  if(mode==='run'){const back=kind==='race';hero.x=RUN.x+(back?RUN.L-1.5:1.5);hero.z=RUN.z+2+Math.random()*(RUN.W-4);hero.a=back?Math.PI:0;hcam.yaw=back?Math.PI/2:-Math.PI/2;}
+function enterArena(kind,r){if(arena||!G||ended||!KIND[kind])return;const K=KIND[kind],mode=K.m;arSeq++;const an=Math.random()*6.28;hero.tx=null;orders=[];buildSel=null;sel=null;roadMode=false;hero.hp=maxHp();shieldT=0;shieldCd=0;msLast=null;
+  if(mode==='run'){hero.x=RUN.x+1.5;hero.z=RUN.z+2+Math.random()*(RUN.W-4);hero.a=0;hcam.yaw=-Math.PI/2;}
   else{const d=kind==='titan'?7.2:6.2;hero.x=ACX+Math.cos(an)*d;hero.z=ACZ+Math.sin(an)*d;hero.a=an+Math.PI;hcam.yaw=Math.PI/2-an;} // camera achter de held, met het midden van de arena in beeld
-  arena={mode,kind,K,r:r||0,t:K.T,T:K.T,age:0,seq:arSeq,kills:0,g:null,checked:false,score:0,rivals:false,
-    pvp:mode==='pvp'||mode==='mini'||kind==='race'||kind==='duel',ms:mode==='mini'||kind==='race'||kind==='duel'};
-  dmSeen.clear();lastAtk=null;for(const k in dmOut)delete dmOut[k];for(const p of peers)dnSeen.set(p.peer,(p.presence&&p.presence.dn)|0);
-  if(mode==='boss')bossInit(arena);else if(mode==='run')runInit(arena);else if(mode==='mini')miniInit(arena);
+  arena={mode,kind,K,r:r||0,t:K.T,T:K.T,age:0,seq:arSeq,kills:0,g:null,score:0,rivals:false,ms:mode==='mini'||mode==='chairs'||kind==='duel'}; // ms: de score telt mee tegen die van de anderen
+  if(mode==='boss')bossInit(arena);else if(mode==='run')runInit(arena);else if(mode==='chairs')chairsInit(arena);else miniInit(arena);
   camMode='hero';toast(K.go,6000);
   if(gl3){fxRing(V(hero.x,0,hero.z),'#8fb6ff',2,.8);fxBall(V(hero.x,1,hero.z),'#bfd4ff',.3,2.2,.6,.8);}pushHero(true);refresh();}
 // Beloning: een stuk harnas, of credits als het harnas al compleet is.
 function reward(a,txt){if(armour<4){armour++;applyArmour(armour);hero.hp=maxHp();toast(txt+`${ARMOUR[armour-1].n}. ${ARMOUR[armour-1].d}`,5000);}
   else{const c=300+10*a.r;G.gold+=c;toast(txt+`+${c} credits`,4000);}}
 function leaveArena(res){const a=arena,K=a.K;arena=null;if(a.g&&a.g.obj)scene.remove(a.g.obj);if(a.tw)for(const t of a.tw)if(t.obj)scene.remove(t.obj);shieldT=0;
-  if(a.ms)msLast=[a.r,Math.floor(a.score||0),res==='dead'?2:1];
+  if(a.ms)msLast=[a.r,Math.floor(a.score||0),res==='dead'||res==='out'?2:1];
   const[ox,oz]=slotO(mySlot);hero.x=ox+6.5;hero.z=oz+5.5;hero.tx=null;hero.hp=maxHp();hcam.yaw=0;if(res==='win'&&HM.mission)G.gold+=HM.mission;if(res==='win'&&a.mode==='boss')award(1);
   if(a.kind==='titan'){if(res==='win')E.win(G);else if(res==='dead')toast('Je bent uitgeschakeld. Wie nog staat vecht door tegen de Titaan.',5000);else E.lose(G);}
   else if(res==='win'&&a.kind==='run'){G.gold+=400;toast('Doolhof gehaald · +400 credits');}
   else if(res==='win')reward(a,a.kind==='boss'?'De Kolos is verslagen: ':K.n+' gewonnen: ');
   else if(res==='lose')toast(a.winner?`${K.n}: ${a.winner} wint deze keer.`:`${K.n}: te weinig gescoord voor een beloning.`,4000);
-  else if(res==='dead')toast(a.pvp?'Uitgeschakeld. Je bent terug in je vesting.':'Je bent uitgeschakeld. Je bent terug in je vesting en kunt verder bouwen.');
-  else toast(a.mode==='boss'?`De tijd is om. ${a.B.N} houdt stand.`:a.mode==='run'?'De tijd is om. Je hebt de overkant niet gehaald.':'De arena sluit zonder winnaar.');
+  else if(res==='out')toast(a.late?'Stoelendans: je hebt een ronde gemist en ligt eruit. Je bent terug in je vesting.':'Stoelendans: je stond niet op een groen veld toen de tijd stopte. Je bent terug in je vesting.',5000);
+  else if(res==='dead')toast('Je bent uitgeschakeld. Je bent terug in je vesting en kunt verder bouwen.');
+  else toast(a.mode==='boss'?`De tijd is om. ${a.B.N} houdt stand.`:a.mode==='run'?'De tijd is om. Je hebt de overkant niet gehaald.':K.n+' eindigt zonder winnaar.');
   if(gl3)fxRing(V(hero.x,0,hero.z),'#8fb6ff',2,.8);pushHero(true);refresh();}
 // De andere spelers in dezelfde minigame: hun score en of ze nog meedoen (0 bezig, 1 klaar, 2 uitgeschakeld).
 function rivals(a){const o=[];for(const p of mates()){const ms=p.presence.ms;if(Array.isArray(ms)&&ms[0]===a.r)o.push({p,sc:+ms[1]||0,st:ms[2]|0});}if(o.length)a.rivals=true;return o;}
@@ -862,18 +860,15 @@ function finalWatch(){let sum=myBh,won=false,fighting=false;
     if(pr.st==='playing'&&pr.am===ROUNDS&&+pr.ar>0&&+pr.hp>0)fighting=true;}
   if(won||(finalMax&&sum>=finalMax)){E.win(G);return;}
   const now=performance.now();if(fighting||!finalAt){finalAt=now;return;}if(now-finalAt>3000)E.lose(G);}
-/* --- doolhof na ronde 20, en de doolhofrace na ronde 50 --- */
+/* --- doolhof na ronde 20 --- */
 // Elke speler loopt zijn eigen doolhof: je ziet de anderen rennen, maar torens en kogels zijn van jou alleen.
-// De race gaat de andere kant op, met taaiere torens, en helden kunnen elkaar raken als er geen muur tussen staat.
-function runInit(a){const race=a.kind==='race',hp=race?150:110;a.shots=[];a.shotDmg=race?18:15;a.shotCd=race?.75:.9;
-  a.tw=[[7,1.6],[11,8.4],[15,1.6],[15,8.6],[19,8.4],[19,1.4],[23,1.6],[27,8.4],[27,1.4],[31,1.6],[31,8.6],[35,8.4]].map(([x,z],i)=>{if(race){x=RUN.L-x;z=RUN.W-z;}const t={x,z,hp,max:hp,cd:.6+i*.17,ang:race?0:Math.PI,obj:null};
+function runInit(a){const hp=110;a.shots=[];a.shotDmg=15;a.shotCd=.9;
+  a.tw=[[7,1.6],[11,8.4],[15,1.6],[15,8.6],[19,8.4],[19,1.4],[23,1.6],[27,8.4],[27,1.4],[31,1.6],[31,8.6],[35,8.4]].map(([x,z],i)=>{const t={x,z,hp,max:hp,cd:.6+i*.17,ang:Math.PI,obj:null};
     if(gl3){t.obj=makeTower('sentry',SLOTS,0,null);t.obj.scale.setScalar(1.35);t.obj.position.set(RUN.x+x,0,RUN.z+z);scene.add(t.obj);}return t;});}
 function runHit(t,d){if(t.hp<=0)return;t.hp-=d;if(t.hp<=0){arena.kills++;if(t.obj)scene.remove(t.obj);if(gl3)fxBall(V(RUN.x+t.x,.6,RUN.z+t.z),'#ff8a2c',.2,1.4,.5,.85);}}
 function useShield(){if(!arena||arena.mode!=='run'||shieldCd>0)return;shieldT=2.5+HM.shDur;shieldCd=9-HM.shCd;if(gl3)fxRing(V(hero.x,0,hero.z),'#59c8f2',1.6,.3);}
-function updRun(a,dt){const h=hero,lx=h.x-RUN.x,lz=h.z-RUN.z,race=a.kind==='race';shieldT=Math.max(0,shieldT-dt);shieldCd=Math.max(0,shieldCd-dt);
-  if(race){const rv=rivals(a),first=rv.find(o=>o.st===1&&o.sc>=1000);
-    if(lx<=2){a.score=1000+Math.ceil(a.t);if(first)a.winner=nameOf(first.p);leaveArena(first?'lose':'win');return;}}
-  else if(lx>=RUN.L-2){leaveArena('win');return;}
+function updRun(a,dt){const h=hero,lx=h.x-RUN.x,lz=h.z-RUN.z;shieldT=Math.max(0,shieldT-dt);shieldCd=Math.max(0,shieldCd-dt);
+  if(lx>=RUN.L-2){leaveArena('win');return;}
   for(const t of a.tw){if(t.hp<=0)continue;const dx=lx-t.x,dz=lz-t.z,d=Math.hypot(dx,dz);if(d>9||d<.01||!runLos(t.x,t.z,lx,lz)){t.cd=Math.max(t.cd,.35);continue;}
     t.ang=Math.atan2(dz,dx);t.cd-=dt;if(t.cd<=0){t.cd=a.shotCd;a.shots.push({x:t.x,z:t.z,vx:dx/d*11,vz:dz/d*11,life:1.2});if(gl3)fxBall(V(RUN.x+t.x,.7,RUN.z+t.z),'#ffd98a',.08,.3,.1,.9);}}
   for(let i=a.shots.length-1;i>=0;i--){const o=a.shots[i];let dead=false;
@@ -881,14 +876,88 @@ function updRun(a,dt){const h=hero,lx=h.x-RUN.x,lz=h.z-RUN.z,race=a.kind==='race
       for(const[wx,sd]of RUN.walls)if((px-wx)*(o.x-wx)<=0){const g=runGap(sd);if(o.z<g[0]||o.z>g[1])dead=true;}
       if(!dead&&Math.hypot(o.x-lx,o.z-lz)<.5){dead=true;if(shieldT>0){if(gl3)fxRing(V(h.x,0,h.z),'#59c8f2',1.2,.2);}else{hurt(a.shotDmg);if(gl3)fxBall(V(h.x,.8,h.z),'#ff5a4a',.1,.5,.2,.7);}}}
     o.life-=dt;if(dead||o.life<=0||o.x<0||o.x>RUN.L||o.z<0||o.z>RUN.W)a.shots.splice(i,1);}}
-/* --- minigames in de arena, level 30 tot en met 90: PvE en PvP tegelijk --- */
-// Monsters, inslagen en doelen zijn de PvE-kant. Daarnaast kan elke held de andere helden raken. Wie sneuvelt ligt eruit.
-// Kristallen en kernen volgen uit het potje, zodat iedereen dezelfde ziet; wie er een pakt meldt dat, en dan verdwijnt hij bij de rest.
+/* --- stoelendans na ronde 30 en 50 --- */
+// Er ligt één groen veld minder dan er spelers zijn, en op elk veld past één held. Na een verborgen tijd van 10 tot 20 seconden stopt de ronde:
+// wie dan een veld heeft blijft, de rest ligt eruit. Zolang de tijd loopt kost op een veld staan levenspunten. Dat herhaalt zich tot er één speler over is.
+// Eén speler leidt (de eerste die nog meedoet): hij kiest het zaad van de ronde en meldt wanneer de tijd om is, zodat iedereen dezelfde velden en hetzelfde einde ziet.
+// Elke speler meldt zelf welk veld hij heeft. Claimen twee helden hetzelfde veld, dan telt de vroegste claim en wordt de ander eraf geduwd.
+// intro: aanloop, open: zo lang na het verschijnen kun je een veld nog niet pakken, stop: bevroren tot de uitslag, gap: pauze tussen rondes, wait: zo lang wacht je op een leider die niets meldt, solo: rondes die je alleen spelend moet halen
+const CH={intro:4,open:2,stop:1.2,gap:2.5,wait:3,solo:3,drain:.12,regen:.03,cap:900};
+function chairsInit(a){a.D=a.r>=50?1.3:1;a.rd=0;a.n=0;a.seed=0;a.ph=0;a.phase='intro';a.pt=CH.intro;a.rt=0;a.dur=0;a.R=1.25;a.spots=[];a.marks=[];a.my=null;a.ok=0;a.inSet=null;a.solo=false;a.slow=1;a.bt=0;}
+// De anderen die nog meedoen: in deze minigame, overeind, en na de eerste ronde alleen wie een veld had.
+function chOthers(a){return mates().filter(p=>{const pr=p.presence;return pr.am===a.r&&+pr.ar>0&&+pr.hp>0&&(!a.inSet||a.inSet.has(p.peer));});}
+// De leider, of null als ik dat zelf ben.
+function chLead(a){let b=null;const rk=p=>+p.presence.t||0;for(const p of chOthers(a))if(!b||rk(p)<rk(b)||(rk(p)===rk(b)&&p.peer<b.peer))b=p;
+  if(!b)return null;return rk(b)<myT||(rk(b)===myT&&(!myPeer||b.peer<myPeer))?b:null;}
+// De beste claim van de anderen per veld: de vroegste, en bij gelijke tijd de laagste peer.
+function chClaims(a){const o=new Map();for(const p of chOthers(a)){const c=p.presence.sc;if(!Array.isArray(c)||c[0]!==a.r||c[1]!==a.rd)continue;
+    const i=c[2]|0,t=+c[3]||0,b=o.get(i);if(!b||t<b.t||(t===b.t&&p.peer<b.peer))o.set(i,{t,peer:p.peer});}return o;}
+const chBeats=(c,my)=>!!c&&(c.t<my.t||(c.t===my.t&&(!myPeer||c.peer<myPeer)));
+function chSpots(n,seed){const rnd=lcg(Math.max(1,Math.min(2147483646,seed|0))),dur=10+10*rnd(),R=n>12?.95:n>6?1.1:1.25,spots=[];
+  for(let i=0;i<n;i++){let best=null,bd=-1;
+    for(let k=0;k<120;k++){const an=rnd()*TAU,d=(AR-R-.3)*Math.sqrt(rnd()),x=ACX+Math.cos(an)*d,z=ACZ+Math.sin(an)*d;let m=1e9;for(const s of spots)m=Math.min(m,Math.hypot(x-s.x,z-s.z));
+      if(m>bd){bd=m;best={x,z};}if(m>=2*R+1.2)break;}
+    spots.push(best);}
+  return{dur,R,spots};}
+function chStart(a,rd,n,seed){const o=chSpots(n,seed);a.rd=rd;a.n=n;a.seed=seed;a.ph=0;a.phase='run';a.rt=0;a.dur=o.dur;a.R=o.R;a.spots=o.spots;a.my=null;hero.hp=maxHp();
+  toast(a.solo?`Ronde ${rd} van ${CH.solo}: sta op het groene veld als de tijd stopt`:`Ronde ${rd}: ${n} ${n===1?'veld':'velden'} voor ${n+1} spelers`,3500);
+  if(gl3)for(const s of a.spots)fxRing(V(s.x,0,s.z),'#35ff5a',a.R*1.3,.5);pushHero(true);}
+function chStop(a){a.ph=1;a.phase='stop';a.pt=CH.stop;hero.tx=null;toast('Stop! De tijd is om.',2000);if(gl3)fxRing(V(ACX,0,ACZ),'#ffffff',AR,.5);pushHero(true);}
+// Van een bezet veld af: naar de rand, en als daar de arena ophoudt naar het midden toe.
+function chPush(a,i){const s=a.spots[i],h=hero;let dx=h.x-s.x,dz=h.z-s.z,d=Math.hypot(dx,dz);if(d<.01){dx=1;dz=0;d=1;}
+  let x=s.x+dx/d*(a.R+.06),z=s.z+dz/d*(a.R+.06);if(!walkable(x,z)){const cx=ACX-s.x,cz=ACZ-s.z,c=Math.hypot(cx,cz)||1;x=s.x+cx/c*(a.R+.06);z=s.z+cz/c*(a.R+.06);}
+  h.x=x;h.z=z;h.tx=null;if(a.bt<=0){a.bt=2.5;toast('Dit veld is bezet');if(gl3)fxRing(V(s.x,0,s.z),'#ff8a2c',a.R,.3);}}
+// De uitslag van een ronde: heb ik een veld, en wie nog meer.
+function chJudge(a){const occ=chClaims(a);if(!a.my||chBeats(occ.get(a.my.i),a.my)){leaveArena('out');return;}
+  const S=new Set();for(const[i,c]of occ)if(i!==a.my.i)S.add(c.peer);
+  a.ok=a.rd;a.score=a.rd;a.inSet=S;a.phase='gap';a.pt=CH.gap;hero.hp=maxHp();
+  if(gl3){const s=a.spots[a.my.i];fxRing(V(s.x,0,s.z),'#35ff5a',a.R*1.6,.6);}
+  if(!a.solo)toast(S.size?`Je hebt een veld. Nog ${S.size+1} spelers over.`:'Je hebt het laatste veld.',3000);}
+function updChairs(a,dt){const h=hero,L=chLead(a),seed=()=>1+Math.floor(Math.random()*2147483000);a.marks.length=0;a.slow=1;a.bt-=dt;
+  if(a.age>CH.cap){leaveArena('draw');return;}
+  // de leider volgen: een nieuwe ronde, of het einde van de lopende
+  const sd=L&&L.presence.sd;
+  if(Array.isArray(sd)&&sd[0]===a.r){const rd=sd[1]|0,n=sd[2]|0,sv=sd[3]|0;
+    if(rd>a.rd||(rd===a.rd&&rd>0&&sv!==a.seed&&a.phase==='run')){
+      if(rd>1&&a.ok!==rd-1){a.late=true;leaveArena('out');return;} // een ronde gemist: de rest is zonder mij verder gegaan
+      if(n>0)chStart(a,rd,n,sv);}
+    if(rd===a.rd&&sd[4]===1&&a.phase==='run')chStop(a);}
+  const occ=chClaims(a);let at=-1;for(let i=0;i<a.spots.length;i++)if(Math.hypot(h.x-a.spots[i].x,h.z-a.spots[i].z)<a.R){at=i;break;}
+  if(a.phase==='intro'){a.pt-=dt;
+    if(a.pt<=0&&(!L||a.pt<-CH.wait)){const n=chOthers(a).length;a.solo=n===0;chStart(a,1,Math.max(1,n),seed());}}
+  else if(a.phase==='run'){a.rt+=dt;const had=a.my;
+    if(at<0||a.rt<CH.open)a.my=null;
+    else if(a.my&&a.my.i===at){if(chBeats(occ.get(at),a.my)){a.my=null;chPush(a,at);}}
+    else if(occ.has(at)){a.my=null;chPush(a,at);}
+    else a.my={i:at,t:Math.round(a.rt*100)/100};
+    if(a.my!==had)pushHero(true);
+    if(a.my)h.hp-=maxHp()*CH.drain*a.D*dt;else if(h.hp>0)h.hp=Math.min(maxHp(),h.hp+maxHp()*CH.regen*dt);
+    if(a.rt>=a.dur&&(!L||a.rt>=a.dur+CH.wait+1))chStop(a);}
+  else if(a.phase==='stop'){a.slow=1e-6;a.pt-=dt;if(a.my&&chBeats(occ.get(a.my.i),a.my)){a.my=null;pushHero(true);}
+    if(a.pt<=0){chJudge(a);if(arena!==a)return;}}
+  else if(a.phase==='gap'){a.pt-=dt;
+    if(a.pt<=0){const n=chOthers(a).length;
+      if(a.solo?a.rd>=CH.solo:n===0){leaveArena('win');return;}
+      if(!L||a.pt<-CH.wait)chStart(a,a.rd+1,a.solo?1:n,seed());}}
+  // de velden: groen is vrij, fel groen is van mij, oranje is van een ander
+  const live=a.phase==='run'||a.phase==='stop',soon=a.phase==='run'&&a.rt<CH.open;
+  for(let i=0;i<a.spots.length;i++){const s=a.spots[i],mine=!!a.my&&a.my.i===i,taken=!mine&&occ.has(i);
+    if(!live&&!mine&&!taken)continue;
+    a.marks.push({x:s.x,z:s.z,r:a.R,col:mine?'#7dff3a':taken?'#ff8a2c':'#35ff5a',op:soon?.2:mine?.85:taken?.55:.6});}}
+function chairsSub(a){const n=a.n,who=a.solo?'':` · ${n+1} spelers`;
+  if(a.phase==='intro')return'Straks verschijnen de groene velden · de klok zie je niet';
+  if(a.phase==='run')return a.my?`Ronde ${a.rd} · je staat op een veld en verliest levenspunten`:`Ronde ${a.rd} · ${n} ${n===1?'veld':'velden'}${who} · de tijd stopt onverwacht`;
+  if(a.phase==='stop')return a.my?'Stop! Je hebt een veld':'Stop! Je hebt geen veld';
+  return a.solo?`Ronde ${a.rd} van ${CH.solo} gehaald`:`Ronde ${a.rd} gehaald · de volgende ronde komt eraan`;}
+// sd: [level, ronde, aantal velden, zaad, 1 als de tijd om is], sc: mijn claim [level, ronde, veld, moment]
+function chairsPatch(){const a=arena;if(!a||a.mode!=='chairs')return{sd:null,sc:null};return{sd:[a.r,a.rd,a.n,a.seed,a.ph],sc:a.my?[a.r,a.rd,a.my.i,a.my.t]:null};}
+/* --- minigames in de arena, level 40 tot en met 80 --- */
+// Iedereen speelt in dezelfde arena tegen monsters, inslagen en doelen, en de hoogste score wint. Wie sneuvelt ligt eruit.
+// Kernen volgen uit het potje, zodat iedereen dezelfde ziet; wie er een pakt meldt dat, en dan verdwijnt hij bij de rest.
 function arPt(rnd,r0,r1){const an=rnd()*TAU,d=r0+(r1-r0)*Math.sqrt(rnd());return[ACX+Math.cos(an)*d,ACZ+Math.sin(an)*d];}
 function miniInit(a){const rnd=a.rnd=lcg(1+(Math.abs(Math.floor(matchId))+7919*a.r)%2147483000),k=a.kind;a.D=Math.max(1,Math.min(2,1+(a.r-30)/60));
-  a.pts=0;a.bon=0;a.pk=0;a.mid=0;a.mobs=[];a.zones=[];a.marks=[];a.orbs=[];a.claim=[];a.gone=new Set();a.sp=2;a.sp2=8;a.mi=0;a.hi=0;a.carry=false;a.slow=1;a.items=[];
-  if(k==='gems')for(let i=0;i*1.3<a.T-4;i++){const[x,z]=arPt(rnd,1,AR-1);a.items.push({i,x,z,t0:1+i*1.3,v:i%6===5?3:1});}
-  else if(k==='hill')for(let i=0;i*16<a.T;i++)a.items.push(arPt(rnd,2,AR-2.6));
+  a.pts=0;a.mid=0;a.mobs=[];a.zones=[];a.marks=[];a.orbs=[];a.claim=[];a.gone=new Set();a.sp=2;a.sp2=8;a.mi=0;a.hi=0;a.carry=false;a.slow=1;a.items=[];
+  if(k==='hill')for(let i=0;i*16<a.T;i++)a.items.push(arPt(rnd,2,AR-2.6));
   else if(k==='cores'){a.home=[ACX,ACZ];for(let i=0;i<40;i++){const an=rnd()*TAU;a.items.push({i,x:ACX+Math.cos(an)*(AR-1),z:ACZ+Math.sin(an)*(AR-1),t0:i<3?0:(i-2)*4.5});}}}
 function addMob(a,type,o){const an=Math.random()*TAU;a.mobs.push(Object.assign({id:++a.mid,type,x:ACX+Math.cos(an)*(AR-.4),z:ACZ+Math.sin(an)*(AR-.4),a:an+Math.PI,cd:.6,every:1,reach:1.25,max:o.hp},o));}
 function mobHit(m,d){if(m.hp<=0)return;m.hp-=d;if(m.hp>0)return;const a=arena;
@@ -901,16 +970,10 @@ function stepMobs(a,dt){const h=hero;for(const m of a.mobs){if(m.hp<=0)continue;
     for(const o of a.mobs){if(o===m||o.hp<=0)continue;const ex=m.x-o.x,ez=m.z-o.z,e=Math.hypot(ex,ez);if(e<.8&&e>.001){m.x+=ex/e*(.8-e)*.5;m.z+=ez/e*(.8-e)*.5;}}
     m.cd-=dt;if(dh<=m.reach&&m.cd<=0){m.cd=m.every;hurt(m.dmg);if(gl3)fxRing(V(h.x,0,h.z),'#ff6a4e',1,.25);}}
   for(let i=a.mobs.length-1;i>=0;i--)if(a.mobs[i].hp<=0)a.mobs.splice(i,1);}
-function updMini(a,dt){const h=hero,K=a.K,D=a.D,k=a.kind,rv=rivals(a),got=(x,z,col)=>{if(gl3){fxRing(V(x,0,z),col,1.2,.3);fxBall(V(x,.6,z),col,.1,.6,.25,.8);}};
+function updMini(a,dt){const h=hero,D=a.D,k=a.kind,rv=rivals(a),got=(x,z,col)=>{if(gl3){fxRing(V(x,0,z),col,1.2,.3);fxBall(V(x,.6,z),col,.1,.6,.25,.8);}};
   a.marks.length=0;a.orbs.length=0;a.slow=1;a.sp-=dt;a.sp2-=dt;
   for(const o of rv){const mg=o.p.presence.mg;if(Array.isArray(mg))for(const i of mg)a.gone.add(i);}
-  if(a.kills>a.pk){a.bon+=(a.kills-a.pk)*K.pk;a.pk=a.kills;}
-  if(k==='gems'){ // level 30: kristallen rapen terwijl drones op je jagen
-    for(const g of a.items){if(g.t0>a.age||a.age>g.t0+14||a.gone.has(g.i))continue;
-      if(Math.hypot(h.x-g.x,h.z-g.z)<1){a.gone.add(g.i);a.claim.push(g.i);a.pts+=g.v;got(g.x,g.z,g.v>1?'#ffd24a':'#59c8f2');continue;}
-      a.orbs.push({x:g.x,z:g.z,y:.55,s:g.v>1?.4:.26,col:g.v>1?'#ffd24a':'#59c8f2'});}
-    if(a.sp<=0&&a.mobs.length<2+2*D){a.sp=5/D;addMob(a,'drone',{hp:40,sp:3.7,dmg:6});}}
-  else if(k==='hill'){ // level 40: alleen op de heuvel staan levert punten op; de heuvel verhuist
+  if(k==='hill'){ // level 40: alleen op de heuvel staan levert punten op; de heuvel verhuist
     const i=Math.min(a.items.length-1,Math.floor(a.age/16)),p=a.items[i],R=2.4,inn=Math.hypot(h.x-p[0],h.z-p[1])<=R;let foe=false;
     if(i!==a.hi){a.hi=i;toast('De heuvel is verhuisd');}a.home=p;
     for(const r of rheroes.values())if(r.ar>0&&r.hp>0&&Math.hypot(r.x-p[0],r.z-p[1])<=R)foe=true;
@@ -937,31 +1000,23 @@ function updMini(a,dt){const h=hero,K=a.K,D=a.D,k=a.kind,rv=rivals(a),got=(x,z,c
     while(a.mi*iv<a.age-1.5){a.mi++;const an=a.rnd()*TAU,d=Math.sqrt(a.rnd())*R,me=a.mi%5===0;a.zones.push({x:me?h.x:ACX+Math.cos(an)*d,z:me?h.z:ACZ+Math.sin(an)*d,r:1.6,t:1.3,T:1.3,dmg:36});}}
   if(k!=='storm'&&h.hp>0)h.hp=Math.min(maxHp(),h.hp+maxHp()*.015*dt);
   stepMobs(a,dt);stepZones(a,dt);
-  a.score=(k==='storm'?Math.min(a.T-1,a.age):a.pts)+a.bon;
+  a.score=k==='storm'?Math.min(a.T-1,a.age):a.pts;
   if(a.age>4&&rv.length&&rv.every(o=>o.st===2))leaveArena('win');} // als laatste overeind
-function updArena(dt){const a=arena;if(a.mode==='pvp'){updPvp(dt);return;}a.t-=dt;a.age+=dt;if(a.mode==='boss')updBoss(a,dt);else if(a.mode==='run')updRun(a,dt);else updMini(a,dt);
-  if(arena!==a)return;if(hero.hp<=0&&!revive()){myDn++;leaveArena('dead');}else if(a.t<=0)leaveArena(a.mode==='mini'?rankEnd(a):'draw');}
+function updArena(dt){const a=arena;a.age+=dt;if(a.mode!=='chairs')a.t-=dt; // de stoelendans heeft geen klok in beeld
+  if(a.mode==='boss')updBoss(a,dt);else if(a.mode==='run')updRun(a,dt);else if(a.mode==='chairs')updChairs(a,dt);else updMini(a,dt);
+  if(arena!==a)return;if(hero.hp<=0&&!revive())leaveArena('dead');else if(a.t<=0)leaveArena(a.mode==='mini'?rankEnd(a):'draw');}
 // De regel onder de titel in het opdrachtvenster.
 function arenaSub(a,sec){const best=()=>{let b=-1;for(const o of rivals(a))if(o.st!==2&&o.sc>b)b=o.sc;return b;};
   if(a.mode==='boss'){const u=a.ult;if(u)return u.kind==='safe'?`Ultra-aanval over ${Math.max(1,Math.ceil(u.t))} s · ren naar groen`:u.kind==='rings'?'Schokgolven · ga in de groene opening staan':'Doodsstralen · loop mee tussen de stralen';
     let s=`Nog ${sec} seconden · ${a.B.N.slice(3)} ${Math.ceil(a.g.hp/a.max*100)}%`;if(a.kind==='duel'){const b=best();s+=` · jouw schade ${fmt(myBh)}`+(b>=0?` · beste ander ${fmt(b)}`:'');}return s;}
-  if(a.mode==='run')return`Nog ${sec} seconden · ${a.tw.filter(t=>t.hp>0).length} torens over`+(a.kind==='race'?' · de eerste wint':'');
+  if(a.mode==='run')return`Nog ${sec} seconden · ${a.tw.filter(t=>t.hp>0).length} torens over`;
+  if(a.mode==='chairs')return chairsSub(a);
   if(a.mode==='mini'){const b=best();return`Nog ${sec} s · jij ${Math.floor(a.score)}`+(b>=0?` · beste ander ${b}`:a.rivals?'':` · doel ${a.K.goal}`)+(a.carry?' · breng de kern naar het midden':'');}
   return`Nog ${sec} seconden · ${a.kills} verslagen`;}
-function updPvp(dt){const a=arena,h=hero;a.t-=dt;a.age+=dt;const foes=[...rheroes.values()].filter(r=>r.ar>0&&r.hp>0);
-  if(!a.checked&&a.age>1.5){a.checked=true;if(!foes.length){const max=200+6*G.round;a.g={x:ACX,z:ACZ,a:0,hp:max,max,cd:1,walk:0,atk:0,obj:null};if(gl3){a.g.obj=makeHero(3,SLOTS);a.g.obj.scale.setScalar(1.7);scene.add(a.g.obj);}toast('Geen andere helden: de arenakampioen daagt je uit');}}
-  const g=a.g;
-  if(g&&g.hp>0){if(foes.length){if(g.obj)scene.remove(g.obj);a.g=null;toast('De kampioen maakt plaats voor een echte tegenstander');}
-    else{const dx=h.x-g.x,dz=h.z-g.z,d=Math.hypot(dx,dz);g.a=Math.atan2(dz,dx);g.atk=Math.max(0,g.atk-dt*3);g.cd-=dt;
-      if(d>1.6){g.x+=dx/d*3.4*dt;g.z+=dz/d*3.4*dt;g.walk+=dt*8;}else if(g.cd<=0){g.cd=.9;g.atk=1;hurt(14);if(gl3)fxRing(V(h.x,0,h.z),'#ff6a4e',1,.25);}}}
-  else if(g&&!g.dead){g.dead=true;a.kills++;if(g.obj)scene.remove(g.obj);if(gl3)fxBall(V(g.x,1,g.z),'#ff8a2c',.2,2,.6,.85);toast('De arenakampioen is verslagen');}
-  if(h.hp<=0&&!revive()){myDn++;leaveArena('dead');return;}
-  if(a.age>2.5&&a.kills>0&&!foes.length&&!(a.g&&a.g.hp>0)){leaveArena('win');return;}
-  if(a.t<=0)leaveArena('draw');}
 function hud(){if(!G)return;setText($('#hGold'),fmt(G.gold));setText($('#hLives'),String(G.lives));setText($('#hRound'),G.round+'/'+ROUNDS);setText($('#hScore'),fmt(G.score));setText($('#hRoundBig'),String(G.round));
   const wb=$('#waveBtn'),left=G.en.length+G.q.length;let fr;
   const ms=mates(),qr=$('#qRoad'),prep=G.phase==='prep'&&!arena;qr.hidden=!prep;
-  if(arena){const a=arena,sec=Math.max(0,Math.ceil(a.t));wb.disabled=true;setText(wb,a.mode==='pvp'?'In de arena':'Minigame bezig');setText($('#qTitle'),a.K.n);
+  if(arena){const a=arena,sec=Math.max(0,Math.ceil(a.t));wb.disabled=true;setText(wb,'Minigame bezig');setText($('#qTitle'),a.K.n);
     setText($('#qSub'),arenaSub(a,sec));fr=1-a.t/a.T;}
   else if(prep){const t=Math.ceil(G.timer),pv=E.preview(G),n=ms.filter(p=>p.presence.bd===true).length+(built?1:0);
     wb.disabled=false;setText(wb,built?'Toch niet klaar':'Klaar met bouwen');setText($('#qTitle'),'Bouwfase');
@@ -1158,19 +1213,17 @@ function pushPresence(force){if(!room)return;const now=performance.now();if(!for
     if(myState==='playing')p.en=encE();else p.en='';Object.assign(p,heroPatch());}
   room.presence(p).catch(()=>{});}
 const rd1=v=>Math.round(v*10)/10;
-function heroPatch(){return{h:save.hero,p:[rd1(hero.x),rd1(hero.z),rd1(hero.a)],hp:Math.max(0,Math.round(hero.hp)),mh:Math.round(maxHp()),ar:arena?arena.seq:0,ak:akCount,dn:myDn,kb:lastAtk,dm:arena?{...dmOut}:null,am:arena?arena.r:0,bm:myBm,bh:Math.round(myBh),ms:arena&&arena.ms?[arena.r,Math.floor(arena.score||0),0]:msLast,mg:arena&&arena.claim?arena.claim.slice(-16):null,...bossPatch()};}
+function heroPatch(){return{h:save.hero,p:[rd1(hero.x),rd1(hero.z),rd1(hero.a)],hp:Math.max(0,Math.round(hero.hp)),mh:Math.round(maxHp()),ar:arena?arena.seq:0,ak:akCount,am:arena?arena.r:0,bm:myBm,bh:Math.round(myBh),ms:arena&&arena.ms?[arena.r,Math.floor(arena.score||0),0]:msLast,mg:arena&&arena.claim?arena.claim.slice(-16):null,...chairsPatch(),...bossPatch()};}
 function bossPatch(){const a=arena;if(!a||a.mode!=='boss'||missionLead(a))return{bp:null,ba:null};return{bp:[rd1(a.g.x),rd1(a.g.z),rd1(a.g.a)],ba:a.g.last};}
 let lastHero=0;
 function pushHero(force){if(!room||!G)return;const now=performance.now();if(!force&&now-lastHero<100)return;lastHero=now;room.presence(heroPatch()).catch(()=>{});}
 function syncPeers(){const mine=peers.find(p=>own(p));if(mine)myPeer=mine.peer;const seen=new Set();
   for(const p of peers){if(own(p)||p.kind!=='viewer')continue;const pr=p.presence||{};
-    const dn=pr.dn|0;if(dnSeen.has(p.peer)){if(dn!==dnSeen.get(p.peer)){dnSeen.set(p.peer,dn);if(arena&&myPeer&&pr.kb===myPeer){arena.kills++;toast('Je hebt '+nameOf(p)+' verslagen');}}}else dnSeen.set(p.peer,dn);
     if(!Array.isArray(pr.p)||(pr.st!=='playing'&&pr.st!=='done'))continue;const x=+pr.p[0],z=+pr.p[1];if(!isFinite(x)||!isFinite(z))continue;seen.add(p.peer);
     let r=rheroes.get(p.peer);if(!r){r={x,z,a:0,walk:0,atk:0,ak:pr.ak|0,obj:null,lab:null,sig:'',peer:p.peer};rheroes.set(p.peer,r);}
     if(Math.hypot(x-r.x,z-r.z)>10){r.x=x;r.z=z;}
     r.tx=x;r.tz=z;r.ta=+pr.p[2]||0;r.idx=Math.max(0,Math.min(5,pr.h|0));r.slot=Number.isInteger(pr.sl)&&pr.sl>=0&&pr.sl<SLOTS?pr.sl:SLOTS;r.hp=+pr.hp||0;r.mh=+pr.mh||100;r.ar=+pr.ar||0;r.name=nameOf(p);
-    if((pr.ak|0)!==r.ak){r.ak=pr.ak|0;r.atk=1;r.shoot=true;}
-    if(arena&&myPeer&&pr.dm&&typeof pr.dm==='object'){const v=+pr.dm[myPeer+'|'+arena.seq];if(v>0){const d=Math.min(250,v-(dmSeen.get(p.peer)||0));if(d>0){dmSeen.set(p.peer,v);hurt(d);lastAtk=p.peer;if(gl3)fxBall(V(hero.x,.8,hero.z),'#ff5a4a',.1,.5,.2,.7);}}}}
+    if((pr.ak|0)!==r.ak){r.ak=pr.ak|0;r.atk=1;r.shoot=true;}}
   for(const[k,r]of rheroes)if(!seen.has(k)){if(r.obj)scene.remove(r.obj);if(r.lab)scene.remove(r.lab);rheroes.delete(k);}}
 function renderBoard(){const ul=$('#board');ul.textContent='';
   if(!board||!board.length){const p=document.createElement('p');p.className='empty';
