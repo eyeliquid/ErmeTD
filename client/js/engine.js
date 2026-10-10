@@ -93,7 +93,7 @@ const SKILLS=[
  {id:'hcrit',tree:'H',t:3,c:0,max:5,ic:'blast',n:'Zwakke plek',d:'{v}% kans op een kritieke treffer met dubbele schade',v:4},
  {id:'hdodge',tree:'H',t:3,c:1,max:3,ic:'dodge',n:'Scherpe reflexen',d:'{v}% kans om een treffer te ontwijken',v:5},
  {id:'shdur',tree:'H',t:3,c:2,max:3,ic:'shield',n:'Schildgenerator',d:'Je schild op het parcours houdt {v} seconde langer stand',v:.5},
- {id:'hpvp',tree:'H',t:3,c:3,max:5,ic:'sword',n:'Arenavechter',d:'+{v}% schade tegen andere helden',v:4},
+ {id:'hpvp',tree:'H',t:3,c:3,max:5,ic:'sword',n:'Arenavechter',d:'+{v}% schade tegen monsters en torens in minigames',v:4},
  {id:'hcritd',tree:'H',t:4,c:0,max:3,ic:'star',n:'Dodelijke precisie',d:'Kritieke treffers doen nog eens {v}% extra schade',v:25,req:'hcrit'},
  {id:'shcd',tree:'H',t:4,c:2,max:3,ic:'clock',n:'Snelle lader',d:'Je schild laadt {v} seconde sneller op',v:1,req:'shdur'},
  {id:'mission',tree:'H',t:4,c:3,max:3,ic:'up',n:'Missiepremie',d:'+{v} credits als je een missie of de arena wint',v:150},
@@ -109,7 +109,7 @@ function mods(sk){sk=sk&&!Array.isArray(sk)?sk:{};const r=id=>sk[id]|0,war=r('wa
   ap:.1*r('ap'),splash:1+.05*r('splash'),repair:r('repair'),boss:1+.06*r('boss'),
   hDmg:(1+.04*r('hdmg'))*(lg?1.15:1),hHp:(1+.05*r('hhp'))*(lg?1.15:1),hSpd:(1+.02*r('hspd'))*(lg?1.1:1),hRate:1+.03*r('hrate'),hArm:.03*r('harm'),
   hRange:1+.04*r('hrange'),hAp:.15*r('hap'),hRegen:.005*r('hregen'),hGold:.1*r('hgold'),hBoss:1+.05*r('hboss'),hCrit:.04*r('hcrit'),hCritDmg:.25*r('hcritd'),
-  hDodge:.05*r('hdodge'),shDur:.5*r('shdur'),shCd:r('shcd'),hPvp:1+.04*r('hpvp'),mission:150*r('mission'),leech:.01*r('leech'),second:r('second')>0};}
+  hDodge:.05*r('hdodge'),shDur:.5*r('shdur'),shCd:r('shcd'),hMini:1+.04*r('hpvp'),mission:150*r('mission'),leech:.01*r('leech'),second:r('second')>0};}
 const skillTotal=sk=>SKILLS.reduce((a,s)=>a+(sk[s.id]|0),0);
 const skillSpent=(sk,tree)=>SKILLS.reduce((a,s)=>a+(s.tree===tree?(sk[s.id]|0):0),0);
 // lock: 'tier' = te weinig punten in deze boom, 'req' = het talent erboven is nog niet vol
