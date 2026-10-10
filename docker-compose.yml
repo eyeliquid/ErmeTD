@@ -1,0 +1,14 @@
+# Starten: docker compose up -d --build   ·   het spel staat dan op http://localhost:3000
+services:
+  spel:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Staat er een proxy (Caddy, nginx, een hostingplatform) voor? Zet dit dan op 1.
+      TRUST_PROXY: "0"
+    volumes:
+      - speldata:/data
+volumes:
+  speldata:
