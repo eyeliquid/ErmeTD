@@ -460,10 +460,10 @@ function decode(p){const pr=p.presence||{},fp=fieldPath(pr.pa),tw=[],en=[],s=typ
 function fieldsNow(){const fs=[],used=new Set();
   if(G){let trail=G.trail;if(G.phase==='prep'){const pv=E.preview(G);if(pv.road)trail=NOSET;else{if(G.pvt!==pv){G.pvt=pv;G.pvs=new Set(pv.cells.filter(c=>!G.road.has(c)));}trail=G.pvs;}}
     fs.push({slot:mySlot,own:true,tw:G.tw,en:G.en,name:'Jij',r:G.round,l:G.lives,done:ended,road:G.road,trail,psig:'o'+G.rv});used.add(mySlot);}
-  for(const p of peers){if(own(p)||p.kind!=='viewer')continue;const pr=p.presence||{},sl=pr.sl;
+  for(const p of peers){if(own(p)||p.bot||p.kind!=='viewer')continue;const pr=p.presence||{},sl=pr.sl;
     if((pr.st!=='playing'&&pr.st!=='done')||!Number.isInteger(sl)||sl<0||sl>=SLOTS||used.has(sl)||typeof pr.tw!=='string')continue;
     used.add(sl);const d=decode(p);fs.push({slot:sl,own:false,tw:d.tw,en:d.en,name:nameOf(p),r:+pr.r||1,l:+pr.l||0,done:pr.st==='done',road:d.road,trail:d.trail,psig:typeof pr.pa==='string'?pr.pa:''});}
-  return fs;}
+  botFields(fs,used);return fs;}
 const builderParts=()=>[bx(.52,.16,.32,'#b8901e',0,.2,0),bx(.2,.18,.26,'#2a2f35',.1,.36,0),bx(.44,.06,.06,'#2a2f35',-.08,.5,0,0,.5),bx(.2,.1,.3,'#8a6c16',-.18,.31,0),
     bx(.14,.14,.06,'#141414',.17,.09,.17),bx(.14,.14,.06,'#141414',-.17,.09,.17),bx(.14,.14,.06,'#141414',.17,.09,-.17),bx(.14,.14,.06,'#141414',-.17,.09,-.17)];
 function makeBuilder(own){const g=new T3.Group();g.add(mesh(geo('builder',builderParts)));
@@ -548,7 +548,7 @@ function render3D(time,dt){if(!gl3)return;
     for(const t of fl.tw){const key=fl.slot*1000+t.c,sig=t.type+t.lvl+(t.spec||'');let o=tobj.get(key);
       if(!o||o.sig!==sig){if(o)scene.remove(o.g);o={g:makeTower(t.type,fl.slot,t.lvl,t.spec),sig};o.g.position.set(ox+t.x,0,oz+t.y);scene.add(o.g);tobj.set(key,o);}
       seenT.add(key);const u=o.g.userData;if(u.aim&&t.ang!=null)u.head.rotation.y=-t.ang;for(const a of u.anims)a(time);
-      if(!fl.own&&t.tg&&t.type!=='uplink'&&Math.random()<dt*1.6)spawnFx({k:t.type==='rail'?'rail':t.type==='prism'?'beam':t.type==='geers'?'geers':t.type==='omega'?'omega':'shot',a:[t.x,t.y],b:[t.tg.x,t.tg.y]},ox,oz);}
+      if(!fl.own&&!fl.bot&&t.tg&&t.type!=='uplink'&&Math.random()<dt*1.6)spawnFx({k:t.type==='rail'?'rail':t.type==='prism'?'beam':t.type==='geers'?'geers':t.type==='omega'?'omega':'shot',a:[t.x,t.y],b:[t.tg.x,t.tg.y]},ox,oz);}
     for(const e of fl.en){const I=EI[e.type];if(!I||I.n>=I.cap)continue;const i=I.n++,es=e.big?1.6:1.25;
       const bob=e.type==='drone'?Math.sin(time*5+e.id)*.08:e.type==='boss'?Math.sin(time*1.4)*.06:e.fz>0?0:Math.abs(Math.sin(time*9+e.id))*.03;
       dummy.position.set(ox+e.x,bob,oz+e.y);dummy.quaternion.identity();dummy.rotation.set(0,-Math.atan2(e.dy||0,e.dx||1),0);dummy.scale.setScalar(es);dummy.updateMatrix();
@@ -635,15 +635,16 @@ function updWorldUi(fs){if(!fs)return;const by=new Map(fs.map(f=>[f.slot,f]));
 let toastT=0;
 function toast(msg,ms){const t=$('#toast');t.textContent=msg+toastAdd;toastAdd='';t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,ms||2400);}
 function setText(el,v){if(el.textContent!==v)el.textContent=v;}
-function takenSlots(){const s=new Set();for(const p of peers){if(own(p))continue;const pr=p.presence||{};if((pr.st==='playing'||pr.st==='done')&&Number.isInteger(pr.sl))s.add(pr.sl);}return s;}
+function takenSlots(){const s=new Set();for(const p of peers){if(own(p))continue;const pr=p.presence||{};if(pr.st!=='playing'&&pr.st!=='done')continue;if(Number.isInteger(pr.sl))s.add(pr.sl);if(Array.isArray(pr.bs))for(const v of pr.bs)if(Number.isInteger(v))s.add(v);}return s;}
 function freeSlot(idx){const t=takenSlots(),free=[];for(let i=0;i<SLOTS;i++)if(!t.has(i))free.push(i);return free.length?free[(idx||0)%free.length]:0;}
 let waveTotal=1,nextRound=0;
-function beginGame(idx,mid){closePops();mySlot=freeSlot(idx);G=E.create(save.skills);HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
+// solo: je begint alleen, dus acht bots doen mee
+function beginGame(idx,mid,solo){closePops();clearBots();mySlot=freeSlot(idx);G=E.create(save.skills);HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
   matchId=mid||Date.now();myBm=0;myBh=0;msLast=null;finalMax=0;finalAt=0;built=false;nx=0;sentWave=0;arenaFor=0;roadMode=false;t0=performance.now();prepEnd=t0+E.PREP*1000;
   {const[ox,oz]=slotO(mySlot);hero={x:ox+6.5,z:oz+5.5,a:-1.57,hp:0,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false};}armour=0;arena=null;camMode='hero';hero.hp=maxHp();hcam.yaw=0;hcam.pitch=.62;hcam.d=stage.clientWidth<760?13:10;myState='playing';ready=false;
   $('#home').hidden=true;$('#game').hidden=false;$('#result').hidden=true;
   document.querySelectorAll('#speed button').forEach(b=>b.classList.toggle('on',b.dataset.s==='1'));
-  $('#nogl').hidden=gl3;resize();cam.d=stage.clientWidth<760?46:24;cam.yaw=0;camHome();nextRound=0;refresh();pushPresence(true);
+  $('#nogl').hidden=gl3;resize();cam.d=stage.clientWidth<760?46:24;cam.yaw=0;camHome();nextRound=0;if(solo)spawnBots();refresh();pushPresence(true);
   iconDraw($('#heroCv'),'hero'+save.hero);}
 function endGame(){ended=true;const won=G.phase==='won';
   save.games++;save.best=Math.max(save.best,G.score);persist();
@@ -652,8 +653,8 @@ function endGame(){ended=true;const won=G.phase==='won';
   setText($('#rTitle'),won?'Overwinning':G.final?'De Titaan wint':'Basis gevallen');
   setText($('#rText'),won?`Alle ${ROUNDS} golven afgeslagen en de Titaan is geveld. Het hoofdkwartier staat nog.`:G.final?`Alle ${ROUNDS} golven afgeslagen, maar de Titaan bleef overeind.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`:`Je hield stand tot en met ronde ${G.cleared}.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`);
   setText($('#rRound'),G.cleared+'/'+ROUNDS);setText($('#rScore'),fmt(G.score));setText($('#rXp'),'+'+gamePts);$('#result').hidden=false;}
-function toLobby(){if(arena&&arena.g&&arena.g.obj)scene.remove(arena.g.obj);arena=null;G=null;myState='lobby';ready=false;$('#result').hidden=true;$('#game').hidden=true;$('#home').hidden=false;
-  if(room)room.presence({st:'lobby',rd:false,tw:null,en:null,b:null,go:null,sl:null,p:null,ar:null,dm:null,mt:null,bd:null,ps:null,cl:null,nx:null,sw:null,pa:null,am:null,bm:null,bh:null,bp:null,ba:null,ms:null,mg:null,sd:null,sc:null,dn:null,kb:null,wn:null}).catch(()=>{});renderHome();renderLobby();}
+function toLobby(){if(arena&&arena.g&&arena.g.obj)scene.remove(arena.g.obj);arena=null;G=null;clearBots();myState='lobby';ready=false;$('#result').hidden=true;$('#game').hidden=true;$('#home').hidden=false;
+  if(room)room.presence({st:'lobby',rd:false,tw:null,en:null,b:null,go:null,sl:null,p:null,ar:null,dm:null,mt:null,bd:null,ps:null,cl:null,nx:null,sw:null,pa:null,am:null,bm:null,bh:null,bp:null,ba:null,ms:null,mg:null,sd:null,sc:null,dn:null,kb:null,wn:null,bs:null}).catch(()=>{});renderHome();renderLobby();}
 function events(){const[ox,oz]=slotO(mySlot);for(const e of G.ev){
     if(e.k==='clear'){award(E.pointsFor(e.r));toast(`Ronde ${e.r} afgeslagen · +${fmt(e.bonus)} credits`);}
     else if(e.k==='wave'&&e.r%10===0)toast('Een luchtschip nadert de vesting');
@@ -663,7 +664,7 @@ function events(){const[ox,oz]=slotO(mySlot);for(const e of G.ev){
   G.ev.length=0;if(gl3&&!document.hidden)for(const f of G.fx)spawnFx(f,ox,oz);G.fx.length=0;}
 /* --- samen spelen: bouwfase, snelheid en rondes lopen gelijk --- */
 // De andere spelers in mijn potje die nog meedoen.
-function mates(){return room?peers.filter(p=>!own(p)&&p.kind==='viewer'&&p.presence&&p.presence.mt===matchId&&p.presence.st==='playing'):[];}
+function mates(){return peers.filter(p=>!own(p)&&p.kind==='viewer'&&p.presence&&p.presence.mt===matchId&&p.presence.st==='playing');}
 // Speler 1 is wie het langst in de lobby was. Geeft null als ik dat zelf ben. Valt speler 1 af, dan schuift de volgende door.
 function lead(){let b=null;const rk=p=>+p.presence.t||0;for(const p of mates())if(!b||rk(p)<rk(b)||(rk(p)===rk(b)&&p.peer<b.peer))b=p;
   if(!b)return null;return rk(b)<myT||(rk(b)===myT&&(!myPeer||b.peer<myPeer))?b:null;}
@@ -739,7 +740,7 @@ function heroAttack(dt){const h=hero,H=HEROES[save.hero],HR=H.range*HM.hRange,ra
       if(gl3)for(let i=1;i<=3;i++)fxBall(V(h.x+Math.cos(ta)*HR*i/3,.6,h.z+Math.sin(ta)*HR*i/3),i<3?'#ff8a2c':'#ff5a20',.1,.35+i*.14,.3,.7);break;
   }}
 /* --- arena: na elke tiende ronde --- */
-function applyArmour(n){if(n===1)G.m.dmg*=1.1;else if(n===2){G.lives+=5;G.maxLives+=5;}else if(n===3)G.m.rate*=1.08;else if(n===4)G.m.gold*=1.1;E.recalc(G);}
+function applyArmour(n,g){g=g||G;if(n===1)g.m.dmg*=1.1;else if(n===2){g.lives+=5;g.maxLives+=5;}else if(n===3)g.m.rate*=1.08;else if(n===4)g.m.gold*=1.1;E.recalc(g);}
 // Na elke tiende ronde volgt een minigame. Level 10 is de baas, level 20 het doolhof, level 30 en 50 de stoelendans, level 100 het eindmonster.
 // Helden kunnen elkaar nergens raken: je wint op score, of door als laatste over te blijven.
 const MINI={10:'boss',20:'run',30:'chairs',40:'hill',50:'chairs',60:'hunt',70:'cores',80:'storm',90:'duel',100:'titan'};
@@ -766,11 +767,11 @@ function enterArena(kind,r){if(arena||!G||ended||!KIND[kind])return;const K=KIND
   arena={mode,kind,K,r:r||0,t:K.T,T:K.T,age:0,seq:arSeq,kills:0,g:null,score:0,rivals:false,ms:mode==='mini'||mode==='chairs'||kind==='duel'}; // ms: de score telt mee tegen die van de anderen
   if(mode==='boss')bossInit(arena);else if(mode==='run')runInit(arena);else if(mode==='chairs')chairsInit(arena);else miniInit(arena);
   camMode='hero';toast(K.go,6000);
-  if(gl3){fxRing(V(hero.x,0,hero.z),'#8fb6ff',2,.8);fxBall(V(hero.x,1,hero.z),'#bfd4ff',.3,2.2,.6,.8);}pushHero(true);refresh();}
+  if(gl3){fxRing(V(hero.x,0,hero.z),'#8fb6ff',2,.8);fxBall(V(hero.x,1,hero.z),'#bfd4ff',.3,2.2,.6,.8);}botsEnter(kind,arena.r);pushHero(true);refresh();}
 // Beloning: een stuk harnas, of credits als het harnas al compleet is.
 function reward(a,txt){if(armour<4){armour++;applyArmour(armour);hero.hp=maxHp();toast(txt+`${ARMOUR[armour-1].n}. ${ARMOUR[armour-1].d}`,5000);}
   else{const c=300+10*a.r;G.gold+=c;toast(txt+`+${c} credits`,4000);}}
-function leaveArena(res){const a=arena,K=a.K;arena=null;if(a.g&&a.g.obj)scene.remove(a.g.obj);if(a.tw)for(const t of a.tw)if(t.obj)scene.remove(t.obj);shieldT=0;
+function leaveArena(res){const a=arena,K=a.K;arena=null;botsDone(a,res);if(a.g&&a.g.obj)scene.remove(a.g.obj);if(a.tw)for(const t of a.tw)if(t.obj)scene.remove(t.obj);shieldT=0;
   if(a.ms)msLast=[a.r,Math.floor(a.score||0),res==='dead'||res==='out'?2:1];
   const[ox,oz]=slotO(mySlot);hero.x=ox+6.5;hero.z=oz+5.5;hero.tx=null;hero.hp=maxHp();hcam.yaw=0;if(res==='win'&&HM.mission)G.gold+=HM.mission;if(res==='win'&&a.mode==='boss')award(1);
   if(a.kind==='titan'){if(res==='win')E.win(G);else if(res==='dead')toast('Je bent uitgeschakeld. Wie nog staat vecht door tegen de Titaan.',5000);else E.lose(G);}
@@ -853,7 +854,7 @@ function updBoss(a,dt){const g=a.g,h=hero,B=a.B,L=missionLead(a);let sum=myBh;fo
   g.ct-=dt;if(g.ct<=0&&Math.hypot(h.x-g.x,h.z-g.z)<B.cr){g.ct=.9;hurt(B.ct);if(gl3)fxRing(V(h.x,0,h.z),'#ff6a4e',1,.25);}}
 function stepZones(a,dt){const h=hero;for(let i=a.zones.length-1;i>=0;i--){const z=a.zones[i];z.t-=dt;if(z.t>0)continue;a.zones.splice(i,1);
     if(gl3){fxBall(V(z.x,.3,z.z),'#ff6a2c',.3,z.r,.35,.8);fxRing(V(z.x,0,z.z),'#ffb060',z.r,.3);}
-    if(Math.hypot(h.x-z.x,h.z-z.z)<=z.r)hurt(z.dmg);}}
+    if(Math.hypot(h.x-z.x,h.z-z.z)<=z.r)hurt(z.dmg);botsZone(a,z);}}
 // Na het eindmonster: wie is uitgeschakeld wacht in zijn vesting af of de rest de Titaan velt.
 function finalWatch(){let sum=myBh,won=false,fighting=false;
   for(const p of peers){const pr=p.presence;if(own(p)||!pr||pr.mt!==matchId)continue;if(pr.bm===ROUNDS)sum+=Math.max(0,+pr.bh||0);if(pr.wn===1)won=true;
@@ -1072,10 +1073,226 @@ function frame(ts){requestAnimationFrame(frame);const dt=Math.min(.1,(ts-last)/1
   if(G){const fs=render3D(ts/1000,dt)||fieldsNow();hud();slow+=dt;if(slow>.25){slow=0;refresh();pushPresence();updWorldUi(fs);}}}
 function logic(dt){if(window.__ratdPause)return;
   if(G&&!ended){sync();if(arena)updArena(dt);else if(G.phase!=='prep'){acc+=dt*speed;let n=0;while(acc>=STEP&&n<14){E.step(G,STEP);acc-=STEP;n++;}if(n>=14)acc=0;}
-    events();updHero(dt);pushHero();if(G.phase==='over'||G.phase==='won')endGame();}}
+    botsTick(dt);events();updHero(dt);pushHero();if(G.phase==='over'||G.phase==='won')endGame();}}
 // Een tabblad op de achtergrond krijgt geen frames meer. Het spel loopt dan hier door, anders wacht iedereen op jou.
 setInterval(()=>{const now=performance.now();if(now-last<600)return;let dt=Math.min(3,(now-last)/1000);last=now;
   while(dt>.001){const d=Math.min(.1,dt);logic(d);dt-=d;}if(G)pushPresence();},500);
+
+/* ================= bots ================= */
+// Start je alleen, dan vullen acht bots de wereld. Een bot wordt in deze browser nagespeeld: hij heeft een eigen vesting met dezelfde spelregels
+// (Engine), een andere held dan jij en precies jouw talenten. Voor de rest van het spel is hij een medespeler: hij staat in `peers` met dezelfde
+// presence als een mens, zodat rondes, minigames en de wereld zonder uitzonderingen werken. Zijn t is hoger dan de jouwe, dus jij blijft speler 1.
+const BOTN=8,BOTNAMES=['Tanya','Boris','Natasha','Yuriko','Giles','Zhana','Warren','Moskvin'];
+// De volgorde waarin een bot torens bouwt, en de kolommen waarlangs zijn weg kan slingeren.
+const BSEQ=['flak','sentry','cryo','tesla','sentry','rocket','toxin','rail','flak','prism','wave','uplink','tesla','rail','rocket','prism'],BROADS=[[0,3,6,9,12],[0,4,8,12],[0,6,12]];
+// BF: het baasgevecht van de bots, voor als ze zonder jou verder vechten.
+let bots=[],netPeers=[],bacc=0,bslow=0,BF=null;
+const botLive=b=>b.G.phase!=='over'&&b.G.phase!=='won';
+const botMax=b=>HEROES[b.idx].hp*b.G.m.hHp*(b.armour>=2?1.4:1);
+function mergePeers(){peers=bots.length?netPeers.concat(bots):netPeers;}
+function clearBots(){if(!bots.length)return;bots=[];BF=null;mergePeers();syncPeers();}
+function botHurt(b,d){const m=b.G.m;if(m.hDodge&&Math.random()<m.hDodge)return;b.h.hp-=d*(1-m.hArm);}
+function botGo(b,x,z,step){const h=b.h,dx=x-h.x,dz=z-h.z,d=Math.hypot(dx,dz);if(d<.03)return;if(d<=step){h.x=x;h.z=z;}else{h.x+=dx/d*step;h.z+=dz/d*step;}h.a=Math.atan2(dz,dx);}
+function inArena(x,z){const d=Math.hypot(x-ACX,z-ACZ),m=AR-.4;return d>m?[ACX+(x-ACX)/d*m,ACZ+(z-ACZ)/d*m]:[x,z];}
+// De weg van een bot: een slinger van de linkerpoort naar de rechterpoort. Daarna de bouwplekken, de beste eerst: hoe meer weg in de buurt, hoe beter.
+function botRoad(b){const g=b.G,M=E.MID,cols=BROADS[Math.random()*BROADS.length|0],flip=Math.random()<.5,cells=[],add=(x,y)=>cells.push((flip?N-1-y:y)*N+x);let y=M,up=true;
+  cols.forEach((x,k)=>{const to=k===cols.length-1?M:up?1:N-2;for(;y!==to;y+=Math.sign(to-y))add(x,y);add(x,y);
+    if(k<cols.length-1){for(let u=x+1;u<cols[k+1];u++)add(u,y);up=!up;}});
+  for(const c of cells)E.setRoad(g,c,true);
+  const on=new Set(cells),sc=[];
+  for(let c=0;c<N*N;c++){if(on.has(c)||c===E.C_IN||c===E.C_OUT)continue;const x=c%N,cy2=(c-x)/N;let n=0;
+    for(const r of cells){const dx=r%N-x,dy=(r-r%N)/N-cy2;if(dx*dx+dy*dy<=6.5)n++;}sc.push([c,n+Math.random()]);}
+  b.cells=sc.sort((p,q)=>q[1]-p[1]).map(p=>p[0]);}
+function spawnBots(){const hs=HEROES.map((h,i)=>i).filter(i=>i!==save.hero).sort(()=>Math.random()-.5),used=takenSlots(),free=[],mc=mySlot%COLS,mr=Math.floor(mySlot/COLS);
+  const far=s=>Math.hypot(s%COLS-mc,Math.floor(s/COLS)-mr);
+  for(let s=0;s<SLOTS;s++)if(s!==mySlot&&!used.has(s))free.push(s);
+  free.sort((p,q)=>far(p)-far(q)); // de vestingen rond die van jou
+  bots=free.slice(0,BOTN).map((slot,i)=>{const g=E.create(save.skills),[ox,oz]=slotO(slot);g.maxLives=g.lives;
+    const b={peer:'bot-'+(i+1),kind:'viewer',by:null,name:'Bot '+BOTNAMES[i%BOTNAMES.length],sameTab:false,isMe:false,bot:true,presence:{},G:g,idx:hs[i%hs.length],slot,t:myT+1+i,
+      h:{x:ox+6.5,z:oz+5.5,a:-1.57,hp:0,cd:0},ak:0,as:0,armour:0,built:false,readyAt:4+Math.random()*10,nx:0,arenaFor:0,ar:null,order:null,think:1+Math.random()*2,seq:0,cells:[],
+      bh:0,bm:0,ms:null,react:.25+Math.random()*.5,skill:.3+Math.random()*.3};
+    botRoad(b);b.h.hp=botMax(b);botPres(b);return b;});
+  bacc=0;BF=null;mergePeers();syncPeers();}
+// Wat een mens van een medespeler ziet, vult een bot zelf in.
+function botPres(b){const g=b.G,h=b.h,a=b.ar,pr=b.presence;pr.st=botLive(b)?'playing':'done';pr.t=b.t;pr.mt=matchId;pr.sl=b.slot;pr.r=g.round;pr.l=g.lives;pr.s=g.score;pr.sp=speed;
+  pr.bd=b.built;pr.ps=g.phase==='prep'?0:1;pr.cl=g.cleared;pr.nx=b.nx;pr.sw=0;pr.wn=g.phase==='won'?1:0;
+  pr.h=b.idx;pr.p=[h.x,h.z,h.a];pr.hp=Math.max(0,Math.round(h.hp));pr.mh=Math.round(botMax(b));pr.ar=a?a.seq:0;pr.ak=b.ak;pr.am=a?a.r:0;pr.bm=b.bm;pr.bh=Math.round(b.bh);
+  pr.ms=a&&a.ms?[a.r,Math.floor(a.score),0]:b.ms;pr.sc=a&&a.sc||null;}
+function botFields(fs,used){for(const b of bots){if(used.has(b.slot))continue;used.add(b.slot);const g=b.G;
+    fs.push({slot:b.slot,own:false,bot:true,tw:g.tw,en:g.en,name:b.name,r:g.round,l:g.lives,done:!botLive(b),road:g.road,trail:g.trail,psig:'b'+g.rv});}}
+/* --- een bot in zijn vesting: bouwen, upgraden en meevechten --- */
+// Eén besluit per keer: een toren erbij zolang de vesting daar ruimte voor heeft, en anders de goedkoopste upgrade, link of turbo.
+function botThink(b){const g=b.G;if(b.order||g.omega)return;
+  if(g.tw.length<Math.min(b.cells.length,5+Math.floor(g.round*.7))){const type=BSEQ[b.seq%BSEQ.length],c=b.cells.find(k=>E.canBuild(g,k));
+    if(c!==undefined&&g.gold>=E.buildCost(g,type)){b.order={c,type};b.seq++;return;}}
+  let best=null,kind='',bc=1e9;
+  for(const t of g.tw){if(t.type==='geers'||t.type==='omega'||t.spec)continue;
+    const k=t.lvl<5?'up':t.type==='uplink'||t.nb>=2?'link':'turbo',c=k==='up'?E.upCost(g,t):E.specCost(g,t,k);if(c<bc){bc=c;best=t;kind=k;}}
+  if(best&&g.gold>=bc){if(kind==='up')E.upgrade(g,best);else E.spec(g,best,kind);}}
+// De held van een bot valt aan zoals die van een speler. Geeft de dichtstbijzijnde vijand terug, zodat hij erheen kan lopen.
+function botShoot(b,dt){const g=b.G,h=b.h,H=HEROES[b.idx],m=g.m,[ox,oz]=slotO(b.slot),HR=H.range*m.hRange,inr=[];h.cd-=dt*speed;
+  let best=null,bv=1e18,near=null,nd=1e9;
+  for(const e of g.en){if(e.dead)continue;const d=Math.hypot(ox+e.x-h.x,oz+e.y-h.z);if(d<nd){nd=d;near=e;}
+    if(d<=HR+(e.boss?.7:0)){inr.push(e);const v=H.k==='snipe'?-e.hp:d;if(v<bv){bv=v;best=e;}}}
+  const out=near?{e:near,d:nd}:null;if(!best||h.cd>0)return out;
+  h.cd=1/(H.rate*m.hRate);b.ak++;const ta=Math.atan2(oz+best.y-h.z,ox+best.x-h.x);h.a=ta;
+  const base=H.dmg*m.hDmg*(b.armour>=3?1.3:1)*(Math.random()<m.hCrit?2+m.hCritDmg:1)*Math.pow(E.hpMul(g.round)/E.hpMul(1),.75);
+  const hit=(e,d,p)=>{const was=e.dead;E.hit(g,e,d*(e.boss?m.hBoss:1),1-(1-(p||0))*(1-m.hAp));if(e.dead&&!was&&m.hGold)g.gold+=Math.round(e.b*m.hGold);};
+  if(H.k==='slam'){for(const e of g.en)if(!e.dead&&Math.hypot(ox+e.x-h.x,oz+e.y-h.z)<=1.9+(e.boss?.7:0))hit(e,base);}
+  else if(H.k==='flame'){for(const e of inr){let da=Math.abs(Math.atan2(oz+e.y-h.z,ox+e.x-h.x)-ta);if(da>Math.PI)da=TAU-da;if(da<.6)hit(e,base);}}
+  else if(H.k==='bolt'){let cur=best,d=base;const done=new Set();
+    for(let i=0;i<3&&cur;i++){done.add(cur);hit(cur,d,.5);d*=.7;let nxt=null,bd=2.4;for(const e of g.en){if(e.dead||done.has(e))continue;const dd=Math.hypot(e.x-cur.x,e.y-cur.y);if(dd<bd){bd=dd;nxt=e;}}cur=nxt;}}
+  else hit(best,base,H.k==='snipe'?1:0);
+  return out;}
+function botHome(b,dt){const g=b.G,h=b.h,H=HEROES[b.idx],m=g.m,[ox,oz]=slotO(b.slot);h.hp=botMax(b);
+  b.think-=dt*speed;if(b.think<=0){b.think=.7+Math.random()*.9;botThink(b);}
+  let tx=null,tz=0;
+  if(b.order){const c=b.order.c,x=c%N;tx=ox+x+.5;tz=oz+(c-x)/N+.5;
+    if(Math.hypot(tx-h.x,tz-h.z)<1.6){E.build(g,c,b.order.type);b.order=null;tx=null;}} // net als bij een speler loopt de held eerst naar het vak
+  const tg=botShoot(b,dt);
+  if(tx===null&&tg&&tg.d>H.range*m.hRange*.8){tx=ox+tg.e.x;tz=oz+tg.e.y;}
+  if(tx!==null)botGo(b,Math.max(ox+.3,Math.min(ox+N-.3,tx)),Math.max(oz+.3,Math.min(oz+N-.3,tz)),H.spd*m.hSpd*(b.armour>=4?1.2:1)*dt);}
+// Bouwfase, golven en rondes lopen gelijk met die van jou, precies zoals bij een medespeler.
+function botSync(b){const g=b.G,ok=f=>bots.every(o=>o===b||!botLive(o)||f(o));
+  if(g.phase==='prep'){g.timer=G.timer;if(!b.built&&performance.now()-t0>b.readyAt*1000)b.built=true;if(G.phase!=='prep'){E.lock(g);b.built=true;}}
+  else if(g.phase==='build'){if(G.round===g.round&&(G.phase==='wave'||sentWave===g.round))E.startWave(g);}
+  else if(g.phase==='wait'){const r=g.cleared;if(G.cleared<r||!ok(o=>o.G.cleared>=r))return;
+    if(MINI[r]&&b.arenaFor<r)return; // de minigame begint voor iedereen tegelijk, zodra jij erin stapt
+    if(b.ar||g.final)return;b.nx=g.round;if(nx>=g.round&&ok(o=>o.nx>=g.round))E.next(g);}}
+/* --- bots in de minigames --- */
+// Bots stappen tegelijk met jou een minigame in en spelen hem echt mee: ze lopen, ontwijken, scoren en kunnen sneuvelen.
+function botsEnter(kind,r){const K=KIND[kind],inn=bots.filter(botLive);BF=null;if(!K||!inn.length)return;
+  // ga: de kant van de baas waar de bots bij elkaar staan. Na elke klap schuift de groep een stuk op, zodat ze samen uit de rode cirkels lopen.
+  if(K.m==='boss')BF={r,kind,max:arena&&arena.max||Math.round((BOSS[kind]||BOSS.boss).hp*Math.pow(1+inn.length,1.1)),t:K.T,ga:Math.random()*TAU,dir:Math.random()<.5?1:-1,seen:0};
+  inn.forEach((b,i)=>{const h=b.h,an=TAU*i/inn.length+Math.random()*.5;b.arenaFor=r;b.order=null;h.hp=botMax(b);h.cd=.5+Math.random();
+    b.ar={r,kind,mode:K.m,seq:++b.as,age:0,t:K.T,score:0,ms:K.m==='mini'||K.m==='chairs'||kind==='duel',an,rr:3.2+Math.random()*2.2,sw:2+Math.random()*16,inn:false,
+      wait:1+Math.random()*8,wp:0,pa:BF?BF.ga+Math.atan2(Math.sin(an-BF.ga),Math.cos(an-BF.ga)):an,hit:1,im:0,rp:[],u:null,ud:0,rd:0,jd:0,spot:-1,go:0,sc:null,carry:false,pt:null,skip:new Map(),miss:new Map(),hitK:null};
+    if(K.m==='run'){h.x=RUN.x+1.5;h.z=RUN.z+1.5+Math.random()*(RUN.W-3);h.a=0;}
+    else{const d=5+Math.random()*2.5;h.x=ACX+Math.cos(an)*d;h.z=ACZ+Math.sin(an)*d;h.a=an+Math.PI;}
+    if(K.m==='boss'){b.bm=r;b.bh=0;}});}
+// Staat er nog een andere held op deze plek?
+function heroOn(a,x,z,R,b){if(hero.hp>0&&Math.hypot(hero.x-x,hero.z-z)<=R)return true;
+  for(const o of bots)if(o!==b&&o.ar&&o.ar.r===a.r&&o.h.hp>0&&Math.hypot(o.h.x-x,o.h.z-z)<=R)return true;return false;}
+function botDown(b,final){const a=b.ar;if(!final&&b.G.m.second&&!a.sc2){a.sc2=true;b.h.hp=botMax(b)*.3;return;}botLeave(b,'dead');}
+// Terug naar de eigen vesting, met de beloning van een winnaar.
+function botLeave(b,res){const a=b.ar,g=b.G,[ox,oz]=slotO(b.slot);if(!a)return;b.ar=null;if(a.ms)b.ms=[a.r,Math.floor(a.score),res==='dead'||res==='out'?2:1];
+  b.h.x=ox+6.5;b.h.z=oz+5.5;b.h.a=-1.57;b.h.hp=botMax(b);if(res!=='win')return;g.gold+=g.m.mission;
+  if(a.kind==='run')g.gold+=400;else if(a.kind!=='titan'){if(b.armour<4){applyArmour(++b.armour,g);b.h.hp=botMax(b);}else g.gold+=300+10*a.r;}}
+function botArena(b,dt){const a=b.ar,h=b.h,H=HEROES[b.idx],m=b.G.m,mx=botMax(b),pa=arena&&arena.r===a.r&&arena.kind===a.kind?arena:null; // pa: jij staat nog in dezelfde minigame
+  const rate=H.rate*m.hRate,dmg=H.dmg*m.hDmg*(b.armour>=3?1.3:1)*(1+m.hCrit*(1+m.hCritDmg));let step=H.spd*m.hSpd*(b.armour>=4?1.2:1)*dt,tx=h.x,tz=h.z;a.age+=dt;h.cd-=dt;
+  if(m.hRegen&&h.hp>0)h.hp=Math.min(mx,h.hp+mx*m.hRegen*dt);
+  if(a.mode==='run'){ // ieder zijn eigen doolhof: van opening naar opening, onder vuur van de torens
+    const k=a.wp>>1,lx=h.x-RUN.x;a.t-=dt;
+    if(k<RUN.walls.length){const[wx,sd]=RUN.walls[k],g=runGap(sd);tx=RUN.x+wx+(a.wp&1?.7:-.9);tz=RUN.z+(g[0]+g[1])/2;}else{tx=RUN.x+RUN.L-1;tz=RUN.z+RUN.W/2;}
+    if(Math.hypot(tx-h.x,tz-h.z)<.2)a.wp++;botGo(b,tx,tz,step*.85);
+    a.hit-=dt;if(a.hit<=0){a.hit=.8+Math.random()*.8;if(Math.random()<.22)botHurt(b,15);}
+    if(lx>=RUN.L-2)botLeave(b,'win');else if(h.hp<=0)botDown(b);else if(a.t<=0)botLeave(b,'draw');return;}
+  if(a.mode==='boss'){const u=pa?pa.ult:null; // een ultra-aanval die net afliep: wie niet op groen stond is dood
+    if(a.u!==u){const o=a.u;a.u=u;a.rp=[];a.im=0;a.ud=b.react+Math.random()*.8;
+      if(o&&o.kind==='safe'&&o.t<=0&&!o.safe.some(s=>Math.hypot(h.x-s.x,h.z-s.z)<=s.r)){h.hp=0;botDown(b,true);return;}}
+    if(!pa){ // jij bent uitgeschakeld: de bots vechten versneld door
+      b.bh+=dmg*rate*m.hBoss*.8*dt*4;a.score=b.bh;h.hp-=.5*(1-m.hArm)*dt*4;if(h.hp<=0)botDown(b);return;}}
+  if(!pa)return; // wie de andere minigames zonder jou afmaakt, staat in botsDone
+  if(h.hp<=0){botDown(b);if(!b.ar)return;}
+  // Inslagen ontwijken: eruit lopen, en er niet in lopen. Per aanval (z.k: alle inslagen die tegelijk verschenen) heeft een bot hem door of niet;
+  // alleen een aanval die hij mist kan hem raken (zie botsZone). Zo hangt zijn lot niet af van het gedrang tussen negen overlappende cirkels.
+  let flee=null;const zs=pa.zones||[],odds=a.kind==='titan'?.02:a.mode==='boss'?.04:a.kind==='storm'?.33:.2;
+  for(const z of zs){const d=Math.hypot(h.x-z.x,h.z-z.z);if(z.k===undefined)z.k=Math.round((pa.age-(z.T-z.t))*4);if(!a.miss.has(z.k))a.miss.set(z.k,Math.random()<odds);
+    if(flee||d>z.r+.4||a.miss.get(z.k)||z.T-z.t<b.react*.3)continue;
+    const kx=d<.05?Math.cos(a.an):(h.x-z.x)/d,kz=d<.05?Math.sin(a.an):(h.z-z.z)/d;flee=[z.x+kx*(z.r+.9),z.z+kz*(z.r+.9)];}
+  const move=(x,z,st)=>{[x,z]=inArena(x,z);const dx=x-h.x,dz=z-h.z,d=Math.hypot(dx,dz)||1,k=Math.min(d,1.2),px=h.x+dx/d*k,pz=h.z+dz/d*k;
+    if(!flee&&zs.some(q=>!a.miss.get(q.k)&&Math.hypot(px-q.x,pz-q.z)<q.r+.3))return;botGo(b,x,z,st);};
+  if(a.mode==='boss'){const g=pa.g,B=pa.B,u=pa.ult,HR=H.range*m.hRange,db=Math.hypot(h.x-g.x,h.z-g.z),hx=h.x-ACX,hz=h.z-ACZ,hd=Math.hypot(hx,hz);
+    if(u){const el=u.T-u.t;
+      if(el<a.ud){} // even schrikken
+      else if(u.kind==='safe'){let s=u.safe[0],bd=1e9;for(const o of u.safe){const d=Math.hypot(h.x-o.x,h.z-o.z);if(d<bd){bd=d;s=o;}}tx=s.x+Math.cos(a.an)*s.r*.5;tz=s.z+Math.sin(a.an)*s.r*.5;}
+      else if(u.kind==='rings'){let nr=null;for(const r of u.rings)if((el-r.t0)*4.2<hd){nr=r;break;}if(nr){const an=nr.g+(a.rr-4.3)*.1;tx=ACX+Math.cos(an)*a.rr;tz=ACZ+Math.sin(an)*a.rr;}}
+      else{const st=TAU/u.n,an=beamAng(u)+st*(.5+Math.floor(a.an/st));tx=ACX+Math.cos(an)*(a.rr+.6);tz=ACZ+Math.sin(an)*(a.rr+.6);}
+      if(u.kind==='rings'){const ha=Math.atan2(hz,hx);u.rings.forEach((r,j)=>{const R=(el-r.t0)*4.2,p=a.rp[j]||0;
+          if(R>0&&p<hd&&R>=hd){let da=Math.abs(ha-r.g)%TAU;if(da>Math.PI)da=TAU-da;if(da>r.w/2)botHurt(b,60);}a.rp[j]=Math.max(0,R);});}
+      else if(u.kind==='beams'){a.im-=dt;if(el>1.5&&a.im<=0){const bb=beamAng(u);
+          for(let k=0;k<u.n;k++){const an=bb+k*TAU/u.n,c=Math.cos(an),s=Math.sin(an);if(hx*c+hz*s>1&&Math.abs(hz*c-hx*s)<.55){botHurt(b,34);a.im=.7;break;}}}}}
+    else{ // bij de groep blijven, vlak bij de baas; ligt die plek onder vuur, dan eerst de cirkel uit
+      const R=Math.min(B.cr+1.1+((a.an*5)%1)*.6,HR+B.big-.25),jit=((a.an*3)%1-.5)*.5,ga=BF?BF.ga:a.pa,dA=ga-a.pa,ex=g.x+Math.cos(ga+jit)*R,ez=g.z+Math.sin(ga+jit)*R;
+      a.pa+=Math.sign(dA)*Math.min(Math.abs(dA),step/R);tx=g.x+Math.cos(a.pa+jit)*R;tz=g.z+Math.sin(a.pa+jit)*R;
+      if(flee&&zs.some(q=>Math.hypot(ex-q.x,ez-q.z)<q.r+.3)){tx=flee[0];tz=flee[1];}}
+    if(flee){[tx,tz]=inArena(tx,tz);botGo(b,tx,tz,step);}else move(tx,tz,step);
+    {const ex=h.x-g.x,ez=h.z-g.z,e=Math.hypot(ex,ez)||1,min=B.cr+.3;if(e<min&&!u){h.x=g.x+ex/e*min;h.z=g.z+ez/e*min;}} // niet door de baas heen lopen
+    if(db<=HR+B.big&&h.cd<=0&&g.hp>0){h.cd=1/rate;b.ak++;b.bh+=dmg*m.hBoss;h.a=Math.atan2(g.z-h.z,g.x-h.x);if(m.leech)h.hp=Math.min(mx,h.hp+mx*m.leech/rate);}
+    a.score=b.bh;return;}
+  if(a.mode==='chairs'){const ph=pa.phase,mineP=i=>!!pa.my&&pa.my.i===i;
+    if(ph==='run'){if(a.rd!==pa.rd){a.rd=pa.rd;a.sc=null;a.spot=-1;a.go=8.5+Math.random()*3;h.hp=mx;}
+      // een veld kiezen dat nog niemand heeft, en er pas laat op gaan staan: voor de tiende seconde stopt de tijd nooit. Pak jij het veld eerst, dan zoekt de bot een ander
+      if(a.spot<0||(!a.sc&&mineP(a.spot))){a.spot=-1;let bd=1e9;pa.spots.forEach((s,i)=>{if(mineP(i)||bots.some(o=>o!==b&&o.ar&&o.ar.mode==='chairs'&&o.ar.spot===i))return;const d=Math.hypot(h.x-s.x,h.z-s.z);if(d<bd){bd=d;a.spot=i;}});}
+      const s=pa.spots[a.spot];
+      if(!s){tx=ACX+Math.cos(a.an)*2;tz=ACZ+Math.sin(a.an)*2;} // geen veld vrij: in het midden wachten tot er een vrijkomt
+      else if(pa.rt>=Math.max(CH.open,a.go)){tx=s.x;tz=s.z;if(!a.sc&&Math.hypot(h.x-s.x,h.z-s.z)<pa.R*.7)a.sc=[pa.r,pa.rd,a.spot,Math.round(pa.rt*100)/100];}
+      else{let dx=ACX-s.x,dz=ACZ-s.z,d=Math.hypot(dx,dz);if(d<.1){dx=Math.cos(a.an);dz=Math.sin(a.an);d=1;}tx=s.x+dx/d*(pa.R+.8);tz=s.z+dz/d*(pa.R+.8);}
+      // op een veld staan kost levenspunten: wie bijna leeg is stapt er even af
+      if(a.sc){h.hp-=mx*CH.drain*pa.D*dt;if(h.hp<mx*.06){a.sc=null;a.go=pa.rt+2.5+Math.random()*3;}}else h.hp=Math.min(mx,h.hp+mx*CH.regen*dt);
+      [tx,tz]=inArena(tx,tz);botGo(b,tx,tz,step);}
+    else if(ph==='gap'){if(a.jd!==pa.rd){a.jd=pa.rd;if(!a.sc||a.sc[1]!==pa.rd){botLeave(b,'out');return;}a.score=pa.rd;h.hp=mx;}}
+    else if(ph==='intro'){const an=a.an+a.age*.25;botGo(b,ACX+Math.cos(an)*5,ACZ+Math.sin(an)*5,step*.5);}
+    return;}
+  const k=a.kind;
+  if(k==='hill'){ // af en toe de heuvel op; staat er al iemand, dan scoort niemand
+    const p=pa.home||[ACX,ACZ],f=(a.an*7)%1,d=a.inn?.4+f*1.4:3.6+f*1.6;a.sw-=dt;if(a.sw<=0){a.inn=!a.inn;a.sw=a.inn?1.5+Math.random()*1.5:12+Math.random()*14;}
+    tx=p[0]+Math.cos(a.an)*d;tz=p[1]+Math.sin(a.an)*d;if(Math.hypot(h.x-p[0],h.z-p[1])<=2.4&&!heroOn(a,p[0],p[1],2.4,b))a.score+=dt;}
+  else if(k==='hunt'){ // premiejacht: de monsters van een bot zie jij niet, zijn premie wel
+    a.wp-=dt;if(a.wp<=0||!a.pt){a.wp=1.5+Math.random()*2.5;a.pt=arPt(Math.random,1,AR-1.5);}tx=a.pt[0];tz=a.pt[1];
+    if(h.cd<=0){h.cd=1/rate;b.ak++;}a.score+=Math.min(1.1,dmg*rate*m.hMini/34*b.skill*(H.k==='blade'||H.k==='slam'?.75:1))*dt;h.hp-=2.2*(1-m.hArm)*dt;}
+  else if(k==='cores'){ // kernroof: een kern halen en naar het midden brengen
+    if(a.carry){step*=.72;tx=ACX;tz=ACZ;h.hp-=4*(1-m.hArm)*dt;if(Math.hypot(h.x-ACX,h.z-ACZ)<1.6){a.carry=false;a.score++;a.wait=5+Math.random()*7;}}
+    else{let c=null,bd=1e9,n=0;tx=ACX+Math.cos(a.an)*4.5;tz=ACZ+Math.sin(a.an)*4.5;a.wait-=dt;
+      if(a.wait<=0)for(const o of pa.items){if(o.t0>pa.age||pa.gone.has(o.i))continue;if(++n>3)break;
+          let no=a.skip.get(o.i);if(no===undefined){no=Math.random()<.6;a.skip.set(o.i,no);}if(no)continue; // niet elke bot gaat achter elke kern aan
+          const d=Math.hypot(h.x-o.x,h.z-o.z);if(d<bd){bd=d;c=o;}}
+      if(c){tx=c.x;tz=c.z;if(bd<1.1){pa.gone.add(c.i);a.carry=true;}}}}
+  else if(k==='storm'){ // vuurstorm: binnen de krimpende kring blijven
+    const R=AR-(AR-4.2)*Math.min(1,pa.age/55);a.wp-=dt;
+    if(a.wp<=0||!a.pt){a.wp=2+Math.random()*3;const an=Math.random()*TAU,d=Math.sqrt(Math.random())*Math.max(.5,R-1.3);a.pt=[ACX+Math.cos(an)*d,ACZ+Math.sin(an)*d];}
+    const pd=Math.hypot(a.pt[0]-ACX,a.pt[1]-ACZ),lim=Math.max(.3,R-1);if(pd>lim)a.pt=[ACX+(a.pt[0]-ACX)*lim/pd,ACZ+(a.pt[1]-ACZ)*lim/pd];
+    tx=a.pt[0];tz=a.pt[1];if(Math.hypot(h.x-ACX,h.z-ACZ)>R)h.hp-=22*dt;a.score=Math.min(pa.T-1,pa.age);}
+  if(flee){tx=flee[0];tz=flee[1];}
+  if(k!=='storm'&&h.hp>0)h.hp=Math.min(mx,h.hp+mx*.015*dt);
+  move(tx,tz,step);}
+// Een inslag in de arena raakt ook een bot die erin staat, als hij de aanval niet zag aankomen. Eén aanval raakt hem hooguit één keer.
+function botsZone(a,z){for(const b of bots){const o=b.ar;if(o&&o.r===a.r&&o.mode!=='run'&&o.miss.get(z.k)&&o.hitK!==z.k&&Math.hypot(b.h.x-z.x,b.h.z-z.z)<=z.r){o.hitK=z.k;botHurt(b,z.dmg);}}}
+// De minigame is afgelopen voor de bots die er nog in staan. over: de baas is geveld. ps: jouw score als je tot het eind meedeed, anders -1.
+// Net als bij spelers wint de hoogste score van wie nog staat, en bij gelijke stand wint iedereen die bovenaan staat.
+function botsFinish(kind,over,ps,only){const K=KIND[kind],inn=bots.filter(b=>b.ar&&b.ar.kind===kind);BF=null;
+  if(kind==='titan'){for(const b of bots){if(!botLive(b))continue;botLeave(b,over?'win':'draw');if(over)E.win(b.G);else E.lose(b.G);}return;}
+  let top=ps;for(const b of inn)top=Math.max(top,Math.floor(b.ar.score));
+  for(const b of inn){const sc=Math.floor(b.ar.score);botLeave(b,(K.m==='boss'?over&&(kind!=='duel'||sc>=top):only?b===only:sc>0&&sc>=top)?'win':'lose');}}
+// Jij verlaat een minigame. In het doolhof loopt ieder voor zich, en een baas bevechten de bots desnoods zonder jou. De rest houdt op zodra jij weg bent.
+function botsDone(a,res){if(!bots.length)return;const out=res==='dead'||res==='out';
+  if(a.mode==='run')return;
+  if(a.mode==='boss'){if(a.g.hp<=0)botsFinish(a.kind,true,a.kind==='duel'?Math.floor(myBh):-1);else if(!out)botsFinish(a.kind,false,-1);return;}
+  if(a.mode==='chairs'){ // lig jij eruit, dan gaat het laatste veld naar een van de bots die er nog een had
+    const inn=bots.filter(b=>b.ar&&b.ar.mode==='chairs'),had=inn.filter(b=>b.ar.sc&&b.ar.sc[1]===a.rd),from=had.length?had:inn;
+    botsFinish(a.kind,false,-1,out&&from.length?from[Math.random()*from.length|0]:{});return;}
+  botsFinish(a.kind,false,out?-1:Math.floor(a.score));}
+function botsTick(dt){if(!bots.length)return;
+  // doet er toch een mens mee in dit potje, dan maken de bots plaats
+  if(netPeers.some(p=>!own(p)&&p.presence&&p.presence.mt===matchId)){clearBots();return;}
+  bacc+=dt*speed;let n=0;while(bacc>=STEP&&n<14){bacc-=STEP;n++;}if(n>=14)bacc=0;
+  const fc=focus(),show=gl3&&!document.hidden;
+  for(const b of bots){const g=b.G,[ox,oz]=slotO(b.slot);
+    if(botLive(b)){botSync(b);
+      if(g.phase==='build'||g.phase==='wave'){g.fxOn=show&&Math.abs(ox+6.5-fc[0])+Math.abs(oz+6.5-fc[1])<34;for(let i=0;i<n;i++)E.step(g,STEP);}
+      if(b.ar)botArena(b,dt);else if(botLive(b))botHome(b,dt);}
+    g.ev.length=0;if(g.fx.length){if(show&&live.length<220)for(const f of g.fx)spawnFx(f,ox,oz);g.fx.length=0;}
+    botPres(b);}
+  if(BF){const inn=arena&&arena.r===BF.r&&arena.mode==='boss';
+    if(inn){const l=arena.g.last;BF.max=arena.max;BF.t=arena.t;if(l&&l[0]!==BF.seen){BF.seen=l[0];if(l[1]===0)BF.ga+=BF.dir*2.2;}}
+    else{let sum=myBm===BF.r?myBh:0;for(const b of bots)if(b.bm===BF.r)sum+=b.bh;BF.t-=dt*4;
+      if(sum>=BF.max)botsFinish(BF.kind,true,-1);else if(BF.t<=0||!bots.some(b=>b.ar))botsFinish(BF.kind,false,-1);}}
+  // komt een mens uit een ander potje op de plek van een bot te staan, dan verhuist de bot
+  bslow-=dt;if(bslow<=0){bslow=1;const hum=new Set();
+    for(const p of netPeers){const pr=p.presence||{};if(!own(p)&&(pr.st==='playing'||pr.st==='done')&&Number.isInteger(pr.sl))hum.add(pr.sl);}
+    for(const b of bots){if(!hum.has(b.slot))continue;const used=takenSlots();used.add(mySlot);let s=0;while(s<SLOTS&&used.has(s))s++;if(s>=SLOTS)continue;
+      const[ax,az]=slotO(b.slot),[cx,cz]=slotO(s);b.slot=s;if(!b.ar){b.h.x+=cx-ax;b.h.z+=cz-az;}}}
+  syncPeers();}
 
 /* ---------- invoer ---------- */
 const ptr=new Map();let drag=null,pinch=0;
@@ -1174,7 +1391,7 @@ function paintMap(cells){const el=$('#world'),sig=JSON.stringify(cells);if(el.da
 function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array(SLOTS).fill(null);$('#chatIn').disabled=$('#chatSend').disabled=!room;$('#lobbyDot').className='live'+(room&&room.open?'':' off');
   if(!room){paintRoster([{name:'Jij',chip:connAt===-1?'Solo':'Verbinden',cl:'',score:'',h:save.hero,me:true}]);cells[0]={name:'Jij',st:'lobby',me:true,sub:'jouw vesting'};paintMap(cells);
     setText($('#lobbyNote'),connAt===-1?'solo':'verbinden…');
-    setText(btn,'Start spel');btn.disabled=false;setText(help,connAt===-1?'De gezamenlijke lobby is hier niet bereikbaar. Je speelt alleen in de wereld.':'');return;}
+    setText(btn,'Start spel');btn.disabled=false;setText(help,connAt===-1?'De gezamenlijke lobby is hier niet bereikbaar. Je speelt met acht bots.':'');return;}
   const lp=lobbyPeers(),host=lp[0],me=lp.find(p=>own(p)),others=lp.filter(p=>!own(p)),all=peers.filter(p=>p.kind==='viewer'),list=[];
   setText($('#lobbyNote'),room.open?`${all.length} speler${all.length===1?'':'s'} online`:'verbinding verbroken, opnieuw verbinden…');
   [...lp,...all.filter(p=>!lp.includes(p))].forEach(p=>{const pr=p.presence||{};let chip,cl='';
@@ -1189,15 +1406,15 @@ function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array
   paintMap(cells);
   if(taken.size>=SLOTS||(!me&&lp.length>=SLOTS)){setText(btn,'Wereld vol');btn.disabled=true;setText(help,'Alle 20 vestingen zijn bezet. Wacht tot er een vrijkomt.');return;}
   btn.disabled=false;
-  if(!others.length){setText(btn,'Start spel');setText(help,'Je bent alleen in de lobby. Start direct, of wacht tot er meer spelers zijn. Elk potje begint met vijf minuten bouwen.');}
+  if(!others.length){setText(btn,'Start spel');setText(help,'Je bent alleen in de lobby. Start direct en acht bots doen mee, of wacht tot er meer spelers zijn. Elk potje begint met vijf minuten bouwen.');}
   else if(host&&own(host)){setText(btn,'Start spel');const n=others.filter(p=>p.presence.rd).length;setText(help,`${n} van ${others.length} andere spelers klaar. Jij bent de eerste speler en kunt altijd starten.`);}
   else{setText(btn,ready?'Toch niet klaar':'Ik ben klaar');setText(help,'Het spel start als de eerste speler start, of als alle andere spelers klaar zijn. Daarna heeft iedereen vijf minuten om een weg te bouwen.');}}
 const myIdx=()=>Math.max(0,lobbyPeers().findIndex(p=>own(p)));
-function hostStart(){const go=Date.now(),i=myIdx();seenGo.add(go);if(room){room.presence({go}).catch(()=>{});setTimeout(()=>room.presence({go:null}).catch(()=>{}),6000);}beginGame(i,go);}
-$('#startBtn').onclick=()=>{if(!room){beginGame(0,Date.now());return;}const lp=lobbyPeers(),others=lp.filter(p=>!own(p));
+function hostStart(){const go=Date.now(),i=myIdx();seenGo.add(go);if(room){room.presence({go}).catch(()=>{});setTimeout(()=>room.presence({go:null}).catch(()=>{}),6000);}beginGame(i,go,!lobbyPeers().some(p=>!own(p)));}
+$('#startBtn').onclick=()=>{if(!room){beginGame(0,Date.now(),true);return;}const lp=lobbyPeers(),others=lp.filter(p=>!own(p));
   if(!others.length||(lp[0]&&own(lp[0]))){hostStart();return;}
   ready=!ready;room.presence({rd:ready}).catch(()=>{});renderLobby();};
-function onPeers(ch){peers=ch.peers;const now=performance.now();syncPeers();for(const p of ch.joined)rx.set(p.peer,now);for(const p of ch.updated)rx.set(p.peer,now);for(const p of ch.left)rx.delete(p.peer);
+function onPeers(ch){netPeers=ch.peers;mergePeers();const now=performance.now();syncPeers();for(const p of ch.joined)rx.set(p.peer,now);for(const p of ch.updated)rx.set(p.peer,now);for(const p of ch.left)rx.delete(p.peer);
   
   const settled=now-connAt>3000;let start=0;
   for(const p of peers){const g=p.presence&&p.presence.go;if(typeof g==='number'&&!seenGo.has(g)){seenGo.add(g);if(!own(p)&&settled)start=g;}}
@@ -1209,7 +1426,7 @@ function onPeers(ch){peers=ch.peers;const now=performance.now();syncPeers();for(
   if($('#game').hidden)renderLobby();}
 let lastPush=0;
 function pushPresence(force){if(!room)return;const now=performance.now();if(!force&&now-lastPush<320)return;lastPush=now;
-  const p={st:myState,rd:ready};if(G){p.sl=mySlot;p.r=G.round;p.l=G.lives;p.s=G.score;p.sp=speed;p.tw=encT();p.mt=matchId;p.bd=built;p.ps=G.phase==='prep'?0:1;p.cl=G.cleared;p.nx=nx;p.sw=sentWave;p.pa=encP();p.wn=G.phase==='won'?1:0;
+  const p={st:myState,rd:ready};if(G){p.sl=mySlot;p.r=G.round;p.l=G.lives;p.s=G.score;p.sp=speed;p.tw=encT();p.mt=matchId;p.bd=built;p.ps=G.phase==='prep'?0:1;p.cl=G.cleared;p.nx=nx;p.sw=sentWave;p.pa=encP();p.wn=G.phase==='won'?1:0;p.bs=bots.length?bots.map(b=>b.slot):null;
     if(myState==='playing')p.en=encE();else p.en='';Object.assign(p,heroPatch());}
   room.presence(p).catch(()=>{});}
 const rd1=v=>Math.round(v*10)/10;
@@ -1308,7 +1525,7 @@ $('#skillsBtn').onclick=()=>openPop('#popSkills','tSkills');$('#infoBtn').onclic
 loadLocal();loadAcct();bindAccount();buildHud();
 try{if(init3D()){bindCanvas();renderIcons();}}catch(err){gl3=false;console.error(err);}
 renderHome();renderLobby();renderChat();if(!acct)showGate('new');requestAnimationFrame(frame);
-if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>enterArena(m,r),MINI,KIND,setHero:i=>{save.hero=i;},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
+if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>enterArena(m,r),bots:()=>bots,MINI,KIND,setHero:i=>{save.hero=i;},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
 // Sessie controleren: klopt het token nog, dan komt de voortgang van de server binnen.
 if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
 // Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.
