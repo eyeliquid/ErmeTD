@@ -3,7 +3,7 @@ const E=Engine,{N,T,TYPES,EN,SKILLS,ROUNDS}=E,T3=window.THREE;
 const $=s=>document.querySelector(s);
 const fmt=n=>Math.round(n).toLocaleString('nl-NL');
 const STEP=1/30,FW=20,COLS=5,ROWS=4,SLOTS=COLS*ROWS;
-let save={v:2,pts:0,earned:0,skills:{},games:0,best:0,hero:0,at:0};
+let save={v:2,pts:0,earned:0,skills:{},games:0,best:0,hero:0,diff:0,at:0};
 // gamePts: punten verdiend in dit potje. toastAdd wordt achter de eerstvolgende melding geplakt.
 let gamePts=0,toastAdd='';
 // HM: de talentbonussen die nu gelden. In een potje is dit G.m, dus wat je tijdens een potje leert telt pas het volgende potje.
@@ -34,8 +34,9 @@ const HEROES=[
 const ARMOUR=[{n:'Helm van de kampioen',d:'Turrets doen 10% meer schade.'},{n:'Borstplaat',d:'+5 levens en je held krijgt 40% meer levenspunten.'},
  {n:'Handschoenen',d:'Je held doet 30% meer schade en turrets vuren 8% sneller.'},{n:'Laarzen',d:'Je held loopt 20% sneller en kills leveren 10% meer credits op.'}];
 const maxHp=()=>HEROES[save.hero].hp*HM.hHp*(armour>=2?1.4:1);
-// schade aan je held: eerst ontwijken (Scherpe reflexen), dan Dikke huid
-function hurt(d){if(HM.hDodge&&Math.random()<HM.hDodge)return;hero.hp-=d*(1-HM.hArm);}
+// schade aan je held: eerst ontwijken (Scherpe reflexen), dan Dikke huid. Op een hogere moeilijkheidsgraad komt elke klap harder aan.
+function hurt(d){if(HM.hDodge&&Math.random()<HM.hDodge)return;hero.hp-=d*(1-HM.hArm)*(G?G.D.hurt:1);}
+const mulText=v=>'×'+String(v).replace('.',',');
 function revive(){if(!HM.second||!arena||arena.sc)return false;arena.sc=true;hero.hp=maxHp()*.3;toast('Tweede kans: je held staat weer op');return true;}
 const keys={};
 let room=null,uid=null,peers=[],board=null,connAt=0,ready=false,boardFail=false;
@@ -48,9 +49,9 @@ function clean(d){if(!d||typeof d!=='object')return null;const sk={},v2=d.v===2;
   if(!v2){let xp=Math.max(0,+d.xp||0);if(Array.isArray(d.skills)){const n=Math.min(20,new Set(d.skills.filter(x=>typeof x==='string')).size);for(let i=0;i<n;i++)xp+=500+550*i;}
     pts=Math.floor(xp/500);earned=Math.floor(earned/500);}
   if(d.skills&&typeof d.skills==='object'&&!Array.isArray(d.skills))for(const s of SKILLS){const r=Math.min(s.max,Math.max(0,d.skills[s.id]|0));if(r)sk[s.id]=r;}
-  return{v:2,pts:Math.min(E.SKILL_MAX,Math.floor(pts)),earned:Math.floor(earned),games:Math.max(0,+d.games||0),best:Math.max(0,+d.best||0),skills:sk,hero:Math.max(0,Math.min(5,d.hero|0)),at:Math.max(0,+d.at||0)};}
+  return{v:2,pts:Math.min(E.SKILL_MAX,Math.floor(pts)),earned:Math.floor(earned),games:Math.max(0,+d.games||0),best:Math.max(0,+d.best||0),skills:sk,hero:Math.max(0,Math.min(5,d.hero|0)),diff:E.diffIdx(d.diff),at:Math.max(0,+d.at||0)};}
 function award(n){if(!(n>0))return;save.pts+=n;save.earned+=n;gamePts+=n;persist();toastAdd=` · +${n} skillpunt${n>1?'en':''}`;}
-const blank=()=>({v:2,pts:0,earned:0,skills:{},games:0,best:0,hero:0,at:0});
+const blank=()=>({v:2,pts:0,earned:0,skills:{},games:0,best:0,hero:0,diff:0,at:0});
 const putLocal=()=>{try{localStorage.setItem('ratd-save',JSON.stringify(save));}catch{}};
 function loadLocal(){try{const d=clean(JSON.parse(localStorage.getItem('ratd-save')));if(d)save=d;}catch{}}
 // Voortgang staat altijd in de browser. Wie is ingelogd bewaart hem ook op de server; een gast speelt lokaal
@@ -638,22 +639,25 @@ function setText(el,v){if(el.textContent!==v)el.textContent=v;}
 function takenSlots(){const s=new Set();for(const p of peers){if(own(p))continue;const pr=p.presence||{};if((pr.st==='playing'||pr.st==='done')&&Number.isInteger(pr.sl))s.add(pr.sl);}return s;}
 function freeSlot(idx){const t=takenSlots(),free=[];for(let i=0;i<SLOTS;i++)if(!t.has(i))free.push(i);return free.length?free[(idx||0)%free.length]:0;}
 let waveTotal=1,nextRound=0;
-function beginGame(idx,mid){closePops();mySlot=freeSlot(idx);G=E.create(save.skills);HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
+function beginGame(idx,mid){closePops();mySlot=freeSlot(idx);G=E.create(save.skills,save.diff);HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
   matchId=mid||Date.now();myBm=0;myBh=0;msLast=null;finalMax=0;finalAt=0;built=false;nx=0;sentWave=0;arenaFor=0;roadMode=false;t0=performance.now();prepEnd=t0+E.PREP*1000;
   {const[ox,oz]=slotO(mySlot);hero={x:ox+6.5,z:oz+5.5,a:-1.57,hp:0,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false};}armour=0;arena=null;camMode='hero';hero.hp=maxHp();hcam.yaw=0;hcam.pitch=.62;hcam.d=stage.clientWidth<760?13:10;myState='playing';ready=false;
   $('#home').hidden=true;$('#game').hidden=false;$('#result').hidden=true;
   document.querySelectorAll('#speed button').forEach(b=>b.classList.toggle('on',b.dataset.s==='1'));
   $('#nogl').hidden=gl3;resize();cam.d=stage.clientWidth<760?46:24;cam.yaw=0;camHome();nextRound=0;refresh();pushPresence(true);
-  iconDraw($('#heroCv'),'hero'+save.hero);}
+  iconDraw($('#heroCv'),'hero'+save.hero);
+  setText($('#hScoreL'),G.D.score>1?'Score '+mulText(G.D.score):'Score');$('#hScoreL').parentNode.title=`Score · ${G.D.n}`+(G.D.score>1?`, alles wat je scoort telt ${mulText(G.D.score)}`:'');
+  if(G.diff)toast(`${G.D.n}: taaiere vijanden, score ${mulText(G.D.score)}`,3600);}
 function endGame(){ended=true;const won=G.phase==='won';
   save.games++;save.best=Math.max(save.best,G.score);persist();
   if(acct&&Net.hasToken())Net.api('POST','/scores',{score:G.score,round:G.cleared,won}).catch(authFail);
   myState='done';pushPresence(true);
   setText($('#rTitle'),won?'Overwinning':G.final?'De Titaan wint':'Basis gevallen');
   setText($('#rText'),won?`Alle ${ROUNDS} golven afgeslagen en de Titaan is geveld. Het hoofdkwartier staat nog.`:G.final?`Alle ${ROUNDS} golven afgeslagen, maar de Titaan bleef overeind.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`:`Je hield stand tot en met ronde ${G.cleared}.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`);
+  setText($('#rDiff'),G.D.n+(G.D.score>1?' · score '+mulText(G.D.score):''));
   setText($('#rRound'),G.cleared+'/'+ROUNDS);setText($('#rScore'),fmt(G.score));setText($('#rXp'),'+'+gamePts);$('#result').hidden=false;}
 function toLobby(){if(arena&&arena.g&&arena.g.obj)scene.remove(arena.g.obj);arena=null;G=null;myState='lobby';ready=false;$('#result').hidden=true;$('#game').hidden=true;$('#home').hidden=false;
-  if(room)room.presence({st:'lobby',rd:false,tw:null,en:null,b:null,go:null,sl:null,p:null,ar:null,dm:null,mt:null,bd:null,ps:null,cl:null,nx:null,sw:null,pa:null,am:null,bm:null,bh:null,bp:null,ba:null,ms:null,mg:null,wn:null}).catch(()=>{});renderHome();renderLobby();}
+  if(room)room.presence({st:'lobby',rd:false,df:save.diff,tw:null,en:null,b:null,go:null,sl:null,p:null,ar:null,dm:null,mt:null,bd:null,ps:null,cl:null,nx:null,sw:null,pa:null,am:null,bm:null,bh:null,bp:null,ba:null,ms:null,mg:null,wn:null}).catch(()=>{});renderHome();renderLobby();}
 function events(){const[ox,oz]=slotO(mySlot);for(const e of G.ev){
     if(e.k==='clear'){award(E.pointsFor(e.r));toast(`Ronde ${e.r} afgeslagen · +${fmt(e.bonus)} credits`);}
     else if(e.k==='wave'&&e.r%10===0)toast('Een luchtschip nadert de vesting');
@@ -1108,16 +1112,18 @@ function renderChat(toEnd){const box=$('#chatLog'),stick=toEnd||box.scrollHeight
   if(stick)box.scrollTop=box.scrollHeight;}
 $('#chatForm').onsubmit=ev=>{ev.preventDefault();const inp=$('#chatIn'),text=cleanMsg(inp.value);if(!text||!room)return;if(room.chat(text)){inp.value='';const box=$('#chatLog');box.scrollTop=box.scrollHeight;}};
 const heroOf=p=>own(p)?save.hero:Math.max(0,Math.min(5,(p.presence&&p.presence.h)|0));
+// De moeilijkheidsgraad van een speler: van mezelf in een potje die van het potje, anders wat er gekozen is.
+const diffOf=p=>own(p)?(G?G.diff:save.diff):E.diffIdx(p.presence&&p.presence.df);
 function paintRoster(list){const ul=$('#lobby'),sig=JSON.stringify(list);if(ul.dataset.k===sig)return;ul.dataset.k=sig;ul.textContent='';
   for(const r of list){const li=document.createElement('li');li.className=(r.me?'me ':'')+(r.cl==='host'?'host':'');const cv=document.createElement('canvas');cv.width=92;cv.height=78;iconDraw(cv,'hero'+r.h);
-    const nm=document.createElement('span');nm.className='nm';nm.textContent=r.name;const sub=document.createElement('span');sub.className='sub';sub.textContent=HEROES[r.h].n+(r.score?' · '+r.score+' punten':'');nm.append(sub);
+    const nm=document.createElement('span');nm.className='nm';nm.textContent=r.name;const sub=document.createElement('span');sub.className='sub';sub.textContent=HEROES[r.h].n+' · '+E.DIFF[r.df].n+(r.score?' · '+r.score+' punten':'');nm.append(sub);
     const ch=document.createElement('span');ch.className='chip'+(r.cl?' '+r.cl:'');ch.textContent=r.chip;li.append(cv,nm,ch);ul.append(li);}}
 function paintMap(cells){const el=$('#world'),sig=JSON.stringify(cells);if(el.dataset.k===sig)return;el.dataset.k=sig;el.textContent='';let n=0;
   cells.forEach((c,i)=>{const d=document.createElement('div');d.className='cell'+(c?' '+c.st+(c.me?' me':''):'');const k=document.createElement('span');k.className='n';k.textContent=String(i+1);d.append(k);
     if(c){n++;const w=document.createElement('span');w.className='who';w.textContent=c.name;const s=document.createElement('span');s.className='st';s.textContent=c.sub;d.append(w,s);d.title=`Vesting ${i+1}: ${c.name}, ${c.sub}`;}else d.title=`Vesting ${i+1}: vrij`;el.append(d);});
   setText($('#worldNote'),`${n} van ${SLOTS} vestingen bezet`);}
 function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array(SLOTS).fill(null);$('#chatIn').disabled=$('#chatSend').disabled=!room;$('#lobbyDot').className='live'+(room&&room.open?'':' off');
-  if(!room){paintRoster([{name:'Jij',chip:connAt===-1?'Solo':'Verbinden',cl:'',score:'',h:save.hero,me:true}]);cells[0]={name:'Jij',st:'lobby',me:true,sub:'jouw vesting'};paintMap(cells);
+  if(!room){paintRoster([{name:'Jij',chip:connAt===-1?'Solo':'Verbinden',cl:'',score:'',h:save.hero,df:save.diff,me:true}]);cells[0]={name:'Jij',st:'lobby',me:true,sub:'jouw vesting'};paintMap(cells);
     setText($('#lobbyNote'),connAt===-1?'solo':'verbinden…');
     setText(btn,'Start spel');btn.disabled=false;setText(help,connAt===-1?'De gezamenlijke lobby is hier niet bereikbaar. Je speelt alleen in de wereld.':'');return;}
   const lp=lobbyPeers(),host=lp[0],me=lp.find(p=>own(p)),others=lp.filter(p=>!own(p)),all=peers.filter(p=>p.kind==='viewer'),list=[];
@@ -1125,8 +1131,8 @@ function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array
   [...lp,...all.filter(p=>!lp.includes(p))].forEach(p=>{const pr=p.presence||{};let chip,cl='';
     if(pr.st==='lobby'){if(p===host){chip='Eerste speler';cl='host';}else if(pr.rd){chip='Klaar';cl='ok';}else chip='Wacht';}
     else if(pr.st==='playing'){chip='Ronde '+(+pr.r||1);cl='play';}else chip=pr.st==='done'?'Uitgespeeld':'Kijkt';
-    list.push({name:nameOf(p),chip,cl,score:pr.s?fmt(+pr.s):'',h:heroOf(p),me:!!own(p)});});
-  if(!all.length)list.push({name:'Jij',chip:'Verbinden',cl:'',score:'',h:save.hero,me:true});
+    list.push({name:nameOf(p),chip,cl,score:pr.s?fmt(+pr.s):'',h:heroOf(p),df:diffOf(p),me:!!own(p)});});
+  if(!all.length)list.push({name:'Jij',chip:'Verbinden',cl:'',score:'',h:save.hero,df:save.diff,me:true});
   paintRoster(list);
   const taken=takenSlots(),free=[];for(let i=0;i<SLOTS;i++)if(!taken.has(i))free.push(i);
   for(const p of all){const pr=p.presence||{};if(!own(p)&&(pr.st==='playing'||pr.st==='done')&&Number.isInteger(pr.sl)&&pr.sl>=0&&pr.sl<SLOTS)cells[pr.sl]={name:nameOf(p),st:'play',me:false,sub:pr.st==='done'?'uitgespeeld':'ronde '+(+pr.r||1)};}
@@ -1158,7 +1164,7 @@ function pushPresence(force){if(!room)return;const now=performance.now();if(!for
     if(myState==='playing')p.en=encE();else p.en='';Object.assign(p,heroPatch());}
   room.presence(p).catch(()=>{});}
 const rd1=v=>Math.round(v*10)/10;
-function heroPatch(){return{h:save.hero,p:[rd1(hero.x),rd1(hero.z),rd1(hero.a)],hp:Math.max(0,Math.round(hero.hp)),mh:Math.round(maxHp()),ar:arena?arena.seq:0,ak:akCount,dn:myDn,kb:lastAtk,dm:arena?{...dmOut}:null,am:arena?arena.r:0,bm:myBm,bh:Math.round(myBh),ms:arena&&arena.ms?[arena.r,Math.floor(arena.score||0),0]:msLast,mg:arena&&arena.claim?arena.claim.slice(-16):null,...bossPatch()};}
+function heroPatch(){return{h:save.hero,df:G.diff,p:[rd1(hero.x),rd1(hero.z),rd1(hero.a)],hp:Math.max(0,Math.round(hero.hp)),mh:Math.round(maxHp()),ar:arena?arena.seq:0,ak:akCount,dn:myDn,kb:lastAtk,dm:arena?{...dmOut}:null,am:arena?arena.r:0,bm:myBm,bh:Math.round(myBh),ms:arena&&arena.ms?[arena.r,Math.floor(arena.score||0),0]:msLast,mg:arena&&arena.claim?arena.claim.slice(-16):null,...bossPatch()};}
 function bossPatch(){const a=arena;if(!a||a.mode!=='boss'||missionLead(a))return{bp:null,ba:null};return{bp:[rd1(a.g.x),rd1(a.g.z),rd1(a.g.a)],ba:a.g.last};}
 let lastHero=0;
 function pushHero(force){if(!room||!G)return;const now=performance.now();if(!force&&now-lastHero<100)return;lastHero=now;room.presence(heroPatch()).catch(()=>{});}
@@ -1217,11 +1223,17 @@ function renderTrees(){const sk=save.skills,tot=E.skillTotal(sk);
   buy.disabled=mx||!!st.lock||save.pts<1;
   setText(buy,mx?'Maximale rang':st.lock?'Nog op slot':save.pts>0?`Leer rang ${st.rank+1} · 1 punt`:'Geen punten over');
   const rs=$('#tReset');rs.hidden=!tot;setText(rs,Date.now()<resetArm?`Klik nogmaals: ${tot} ${tot===1?'punt':'punten'} terug`:'Alle punten terugzetten');}
+// Moeilijkheidsgraad: drie knoppen boven de startknop. De keuze geldt alleen voor jou en ligt vast zodra het potje begint.
+function renderDiff(){const box=$('#diff');
+  if(!box.children.length)E.DIFF.forEach((d,i)=>{const b=document.createElement('button');b.type='button';const n=document.createElement('b');n.textContent=d.n;const s=document.createElement('small');s.className='num';s.textContent='score '+mulText(d.score);b.append(n,s);b.title=d.d;
+    b.onclick=()=>{if(save.diff===i)return;save.diff=i;persist();if(room&&!G)room.presence({df:i}).catch(()=>{});renderDiff();renderLobby();};box.append(b);});
+  [...box.children].forEach((b,i)=>{const on=save.diff===i;b.classList.toggle('on',on);b.setAttribute('aria-pressed',String(on));});
+  const d=E.DIFF[save.diff];setText($('#diffNote'),d.d+(d.score>1?` Alles wat je scoort telt ${mulText(d.score)}.`:''));}
 function renderHome(){renderAcct();const tot=E.skillTotal(save.skills),sdone=tot>=E.SKILL_MAX,free=save.pts;
   setText($('#xp'),String(free));setText($('#skn'),tot+' / '+E.SKILL_MAX);setText($('#gms'),String(save.games));
   setText($('#skNote'),sdone?'Je hebt alles geleerd.':'');
   renderTrees();
-  setText($('#skHint'),free&&!sdone?free+(free===1?' punt':' punten'):'');$('#skillsBtn').classList.toggle('can',!sdone&&free>0);setText($('#heroNow'),HEROES[save.hero].n);
+  setText($('#skHint'),free&&!sdone?free+(free===1?' punt':' punten'):'');$('#skillsBtn').classList.toggle('can',!sdone&&free>0);setText($('#heroNow'),HEROES[save.hero].n);renderDiff();
   setText($('#xpNote'),sdone?'Alle rangen geleerd.':free?`Je hebt ${free} ${free===1?'skillpunt':'skillpunten'} te besteden.`:'Geen punten over. Haal levels en minibosses om er meer te verdienen.');
   const hg=$('#heroes');if(!hg.children.length)HEROES.forEach((h,i)=>{const b=document.createElement('button');b.className='hero';b.id='hero-'+i;b.title=h.role;const cv=document.createElement('canvas');cv.width=128;cv.height=108;iconDraw(cv,'hero'+i);
     const n=document.createElement('b');n.textContent=h.n;b.append(cv,n);b.onclick=()=>{save.hero=i;persist();if(room)room.presence({h:i}).catch(()=>{});renderHome();renderLobby();};hg.append(b);});
@@ -1255,7 +1267,7 @@ $('#skillsBtn').onclick=()=>openPop('#popSkills','tSkills');$('#infoBtn').onclic
 loadLocal();loadAcct();bindAccount();buildHud();
 try{if(init3D()){bindCanvas();renderIcons();}}catch(err){gl3=false;console.error(err);}
 renderHome();renderLobby();renderChat();if(!acct)showGate('new');requestAnimationFrame(frame);
-if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>enterArena(m,r),MINI,KIND,setHero:i=>{save.hero=i;},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
+if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>enterArena(m,r),MINI,KIND,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
 // Sessie controleren: klopt het token nog, dan komt de voortgang van de server binnen.
 if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
 // Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.
@@ -1264,7 +1276,7 @@ const lobby=Net.connect({onPeers,onChat,onBoard,
   onOpen(r){room=r;connAt=performance.now();renderChat();renderLobby();},
   onFail(){if(!room){connAt=-1;renderLobby();renderChat();}},
   onClose(){renderLobby();}});
-lobby.presence({t:myT,st:myState,rd:false,h:save.hero});
+lobby.presence({t:myT,st:myState,rd:false,h:save.hero,df:save.diff});
 Net.api('GET','/scores').then(r=>{if(!board)onBoard(r.rows);},()=>{if(!board){boardFail=true;renderBoard();}});
 
 })();

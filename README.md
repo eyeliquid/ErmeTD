@@ -45,10 +45,22 @@ docs/game-design.md     het oorspronkelijke game design document
 
 De server serveert ook de frontend, dus één adres is genoeg. `engine.js` wordt door beide kanten gebruikt: de browser speelt ermee, de server controleert er opgeslagen voortgang mee.
 
+## Moeilijkheidsgraden
+
+Voor de start kiest elke speler zelf een moeilijkheidsgraad; die geldt alleen voor zijn eigen vesting en held.
+
+| Graad | Vijanden | Schade aan je held | Score |
+| --- | --- | --- | --- |
+| Geers | gewoon | gewoon | ×1 |
+| Super Geers | 35% meer levens, 6% sneller | +20% | ×1,25 |
+| Alleen voor Geers | 85% meer levens, 12% sneller | +50% | ×1,75 |
+
+De waarden staan in `DIFF` bovenin `client/js/engine.js`.
+
 ## Hoe het online werkt
 
 - **Accounts.** Een roepnaam met een wachtwoord. Wachtwoorden worden met scrypt gehasht. Na inloggen krijgt de browser een sessietoken; in de database staat alleen de hash daarvan. Er is geen e-mailadres en dus ook geen wachtwoordherstel.
-- **Voortgang.** Skillpunten, skills, held en aantal potjes staan per account op de server en gaan mee naar elk apparaat. Een gast speelt alleen lokaal.
+- **Voortgang.** Skillpunten, skills, held, gekozen moeilijkheidsgraad en aantal potjes staan per account op de server en gaan mee naar elk apparaat. Een gast speelt alleen lokaal.
 - **Leaderboard.** De beste score per account. Een nieuwe score verschijnt direct bij iedereen die online is.
 - **Lobby en samen spelen.** Elke browser houdt een WebSocket open. De server houdt per speler een stukje toestand bij (lobbystatus, vesting, held, minigamescore) en stuurt wijzigingen 20 keer per seconde gebundeld door. Chatberichten gaan ook via de server; de laatste zestig blijven bewaard.
 - **Haperende verbinding.** De browser verbindt vanzelf opnieuw en krijgt dezelfde plek terug. Wie echt weg is valt binnen een halve minuut af, zodat een potje niet op hem blijft wachten.

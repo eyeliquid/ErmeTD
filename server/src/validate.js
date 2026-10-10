@@ -35,6 +35,7 @@ function cleanSave(d) {
     games: num(d.games, 1e7),
     best: num(d.best, 1e12),
     hero: num(d.hero, 5),
+    diff: Engine.diffIdx(d.diff),
     at: num(d.at, Date.now() + 60000),
   };
 }

@@ -67,6 +67,11 @@
         <form id="chatForm" autocomplete="off"><input id="chatIn" type="text" maxlength="160" placeholder="Typ een bericht…" aria-label="Bericht aan de lobby" enterkeyhint="send"><button id="chatSend" type="submit">Stuur</button></form>
       </div>
       <div class="deploy">
+        <div class="diffpick">
+          <span class="label" id="diffL">Moeilijkheidsgraad</span>
+          <div class="diff" id="diff" role="group" aria-labelledby="diffL"></div>
+          <p id="diffNote"></p>
+        </div>
         <button class="btn-go" id="startBtn">Start spel</button>
         <p id="lobbyHelp"></p>
         <p class="heroline"><span>Je speelt als <b id="heroNow"></b>.</span><button class="linkbtn" id="heroBtn" type="button">Andere held kiezen</button></p>
@@ -134,6 +139,7 @@
           <div><h3>Vechten</h3><p>Je held valt automatisch de dichtstbijzijnde vijand binnen bereik aan. Hoe dat gaat hangt af van de held: van katana en hamer tot scherpschuttersgeweer.</p></div>
           <div><h3>Weg</h3><p>Elk potje begint met een bouwfase van vijf minuten. Kies Weg op de commandokaart en sleep een pad van de linkerpoort naar de rechterpoort. Weg is gratis. Ligt er geen doorlopende weg, dan steekt de vijand recht het gras over.</p></div>
           <div><h3>Samen</h3><p>Na de bouwfase begint het spel voor iedereen tegelijk. Speler 1 kiest de snelheid voor het hele potje. Een nieuwe ronde begint pas als iedereen de vorige heeft afgeslagen.</p></div>
+          <div><h3>Moeilijkheid</h3><p>Voor de start kies je zelf uit drie moeilijkheidsgraden; de keuze geldt alleen voor jou. Geers is de gewone strijd. Op Super Geers zijn de vijanden taaier en sneller en telt alles wat je scoort ×1,25. Op Alleen voor Geers is het nog zwaarder en telt je score ×1,75.</p></div>
           <div><h3>Bouwen</h3><p>Kies een turret op de commandokaart rechtsonder en klik op een vrij vak in je eigen vesting. Je held loopt erheen en zet hem neer. Na vijf upgrades kies je link of turbo; de derde turbo turret vormt The Geers.</p></div>
           <div><h3>Ultiem wapen</h3><p>Bouw tien keer The Geers en het ultieme wapen komt vrij: op elk vrij vak van je vesting verschijnt een Omega-toren. Die is vernietigend sterk en vertraagt elke vijand in bereik.</p></div>
           <div><h3>Minigames</h3><p>Na elke tiende golf gaat iedereen tegelijk naar een minigame. Wie wint krijgt een stuk harnas met een bonus voor de rest van het potje; is je harnas compleet, dan krijg je credits. Wie sneuvelt gaat terug naar zijn vesting en bouwt verder.</p></div>
@@ -187,7 +193,7 @@
       <div class="res" title="Credits"><i class="coin"></i><b class="num" id="hGold">0</b></div>
       <div class="res" title="Levens"><i class="heart"></i><b class="num" id="hLives">0</b></div>
       <div class="res" title="Ronde"><span class="lbl">Ronde</span><b class="num" id="hRound">1/100</b></div>
-      <div class="res wide" title="Score"><span class="lbl">Score</span><b class="num" id="hScore">0</b></div>
+      <div class="res wide" title="Score"><span class="lbl" id="hScoreL">Score</span><b class="num" id="hScore">0</b></div>
     </div>
     <div id="quest" class="inset">
       <h3 id="qTitle">Golf 1</h3>
@@ -223,6 +229,7 @@
     <div class="card frame">
       <h2 id="rTitle"></h2>
       <p id="rText"></p>
+      <p class="label" id="rDiff"></p>
       <dl><div><dt class="label">Ronde</dt><dd class="num" id="rRound"></dd></div><div><dt class="label">Score</dt><dd class="num" id="rScore"></dd></div><div><dt class="label">Skillpunten</dt><dd class="num" id="rXp"></dd></div></dl>
       <button class="btn-main" id="rBack">Terug naar de lobby</button>
     </div>

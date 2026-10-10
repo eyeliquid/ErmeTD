@@ -81,6 +81,10 @@ test('voortgang wordt gecontroleerd en gaat nooit achteruit', async () => {
   const older = await api('PUT', '/save', { save: { v: 2, pts: 0, earned: 0, skills: {} } }, token);
   assert.equal(older.body.kept, true);
   assert.deepEqual(older.body.save, sv);
+  // de gekozen moeilijkheidsgraad gaat mee met de voortgang en blijft binnen de drie graden
+  assert.equal(sv.diff, 0);
+  assert.equal((await api('PUT', '/save', { save: { ...sv, diff: 2 } }, token)).body.save.diff, 2);
+  assert.equal((await api('PUT', '/save', { save: { ...sv, diff: 7 } }, token)).body.save.diff, 2);
   assert.equal((await api('PUT', '/save', { save: 'x' }, token)).status, 400);
   assert.equal((await api('PUT', '/save', { save: {} })).status, 401);
 });
@@ -146,4 +150,29 @@ test('lobby: spelers zien elkaar, presence en chat komen door', async () => {
   const c2 = peer(null, {}, { peer: wa.peer, key: 'fout' });
   assert.notEqual((await c2.wait(m => m.t === 'welcome')).peer, wa.peer);
   await Promise.all([a.close(), b2.close(), c2.close()]);
+});
+
+test('moeilijkheidsgraden: taaiere vijanden en een hogere score', () => {
+  const E = require('../../client/js/engine.js');
+  assert.deepEqual(E.DIFF.map(d => d.n), ['Geers', 'Super Geers', 'Alleen voor Geers']);
+  assert.deepEqual(E.DIFF.map(d => d.score), [1, 1.25, 1.75]);
+  // Eén ronde zonder torens: alles lekt, dus de score komt alleen van de rondebonus.
+  const run = diff => {
+    const G = E.create({}, diff); G.lives = 1e6; E.lock(G); E.startWave(G);
+    let hp = 0, sp = 0;
+    for (let i = 0; i < 6000 && G.phase === 'wave'; i++) { E.step(G, 1 / 30); for (const e of G.en) { hp = Math.max(hp, e.max); sp = Math.max(sp, e.sp); } }
+    return { score: G.score, hp, sp, diff: G.diff };
+  };
+  const [a, b, c] = [0, 1, 2].map(run);
+  assert.equal(a.score, 50);
+  assert.equal(b.score, 63);
+  assert.equal(c.score, 88);
+  assert.ok(Math.abs(b.hp / a.hp - 1.35) < 1e-9 && Math.abs(c.hp / a.hp - 1.85) < 1e-9);
+  assert.ok(b.sp > a.sp && c.sp > b.sp);
+  // Een onbekende keuze valt terug binnen de drie graden.
+  assert.equal(run(9).diff, 2);
+  assert.equal(run('x').diff, 0);
+  // Kills en de winstbonus tellen ook mee met de vermenigvuldiger.
+  const G = E.create({}, 2); G.lives = 10; E.win(G);
+  assert.equal(G.score, Math.round(7000 * 1.75));
 });

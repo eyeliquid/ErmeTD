@@ -4,6 +4,12 @@ const N=13,ROUNDS=100,MID=6,C_IN=MID*N,C_OUT=MID*N+N-1,PREP=300,DIRS=[[1,0],[0,-
 // Honderd rondes: de curve van vijftig is uitgerekt. Ronde 2r is nu ongeveer zo zwaar als ronde r was, en twee rondes leveren samen op wat één ronde opleverde.
 const B={hp0:14,lin:.06,g:1.063,g2:1.0296,late:80,gold0:2.5,goldLin:.035,startGold:10000/* TESTWAARDE: terug naar 260 voor de definitieve versie */,lives:20,
   bonA:12,bonB:4};
+// Moeilijkheidsgraden: elke speler kiest er zelf een voor het potje begint. hp en sp maken de vijanden in jouw vesting taaier en sneller,
+// hurt is de extra schade die je held in minigames krijgt, score de vermenigvuldiger op alles wat je scoort.
+const DIFF=[{id:'geers',n:'Geers',d:'De gewone strijd.',score:1,hp:1,sp:1,hurt:1},
+ {id:'super',n:'Super Geers',d:'Vijanden hebben 35% meer levens en lopen 6% sneller. Je held krijgt 20% meer schade.',score:1.25,hp:1.35,sp:1.06,hurt:1.2},
+ {id:'only',n:'Alleen voor Geers',d:'Vijanden hebben 85% meer levens en lopen 12% sneller. Je held krijgt 50% meer schade.',score:1.75,hp:1.85,sp:1.12,hurt:1.5}];
+const diffIdx=v=>Math.max(0,Math.min(DIFF.length-1,Math.floor(+v||0)));
 const ROCK=new Set(); // geen bomen of rotsen meer: het hele veld is vrij
 // Er is geen vast pad. Vijanden komen links in het midden binnen en gaan rechts in het midden weg.
 // search zoekt de kortste route over de vakken die `pass` toelaat.
@@ -119,8 +125,8 @@ function skillState(sk,s){const rank=sk[s.id]|0,q=s.req&&SKILLS.find(x=>x.id===s
 const pointsFor=r=>(r%20===0?1:0)+(r%10===0?1:0)+(r===99?3:0);
 const hpMul=r=>B.hp0*(1+B.lin*r)*Math.pow(B.g,r)*(r>B.late?Math.pow(B.g2,r-B.late):1);
 
-function create(skills){const m=mods(skills);
-  return{m,gold:B.startGold+m.start,lives:B.lives+m.lives,round:1,cleared:0,phase:'prep',timer:PREP,wt:0,q:[],road:new Set(),trail:new Set(),path:null,rv:0,pv:null,pvk:-1,
+function create(skills,diff){const m=mods(skills),di=diffIdx(diff);
+  return{m,diff:di,D:DIFF[di],gold:B.startGold+m.start,lives:B.lives+m.lives,round:1,cleared:0,phase:'prep',timer:PREP,wt:0,q:[],road:new Set(),trail:new Set(),path:null,rv:0,pv:null,pvk:-1,
     tw:[],map:{},en:[],fx:[],ev:[],fxOn:false,score:0,kills:0,time:0,nid:1,geers:0};}
 
 function makeWave(r){const q=[];let t=0;const n=8+Math.floor(r*.4),R=Math.round;
@@ -134,9 +140,9 @@ function makeWave(r){const q=[];let t=0;const n=8+Math.floor(r*.4),R=Math.round;
     default:add(r>=18?'haz':'inf',R(n*.4),.7);add('dog',R(n*.5),.4);add('tank',R(n*.25),.9);}
   return q.reverse();}
 function startWave(G){if(G.phase!=='build')return;G.phase='wave';G.wt=0;G.q=makeWave(G.round);G.ev.push({k:'wave',r:G.round});}
-function spawn(G,s){const d=EN[s.type],r=G.round,hp=d.hp*hpMul(r)*s.hm,p=posAt(G.path,0);
-  G.en.push({id:G.nid++,type:s.type,hp,max:hp,d:0,sp:d.sp,arm:d.arm||0,regen:d.regen||0,immune:!!d.immune,boss:!!d.boss,
-    big:s.hm>1,leak:d.leak||1,b:Math.max(1,Math.round(B.gold0*d.b*s.hm*(1+B.goldLin*r)*G.m.gold)),sc:Math.round(d.b*s.hm*r*5),
+function spawn(G,s){const d=EN[s.type],r=G.round,hp=d.hp*hpMul(r)*s.hm*G.D.hp,p=posAt(G.path,0);
+  G.en.push({id:G.nid++,type:s.type,hp,max:hp,d:0,sp:d.sp*G.D.sp,arm:d.arm||0,regen:d.regen||0,immune:!!d.immune,boss:!!d.boss,
+    big:s.hm>1,leak:d.leak||1,b:Math.max(1,Math.round(B.gold0*d.b*s.hm*(1+B.goldLin*r)*G.m.gold)),sc:Math.round(d.b*s.hm*r*5*G.D.score),
     x:p[0],y:p[1],dx:p[2],dy:p[3],fz:0,fi:0,sT:0,sl:0,pT:0,pD:0});}
 function kill(G,e){if(e.dead)return;e.dead=true;G.gold+=e.b;G.score+=e.sc;G.kills++;if(G.fxOn)G.fx.push({k:'die',b:[e.x,e.y],boss:e.boss});}
 function hit(G,e,dmg,pierce){if(e.dead)return;const arm=e.arm*(1-G.m.ap)*(1-(pierce||0));
@@ -242,14 +248,14 @@ function step(G,dt){
   if(G.lives<=0){G.lives=0;G.phase='over';return;}
   if(G.phase==='wave'&&!G.q.length&&!G.en.length){const r=G.round,bonus=Math.round((B.bonA+B.bonB*r)*G.m.bonus),
       int=Math.min(100,Math.floor(G.gold*G.m.interest));
-    G.gold+=bonus+int;G.score+=50*r;G.cleared=r;if(r%10===0)G.lives+=G.m.repair;
+    G.gold+=bonus+int;G.score+=Math.round(50*r*G.D.score);G.cleared=r;if(r%10===0)G.lives+=G.m.repair;
     G.ev.push({k:'clear',r,bonus:bonus+int});
     // Na de laatste golf wacht nog het eindmonster: de spellaag beslist daarna over winst of verlies.
     if(r>=ROUNDS){G.final=true;G.phase='wait';}else{G.round++;G.phase='wait';}}
 }
-function win(G){if(G.phase==='won'||G.phase==='over')return;G.phase='won';G.score+=5000+200*G.lives;}
+function win(G){if(G.phase==='won'||G.phase==='over')return;G.phase='won';G.score+=Math.round((5000+200*G.lives)*G.D.score);}
 function lose(G){if(G.phase==='won'||G.phase==='over')return;G.phase='over';}
-return{N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,B,T,TYPES,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
+return{N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,B,DIFF,diffIdx,T,TYPES,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
   buildCost,upCost,specCost,sellValue,stats,mods,skillTotal,skillSpent,skillState,SKILL_MAX,TIER,pointsFor,hpMul,makeWave,hit,recalc,win,lose};
 })();
 
