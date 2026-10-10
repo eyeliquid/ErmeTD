@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Tower defense in een 3D-wereld: bouw je eigen weg en torens en verdedig samen met andere spelers honderd golven.">
+<meta name="theme-color" content="#0b0d12">
+<title>Red Alert Towerdefense</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="embers" aria-hidden="true"></canvas>
+<div id="app">
+  <section id="gate" hidden>
+    <div class="gate-intro">
+      <h1><span>Meld je aan voor dienst</span>Red Alert Towerdefense</h1>
+      <p>Met een account ga je verder waar je was gebleven, op elk apparaat.</p>
+      <ul class="keeps">
+        <li><span class="label">Skillpunten</span><span>Alles wat je verdient en leert blijft staan.</span></li>
+        <li><span class="label">Je held</span><span>Je gekozen held staat klaar bij het volgende potje.</span></li>
+        <li><span class="label">Leaderboard</span><span>Je beste score komt onder je roepnaam te staan.</span></li>
+      </ul>
+    </div>
+    <form id="gateForm" class="panel plate pass" novalidate>
+      <h2 id="gTitle">Account maken</h2>
+      <p id="gLead"></p>
+      <dl id="gStats" class="inset" hidden>
+        <div><dt class="label">Vrije punten</dt><dd class="num" id="gXp">0</dd></div>
+        <div><dt class="label">Besteed</dt><dd class="num" id="gSk">0</dd></div>
+        <div><dt class="label">Potjes</dt><dd class="num" id="gGm">0</dd></div>
+      </dl>
+      <div class="field" id="gField">
+        <label class="label" for="gName">Roepnaam</label>
+        <input id="gName" name="username" type="text" maxlength="16" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="Bijvoorbeeld Tanya" aria-describedby="gErr">
+      </div>
+      <div class="field" id="gPassField">
+        <label class="label" for="gPass">Wachtwoord</label>
+        <input id="gPass" name="password" type="password" maxlength="200" autocomplete="new-password" placeholder="Minstens 8 tekens" aria-describedby="gErr">
+      </div>
+      <p id="gErr" role="alert"></p>
+      <div class="pass-actions">
+        <button class="btn-main" id="gGo" type="submit">Maak account</button>
+        <button type="button" id="gGuest">Speel als gast</button>
+      </div>
+      <button type="button" class="linkbtn" id="gSwitch">Ik heb al een account</button>
+      <p id="gNote"></p>
+    </form>
+  </section>
+
+  <section id="home">
+    <header class="top">
+      <svg class="crest" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b0"/><stop offset=".5" stop-color="#e6a91e"/><stop offset="1" stop-color="#8a5a08"/></linearGradient><radialGradient id="cr" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#b3261c"/><stop offset="1" stop-color="#2a0705"/></radialGradient></defs><circle cx="50" cy="50" r="46" fill="url(#cr)" stroke="url(#cg)" stroke-width="4"/><circle cx="50" cy="50" r="39" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="2"/><polygon fill="url(#cg)" stroke="#3d0906" stroke-width="1" points="50.0,20.0 57.3,40.9 79.5,41.4 61.9,54.9 68.2,76.1 50.0,63.5 31.8,76.1 38.1,54.9 20.5,41.4 42.7,40.9"/></svg>
+      <h1>Red Alert <em>Towerdefense</em></h1>
+      <div class="top-actions">
+        <button class="btn-pop" id="skillsBtn" aria-haspopup="dialog">Skills<small class="num" id="skHint">0</small></button>
+        <button class="btn-pop" id="infoBtn" aria-haspopup="dialog">Spelinfo</button>
+      </div>
+    </header>
+    <div class="panel plate">
+      <div class="phead"><i class="live off" id="lobbyDot"></i><h2>Lobbychat</h2><small id="lobbyNote">verbinden…</small></div>
+      <div class="chat inset">
+        <div id="chatLog" role="log" aria-live="polite" aria-label="Lobbychat" tabindex="0"></div>
+        <form id="chatForm" autocomplete="off"><input id="chatIn" type="text" maxlength="160" placeholder="Typ een bericht…" aria-label="Bericht aan de lobby" enterkeyhint="send"><button id="chatSend" type="submit">Stuur</button></form>
+      </div>
+      <div class="deploy">
+        <button class="btn-go" id="startBtn">Start spel</button>
+        <p id="lobbyHelp"></p>
+        <p class="heroline"><span>Je speelt als <b id="heroNow"></b>.</span><button class="linkbtn" id="heroBtn" type="button">Andere held kiezen</button></p>
+      </div>
+    </div>
+
+    <dialog class="pop" id="popSkills" aria-labelledby="popSkillsT">
+      <div class="pop-in plate">
+        <div class="pop-head"><h2 id="popSkillsT">Skills en held</h2><button class="pop-x" type="button" aria-label="Sluiten">×</button></div>
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" data-t="tSkills" aria-selected="true">Skills</button>
+          <button type="button" role="tab" data-t="tHero" aria-selected="false">Held</button>
+        </div>
+        <div class="pop-body">
+          <div class="tab" id="tSkills" role="tabpanel">
+            <div class="cmd inset">
+              <dl>
+                <div><dt class="label">Vrije punten</dt><dd class="num" id="xp">0</dd></div>
+                <div><dt class="label">Besteed</dt><dd class="num" id="skn">0</dd></div>
+                <div><dt class="label">Potjes</dt><dd class="num" id="gms">0</dd></div>
+              </dl>
+              <div class="cmd-row"><p id="xpNote"></p><button class="linkbtn" id="tReset" type="button">Alle punten terugzetten</button></div>
+            </div>
+            <p class="lead">Elke rang kost 1 skillpunt. Je verdient punten in een potje: 1 per 20 gehaalde levels, 1 per gehaalde miniboss en 3 zodra je level 100 bereikt. Diepere rijen gaan open per 5 punten in die boom. Wat je leert geldt vanaf je volgende potje. <span id="skNote"></span></p>
+            <div class="trees">
+              <section class="tree" aria-labelledby="trT"><div class="tree-head"><h3 id="trT">Arsenaal</h3><span>maakt je torens beter</span><b class="num" id="ptsT">0</b></div><div class="tgrid" id="treeT"></div></section>
+              <section class="tree hero" aria-labelledby="trH"><div class="tree-head"><h3 id="trH">Veldheer</h3><span>maakt je held sterker</span><b class="num" id="ptsH">0</b></div><div class="tgrid" id="treeH"></div></section>
+            </div>
+            <div class="tinfo inset" id="tInfo" aria-live="polite">
+              <div class="txt"><div class="tinfo-t"><h3 id="tiName"></h3><span class="rk num" id="tiRank"></span></div><p id="tiNow"></p><p class="nx" id="tiNext"></p><p class="rq" id="tiReq"></p></div>
+              <button class="btn-main" id="tiBuy" type="button">Leer rang</button>
+            </div>
+          </div>
+          <div class="tab" id="tHero" role="tabpanel" hidden>
+            <div class="show">
+              <div class="pic"><canvas id="heroBig" width="256" height="216"></canvas></div>
+              <div>
+                <h3 id="hName"></h3>
+                <span class="role" id="hRole"></span>
+                <p id="hDesc"></p>
+                <div id="hStats"></div>
+              </div>
+            </div>
+            <div class="herogrid" id="heroes"></div>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="pop" id="popInfo" aria-labelledby="popInfoT">
+      <div class="pop-in plate">
+        <div class="pop-head"><h2 id="popInfoT">Spelinfo</h2><button class="pop-x" type="button" aria-label="Sluiten">×</button></div>
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" data-t="tManual" aria-selected="true">Uitleg</button>
+          <button type="button" role="tab" data-t="tPlayers" aria-selected="false">Spelers</button>
+          <button type="button" role="tab" data-t="tWorld" aria-selected="false">Wereldkaart</button>
+          <button type="button" role="tab" data-t="tBoard" aria-selected="false">Leaderboard</button>
+          <button type="button" role="tab" data-t="tAcct" aria-selected="false">Account</button>
+        </div>
+        <div class="pop-body">
+          <div class="tab" id="tManual" role="tabpanel">
+            <p class="lead">Kies een held, leg je eigen weg door je vesting en verdedig je hoofdkwartier samen tegen honderd golven. Na elke tiende golf volgt een minigame, na de honderdste het eindmonster.</p>
+            <div class="manual">
+          <div><h3>Lopen</h3><p>Je bestuurt je held in third-person. WASD loopt, slepen met de muis draait de camera, scrollen zoomt. Op een telefoon stuur je met de duimknuppel links. Via de bruggen loop je naar andere vestingen.</p></div>
+          <div><h3>Vechten</h3><p>Je held valt automatisch de dichtstbijzijnde vijand binnen bereik aan. Hoe dat gaat hangt af van de held: van katana en hamer tot scherpschuttersgeweer.</p></div>
+          <div><h3>Weg</h3><p>Elk potje begint met een bouwfase van vijf minuten. Kies Weg op de commandokaart en sleep een pad van de linkerpoort naar de rechterpoort. Weg is gratis. Ligt er geen doorlopende weg, dan steekt de vijand recht het gras over.</p></div>
+          <div><h3>Samen</h3><p>Na de bouwfase begint het spel voor iedereen tegelijk. Speler 1 kiest de snelheid voor het hele potje. Een nieuwe ronde begint pas als iedereen de vorige heeft afgeslagen.</p></div>
+          <div><h3>Bouwen</h3><p>Kies een turret op de commandokaart rechtsonder en klik op een vrij vak in je eigen vesting. Je held loopt erheen en zet hem neer. Na vijf upgrades kies je link of turbo; de derde turbo turret vormt The Geers.</p></div>
+          <div><h3>Ultiem wapen</h3><p>Bouw tien keer The Geers en het ultieme wapen komt vrij: op elk vrij vak van je vesting verschijnt een Omega-toren. Die is vernietigend sterk en vertraagt elke vijand in bereik.</p></div>
+          <div><h3>Minigames</h3><p>Na elke tiende golf gaat iedereen tegelijk naar een minigame. Wie wint krijgt een stuk harnas met een bonus voor de rest van het potje; is je harnas compleet, dan krijg je credits. Wie sneuvelt gaat terug naar zijn vesting en bouwt verder.</p></div>
+          <div><h3>Level 10 · De Kolos</h3><p>Iedereen vecht samen tegen de Kolos. Hij wordt sterker met elke speler die meedoet. Ren weg uit de rode cirkels. Op 75% en 50% laadt hij in het midden een ultra-aanval op: alleen op een groene plek overleef je de klap. Wie overeind staat als hij valt, krijgt harnas.</p></div>
+          <div><h3>Level 20 · Doolhof</h3><p>Ren door het doolhof naar de poort aan de overkant terwijl torens op je schieten. Muren houden kogels tegen. Met F zet je even een schild op, en je held schiet zelf de torens kapot die hij kan zien. De overkant halen levert credits op.</p></div>
+          <div><h3>Level 30 tot 90 · PvP en PvE</h3><p>In deze minigames vecht je tegen monsters en tegen elkaar: helden kunnen elkaar raken, en wie sneuvelt ligt eruit. De hoogste score van wie nog staat wint. Speel je alleen, dan moet je het doel halen dat in beeld staat.</p></div>
+          <div><h3>Level 30 · Kristalkoorts</h3><p>Raap de meeste kristallen; een gouden telt voor drie. Elk kristal kan maar door één held gepakt worden. Drones jagen ondertussen op je.</p></div>
+          <div><h3>Level 40 · Heuvelkoning</h3><p>Sta op de gouden plek om punten te verdienen. Staat er nog een held op, dan scoort niemand. Mechs bewaken de heuvel, en hij verhuist om de zestien seconden.</p></div>
+          <div><h3>Level 50 · Doolhofrace</h3><p>Het doolhof in omgekeerde richting, met taaiere torens. Wie het eerst de overkant haalt wint. Helden kunnen elkaar raken als er geen muur tussen staat.</p></div>
+          <div><h3>Level 60 · Premiejacht</h3><p>Elk monster dat je doodt is premie waard: een hond 1, een conscript 2, een tank 5 en het gouden doelwit 12. Een kill geeft je ook wat levenspunten terug.</p></div>
+          <div><h3>Level 70 · Kernroof</h3><p>Haal een kern aan de rand van de arena en breng hem naar het midden. Wie een kern draagt loopt trager en krijgt inslagen op zijn hielen. Twee mechs bewaken het midden.</p></div>
+          <div><h3>Level 80 · Vuurstorm</h3><p>De groene kring krimpt en het regent inslagen. Buiten de kring verlies je snel levenspunten. Elke seconde overeind is een punt, een andere held uitschakelen tien.</p></div>
+          <div><h3>Level 90 · Kolosjacht</h3><p>De Kolos is terug en sterker. Je velt hem samen, maar alleen wie hem de meeste schade toebracht wint, en helden kunnen elkaar raken.</p></div>
+          <div><h3>Level 100 · De Titaan</h3><p>Het eindmonster: groter en veel sterker dan de Kolos. Elke 10% levens die hij verliest volgt een speciale aanval, om de beurt: de ultra-aanval (ren naar een groene plek), schokgolven (ga bij elke ring in de groene opening staan) en doodsstralen (loop mee tussen de draaiende stralen). Elke ronde worden ze zwaarder. Valt de Titaan, dan heeft iedereen gewonnen. Lukt het niet binnen vijf minuten, of sneuvelt iedereen, dan is het potje verloren.</p></div>
+          <div><h3>Overzicht</h3><p>Een klik op de minimap zet de camera los boven die plek, zodat je bij anderen kunt meekijken. H of je heldenportret brengt de camera terug.</p></div>
+        </div>
+          </div>
+          <div class="tab" id="tPlayers" role="tabpanel" hidden>
+            <ul class="roster" id="lobby"></ul>
+          </div>
+          <div class="tab" id="tWorld" role="tabpanel" hidden>
+            <p class="lead" id="worldNote"></p>
+            <div class="world" id="world"></div>
+            <ul class="legend"><li><i class="me"></i>jouw vesting</li><li><i class="lobby"></i>in de lobby, verwachte plek</li><li><i class="play"></i>in gevecht</li><li><i></i>vrij</li></ul>
+          </div>
+          <div class="tab" id="tBoard" role="tabpanel" hidden>
+            <p class="lead">Beste score per speler.</p>
+            <ul class="rows" id="board"></ul>
+          </div>
+          <div class="tab" id="tAcct" role="tabpanel" hidden>
+            <div class="acct inset">
+              <div><span class="label"><i class="dot" id="aDot"></i><span id="aState">Niet ingelogd</span></span><b id="aName">Gast</b></div>
+              <button id="aEdit">Account maken</button>
+              <button id="aLogin">Inloggen</button>
+              <button id="aOut" hidden>Afmelden</button>
+            </div>
+            <p class="lead">Met een account bewaart het spel je skillpunten, skills en held op de server, en komt je beste score onder je roepnaam op het leaderboard. Log op een ander apparaat in met dezelfde roepnaam en hetzelfde wachtwoord om verder te spelen.</p>
+          </div>
+        </div>
+      </div>
+    </dialog>
+  </section>
+
+  <section id="game" hidden>
+    <div id="stage"><div id="vig"></div><div id="joy" hidden><i></i></div><div id="nogl" hidden>Dit spel heeft 3D-weergave (WebGL) nodig, en die is in deze browser niet beschikbaar.</div></div>
+    <button id="hero" title="Je held: camera terug achter je held (H)" aria-label="Held selecteren en camera terug achter je held"><canvas id="heroCv" width="116" height="100"></canvas><i class="bar"><b id="heroHp"></b></i></button>
+    <div id="topbar" class="frame">
+      <button id="quitBtn">Opgeven</button>
+      <div class="seg" id="speed"><button data-s="1" class="on">1×</button><button data-s="2">2×</button><button data-s="3">3×</button></div>
+      <div id="clock" title="Ronde"><svg viewBox="0 0 50 50"><circle class="trk" cx="25" cy="25" r="22"/><circle class="arc" id="arc" cx="25" cy="25" r="22"/></svg><b class="num" id="hRoundBig">1</b></div>
+      <div class="res" title="Credits"><i class="coin"></i><b class="num" id="hGold">0</b></div>
+      <div class="res" title="Levens"><i class="heart"></i><b class="num" id="hLives">0</b></div>
+      <div class="res" title="Ronde"><span class="lbl">Ronde</span><b class="num" id="hRound">1/100</b></div>
+      <div class="res wide" title="Score"><span class="lbl">Score</span><b class="num" id="hScore">0</b></div>
+    </div>
+    <div id="quest" class="inset">
+      <h3 id="qTitle">Golf 1</h3>
+      <p id="qSub"></p>
+      <p id="qRoad" hidden></p>
+      <p id="qNext"></p>
+      <ul id="qPlayers"></ul>
+      <button id="waveBtn">Stuur golf</button>
+    </div>
+    <div id="toast" hidden></div>
+    <div id="tip" class="inset" hidden><h4 id="tipN"></h4><div class="cost" id="tipC"></div><p id="tipD"></p></div>
+    <div id="console" class="frame">
+      <div id="mapbox" class="inset"><canvas id="mini" width="400" height="416" aria-label="Minimap van de 20 vestingen"></canvas></div>
+      <div id="camctl">
+        <button id="cRotL" aria-label="Camera linksom draaien" title="Draai linksom (Q)">⟲</button>
+        <button id="cRotR" aria-label="Camera rechtsom draaien" title="Draai rechtsom (E)">⟳</button>
+        <button id="cIn" aria-label="Inzoomen" title="Inzoomen">+</button>
+        <button id="cOut" aria-label="Uitzoomen" title="Uitzoomen">−</button>
+      </div>
+      <div id="portrait" class="inset"><canvas id="pcv" width="128" height="108"></canvas><i class="bar lvl"><b id="pBar"></b><span id="pBarT"></span></i></div>
+      <div id="info" class="inset">
+        <h3 id="iName">Builder</h3>
+        <p id="iSub"></p>
+        <dl id="iStats" hidden><div><dt>Schade</dt><dd class="num" id="iDmg"></dd></div><div><dt>Per sec</dt><dd class="num" id="iRate"></dd></div><div><dt>Bereik</dt><dd class="num" id="iRange"></dd></div></dl>
+        <p id="iDesc"></p>
+      </div>
+      <div id="card" class="inset"></div>
+      <div id="inv" class="inset"><h4>Harnas</h4><div id="invGrid"></div></div>
+    </div>
+  </section>
+
+  <div id="result" hidden>
+    <div class="card frame">
+      <h2 id="rTitle"></h2>
+      <p id="rText"></p>
+      <dl><div><dt class="label">Ronde</dt><dd class="num" id="rRound"></dd></div><div><dt class="label">Score</dt><dd class="num" id="rScore"></dd></div><div><dt class="label">Skillpunten</dt><dd class="num" id="rXp"></dd></div></dl>
+      <button class="btn-main" id="rBack">Terug naar de lobby</button>
+    </div>
+  </div>
+</div>
+<script src="vendor/three.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/net.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

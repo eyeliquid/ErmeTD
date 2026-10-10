@@ -1,785 +1,3 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Red Alert Towerdefense</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Alegreya+Sans:wght@400;500;700&display=swap">
-<style>
-/* Layout: schermvullend slagveld met een RTS-console eroverheen: resourcebalk boven, minimap, portret en commandokaart onder. Eén donker thema. */
-:root{
-  color-scheme:dark;
-  --ink:#06080b; --stone-900:#10131a; --stone-800:#191e27; --stone-700:#252b36; --stone-600:#3a424f; --bevel:#6a7382;
-  --trim:#a8842c; --gold:#f6cf4d; --text:#ebe5d4; --muted:#a09a8a; --hp:#35cf4a; --mana:#3f7ce0; --blood:#c9291f; --cyan:#59c8f2;
-  --display:"Marcellus","Palatino Linotype","Book Antiqua",Georgia,serif;
-  --body:"Alegreya Sans","Segoe UI",system-ui,sans-serif;
-  --stonetex:none;
-}
-*{box-sizing:border-box}
-html,body{height:100%}
-body{background:var(--ink);color:var(--text);font-family:var(--body);font-size:16px;line-height:1.45;
-  background-image:radial-gradient(1200px 600px at 50% -10%,#1a2536 0,var(--ink) 70%)}
-#app{max-width:1200px;margin:0 auto;padding-inline:16px;padding-block:20px 36px}
-h1,h2,h3,h4{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance;letter-spacing:.02em}
-button{font-family:var(--body);font-size:15px;font-weight:700;color:var(--text);cursor:pointer;border:1px solid #000;border-radius:2px;padding:7px 12px;
-  background:linear-gradient(180deg,#3b4350,#20252e);box-shadow:inset 0 0 0 1px var(--bevel)}
-button:hover:not(:disabled){box-shadow:inset 0 0 0 1px var(--gold)}
-button:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
-button:disabled{opacity:.45;cursor:not-allowed}
-.btn-main{font-family:var(--display);font-weight:400;font-size:18px;color:var(--gold);padding:11px 22px;background:linear-gradient(180deg,#4a2a22,#27130f);box-shadow:inset 0 0 0 1px var(--trim)}
-.num{font-variant-numeric:tabular-nums}
-.label{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
-.frame{background:#1a1f28 var(--stonetex);border:2px solid #000;box-shadow:inset 0 0 0 1px var(--bevel),inset 0 0 0 3px #12151b,0 4px 18px rgba(0,0,0,.6)}
-.inset{background:rgba(4,5,8,.92);border:1px solid var(--trim);box-shadow:inset 0 0 14px #000,0 0 0 1px #000}
-
-/* Home: één rustige kolom. Smalle titelbalk met twee knoppen, daaronder alleen de lobbychat met de startknop. Skills, held en spelinfo zitten in twee pop-ups. */
-#embers{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
-body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:
-  radial-gradient(900px 440px at 50% 110%,rgba(201,41,31,.3),transparent 70%),
-  radial-gradient(ellipse at 50% 40%,transparent 50%,rgba(0,0,0,.62) 100%)}
-#app{position:relative;z-index:1;max-width:1280px}
-.plate{position:relative;border:1px solid #000;background:
-  linear-gradient(180deg,rgba(255,255,255,.05),transparent 90px),
-  repeating-linear-gradient(115deg,rgba(255,255,255,.014) 0 2px,transparent 2px 5px),
-  linear-gradient(180deg,#1d232e,#11151c);
-  box-shadow:inset 0 0 0 1px #5a6270,inset 0 0 0 2px #0c0f14,inset 0 0 0 3px rgba(168,132,44,.55),0 12px 32px rgba(0,0,0,.65)}
-.plate::before{content:"";position:absolute;inset:7px;pointer-events:none;
-  --rivet:radial-gradient(circle,var(--gold) 0 1.4px,#5a4310 1.9px 3px,transparent 3.5px);
-  background:var(--rivet) 0 0/8px 8px no-repeat,var(--rivet) 100% 0/8px 8px no-repeat,var(--rivet) 0 100%/8px 8px no-repeat,var(--rivet) 100% 100%/8px 8px no-repeat}
-.panel{padding:20px;min-width:0;display:flex;flex-direction:column;gap:14px}
-.phead{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding-bottom:10px;border-bottom:1px solid;border-image:linear-gradient(90deg,var(--trim),transparent) 1}
-.phead h2{font-size:19px;color:var(--gold);text-transform:uppercase;letter-spacing:.16em;text-shadow:0 1px 0 #000}
-.phead small{margin-left:auto;font-size:13px;color:var(--muted);text-align:right}
-.live{align-self:center;flex:none;width:8px;height:8px;border-radius:50%;background:var(--hp);box-shadow:0 0 8px var(--hp);animation:pulse 1.8s ease-in-out infinite}
-.live.off{background:var(--muted);box-shadow:none;animation:none}
-@keyframes pulse{50%{opacity:.35}}
-
-#home{max-width:820px;margin-inline:auto;display:flex;flex-direction:column;gap:16px}
-.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
-.crest{flex:none;width:46px;height:auto;aspect-ratio:1;filter:drop-shadow(0 0 12px rgba(201,41,31,.6)) drop-shadow(0 2px 0 #000)}
-.top h1{flex:1 1 220px;min-width:0;font-size:clamp(20px,3.6vw,30px);line-height:1.05;text-transform:uppercase;letter-spacing:.08em;
-  background:linear-gradient(180deg,#fff8d6 0,#f6cf4d 40%,#9a7620 64%,#f3d77a 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
-  filter:drop-shadow(0 2px 0 #000)}
-.top h1 em{font-style:normal}
-.top-actions{display:flex;gap:8px}
-.btn-pop{position:relative;font-family:var(--display);font-weight:400;font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);padding:9px 16px;background:linear-gradient(180deg,#2c333f,#171b22);box-shadow:inset 0 0 0 1px var(--trim)}
-.btn-pop small{font-family:var(--body);font-size:13px;font-weight:700;letter-spacing:0;color:var(--muted);margin-left:6px}
-.btn-pop.can::after{content:"";position:absolute;right:-4px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--hp);box-shadow:0 0 8px var(--hp),0 0 0 2px var(--ink)}
-.heroline{margin:0;color:var(--muted);font-size:14px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
-.heroline b{color:var(--text)}
-.linkbtn{background:none;box-shadow:none;border:0;padding:0;font-size:14px;font-weight:700;color:var(--gold);text-decoration:underline;text-underline-offset:3px}
-.linkbtn:hover:not(:disabled){box-shadow:none;color:#fff3c4}
-
-dialog.pop{width:min(980px,calc(100vw - 32px));max-width:none;max-height:min(88dvh,880px);padding:0;border:0;background:none;color:var(--text);overflow:visible}
-dialog.pop::backdrop{background:rgba(3,5,8,.8);backdrop-filter:blur(3px)}
-.pop-in{display:flex;flex-direction:column;max-height:min(88dvh,880px)}
-.pop-head{display:flex;align-items:center;gap:12px;padding:18px 20px 0}
-.pop-head h2{margin-right:auto;font-size:21px;color:var(--gold);text-transform:uppercase;letter-spacing:.16em;text-shadow:0 1px 0 #000}
-.pop-x{flex:none;width:36px;height:36px;padding:0;font-size:22px;line-height:1;color:var(--gold)}
-.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:14px 20px 0}
-.tabs button{font-size:14px;letter-spacing:.06em;text-transform:uppercase;padding:7px 12px;color:var(--muted)}
-.tabs button[aria-selected="true"]{color:var(--gold);background:linear-gradient(180deg,#4a3a12,#261d09);box-shadow:inset 0 0 0 1px var(--gold)}
-.pop-body{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:16px 20px 22px}
-.tab{display:flex;flex-direction:column;gap:14px}
-.tab>.lead{margin:0;color:var(--muted);font-size:14px}
-.pop .roster,.pop .rows{max-height:none}
-.acct{border-bottom:0;padding-bottom:0}
-
-.cmd{padding:14px 18px;display:flex;flex-direction:column;gap:10px}
-.cmd dl{display:flex;flex-wrap:wrap;gap:8px 40px;margin:0}
-.cmd dd{margin:0;font-family:var(--display);font-size:26px;color:var(--gold);line-height:1.1}
-.xpbar{height:8px;background:#07090c;border:1px solid #000;box-shadow:0 0 0 1px #3a424f}
-.xpbar b{display:block;height:100%;width:0;background:linear-gradient(90deg,#1f458f,var(--cyan));box-shadow:0 0 10px rgba(89,200,242,.6);transition:width .4s}
-.cmd p{margin:0;font-size:13px;color:var(--muted)}
-
-.show{display:grid;grid-template-columns:minmax(0,230px) minmax(0,1fr);gap:20px;align-items:center}
-.pic{position:relative;border:1px solid #000;box-shadow:0 0 0 1px var(--trim),0 0 0 4px #0b0d11,0 0 0 5px #5a6270,0 0 34px rgba(246,207,77,.2)}
-.pic canvas{display:block;width:100%;height:auto;aspect-ratio:128/108}
-.pic::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.1),transparent 30%,transparent 70%,rgba(0,0,0,.55))}
-.show h3{font-size:clamp(26px,3.4vw,38px);line-height:1.05;color:#fff;text-shadow:0 2px 0 #000}
-.role{display:block;margin-top:4px;color:var(--gold);font-weight:700;font-size:13px;letter-spacing:.14em;text-transform:uppercase}
-.show p{margin:8px 0 12px;color:var(--text)}
-#hStats{display:flex;flex-direction:column;gap:7px}
-.stat{display:grid;grid-template-columns:132px minmax(0,1fr) 40px;gap:10px;align-items:center}
-.stat span{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}
-.stat i{display:block;height:8px;background:#07090c;border:1px solid #000;box-shadow:0 0 0 1px #3a424f}
-.stat i b{display:block;height:100%;background:linear-gradient(90deg,#6d5212,var(--gold));transition:width .35s}
-.stat em{font-style:normal;text-align:right;color:#fff;font-weight:700;font-variant-numeric:tabular-nums}
-.herogrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
-.hero{min-width:0;padding:4px 4px 7px;display:flex;flex-direction:column;gap:5px;text-align:center;font-weight:400;background:linear-gradient(180deg,#232934,#12161c)}
-.hero canvas{display:block;width:100%;height:auto;aspect-ratio:128/108;border:1px solid #000;filter:saturate(.55) brightness(.72);transition:filter .2s}
-.hero b{font-family:var(--display);font-weight:400;font-size:13px;line-height:1.15;color:var(--muted);overflow-wrap:anywhere}
-.hero:hover canvas,.hero.on canvas{filter:none}
-.hero.on{box-shadow:inset 0 0 0 2px var(--gold),0 0 18px rgba(246,207,77,.4)} .hero.on b{color:var(--gold)}
-
-.roster{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:214px;overflow-y:auto}
-.roster li{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:11px;align-items:center;padding:5px 10px 5px 5px;border-left:2px solid #3a424f;background:linear-gradient(90deg,rgba(255,255,255,.055),transparent)}
-.roster canvas{display:block;width:46px;height:39px;border:1px solid #000;box-shadow:0 0 0 1px #59616e}
-.roster .nm{min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.roster .sub{display:block;font-size:13px;font-weight:400;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
-.roster .host{border-left-color:var(--gold)}
-.roster .me{border-left-color:var(--cyan);background:linear-gradient(90deg,rgba(89,200,242,.16),transparent)} .roster .me .nm{color:var(--cyan)}
-.chip{font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;padding:1px 7px;border:1px solid #444b57;color:var(--muted);white-space:nowrap}
-.chip.host{color:var(--gold);border-color:var(--trim)} .chip.ok{color:var(--hp);border-color:var(--hp)} .chip.play{color:#ff7a6e;border-color:var(--blood)}
-.chat{display:flex;flex-direction:column}
-#chatLog{height:clamp(240px,calc(100dvh - 400px),640px);overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:3px;overscroll-behavior:contain}
-#chatLog:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
-.msg{font-size:15px;line-height:1.35;overflow-wrap:anywhere}
-.msg time{color:var(--muted);font-size:12px;margin-right:6px;font-variant-numeric:tabular-nums}
-.msg b{color:var(--gold);margin-right:6px} .msg.me b{color:var(--cyan)}
-#chatForm{display:flex;gap:6px;padding:6px;border-top:1px solid #2a2f3a}
-#chatIn{flex:1;min-width:0;font:400 16px var(--body);color:var(--text);background:#0b0e13;border:1px solid #000;border-radius:2px;padding:7px 9px;box-shadow:inset 0 0 0 1px #3a424f}
-#chatIn::placeholder{color:var(--muted)}
-#chatIn:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
-#chatIn:disabled{opacity:.5}
-.deploy{margin-top:auto;display:flex;flex-direction:column;gap:10px}
-#lobbyHelp{margin:0;color:var(--muted);font-size:14px;min-height:1.45em}
-.btn-go{position:relative;overflow:hidden;width:100%;font-family:var(--display);font-weight:400;font-size:22px;letter-spacing:.22em;text-transform:uppercase;color:#fff3c4;padding:16px 20px;text-shadow:0 2px 0 #000;
-  background:linear-gradient(180deg,#b3261c,#6d120c 55%,#3d0906);
-  box-shadow:inset 0 0 0 1px var(--gold),inset 0 0 0 3px #2a0705,inset 0 16px 18px -12px rgba(255,255,255,.3),0 0 26px rgba(201,41,31,.5)}
-.btn-go:hover:not(:disabled){filter:brightness(1.18);box-shadow:inset 0 0 0 1px #fff3c4,inset 0 0 0 3px #2a0705,inset 0 16px 18px -12px rgba(255,255,255,.3),0 0 38px rgba(201,41,31,.8)}
-.btn-go:disabled{filter:grayscale(.8)}
-.btn-go:not(:disabled)::after{content:"";position:absolute;top:0;bottom:0;left:-40%;width:28%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.3),transparent);transform:skewX(-20deg);animation:sheen 3.8s infinite}
-@keyframes sheen{0%,62%{left:-40%}100%{left:130%}}
-
-.world{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;padding:10px;border:1px solid var(--trim);box-shadow:inset 0 0 20px #000,0 0 0 1px #000;
-  background:#06080c radial-gradient(ellipse at 50% 50%,rgba(63,124,224,.16),transparent 70%)}
-.cell{position:relative;min-width:0;aspect-ratio:5/4;display:flex;flex-direction:column;justify-content:flex-end;padding:4px 6px;overflow:hidden;border:1px solid #29303b;background:linear-gradient(180deg,#151b24,#0c1016)}
-.cell .n{position:absolute;left:6px;top:3px;font-family:var(--display);font-size:13px;color:#56606f}
-.cell .who{font-size:13px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cell .st{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cell.lobby{border-color:var(--trim);background:linear-gradient(180deg,#2c2410,#14110a)} .cell.lobby .n{color:var(--gold)}
-.cell.play{border-color:var(--blood);background:linear-gradient(180deg,#32130f,#150a09)} .cell.play .n{color:#ff7a6e}
-.cell.me{border-color:var(--cyan);background:linear-gradient(180deg,#10303f,#0a151b);box-shadow:0 0 14px rgba(89,200,242,.45)} .cell.me .n,.cell.me .who{color:var(--cyan)}
-.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0;padding:0;list-style:none;font-size:13px;color:var(--muted)}
-.legend i{display:inline-block;width:10px;height:10px;margin-right:6px;border:1px solid #29303b;background:#0c1016;vertical-align:-1px}
-.legend .me{border-color:var(--cyan);background:#10303f} .legend .lobby{border-color:var(--trim);background:#2c2410} .legend .play{border-color:var(--blood);background:#32130f}
-
-.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;max-height:372px;overflow-y:auto}
-.rows li{display:grid;grid-template-columns:34px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:8px 6px;border-top:1px solid #2a2f3a}
-.rows li:first-child{border-top:0}
-.rows .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
-.rows .me{background:linear-gradient(90deg,rgba(89,200,242,.12),transparent)} .rows .me .nm{color:var(--cyan)}
-.rows .rk{font-family:var(--display);font-size:18px;color:var(--muted);text-align:center}
-.rows li:nth-child(1) .rk{color:var(--gold);text-shadow:0 0 10px rgba(246,207,77,.6)} .rows li:nth-child(2) .rk{color:#d5dbe4} .rows li:nth-child(3) .rk{color:#cf8a45}
-.rows li:nth-child(1) .nm{font-family:var(--display);font-weight:400;font-size:18px}
-.empty{color:var(--muted);padding:10px 4px;margin:0}
-
-/* Talentbomen: links torens, rechts held. Elk een raster van 4 breed en 7 rijen diep; diepere rijen gaan open naarmate je punten in die boom zet. */
-.trees{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
-.tree{--acc:var(--gold);min-width:0;padding:14px 12px 22px;display:flex;flex-direction:column;gap:16px;align-items:center;border:1px solid #000;box-shadow:inset 0 0 0 1px #3a424f,inset 0 0 40px #000;
-  background:radial-gradient(ellipse at 50% 0,rgba(246,207,77,.13),transparent 65%),linear-gradient(180deg,#171b23,#0c0f14)}
-.tree.hero{--acc:var(--cyan);background:radial-gradient(ellipse at 50% 0,rgba(89,200,242,.14),transparent 65%),linear-gradient(180deg,#141b24,#0b0f15)}
-.tree-head{width:100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding-bottom:8px;border-bottom:1px solid;border-image:linear-gradient(90deg,var(--acc),transparent) 1}
-.tree-head h3{font-size:17px;color:var(--acc);text-transform:uppercase;letter-spacing:.14em}
-.tree-head span{color:var(--muted);font-size:13px}
-.tree-head b{margin-left:auto;font-family:var(--display);font-weight:400;font-size:17px;color:var(--text)}
-.tgrid{display:grid;grid-template-columns:repeat(4,54px);grid-auto-rows:54px;gap:22px 16px}
-.tal{position:relative;width:54px;height:54px;padding:0;border-radius:4px;color:#6b7482;background:linear-gradient(180deg,#232934,#12161c);box-shadow:inset 0 0 0 1px #444b57}
-.tal svg{display:block;width:28px;height:28px;margin:auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
-.tal i{position:absolute;right:-7px;bottom:-8px;min-width:28px;padding:0 4px;font-style:normal;font-size:12px;font-weight:700;line-height:17px;text-align:center;color:var(--muted);background:#07090c;border:1px solid #444b57;border-radius:2px;pointer-events:none}
-.tal.lock{opacity:.5}
-.tal.open{color:var(--text);box-shadow:inset 0 0 0 1px var(--acc)} .tal.open i{color:var(--acc);border-color:var(--acc)}
-.tal.has{color:var(--acc);background:linear-gradient(180deg,#2e3442,#171b23)}
-.tal.max{color:#fff;box-shadow:inset 0 0 0 2px var(--hp);background:linear-gradient(180deg,#1b3323,#101c14)} .tal.max i{color:var(--hp);border-color:var(--hp)}
-.tal.sel{outline:2px solid #fff;outline-offset:2px}
-.tal.req::before{content:"";position:absolute;left:50%;bottom:100%;width:4px;height:22px;margin-left:-2px;background:#444b57}
-.tal.req::after{content:"";position:absolute;left:50%;bottom:100%;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:#444b57}
-.tal.req.ok::before{background:var(--acc)} .tal.req.ok::after{border-top-color:var(--acc)}
-.tinfo{position:sticky;bottom:0;z-index:2;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;padding:12px 14px;background:#06080b}
-.tinfo-t{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px}
-.tinfo h3{font-size:19px;color:var(--gold)}
-.tinfo .rk{color:var(--muted);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.tinfo p{margin:0;font-size:14px;color:var(--text)} .tinfo p.nx{color:var(--hp)} .tinfo p.rq{color:#ff7a6e}
-.tinfo .txt{min-width:0;display:flex;flex-direction:column;gap:3px}
-.tinfo .btn-main{font-size:16px;padding:10px 16px;white-space:nowrap}
-@media (max-width:560px){.tinfo{grid-template-columns:minmax(0,1fr)}.tinfo .btn-main{width:100%}}
-.cmd-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px} .cmd-row p{margin-right:auto}
-.manual{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px 26px}
-.manual h3{font-size:16px;color:var(--text);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
-.manual p{margin:0;color:var(--muted);font-size:15px}
-@media(max-width:620px){.herogrid{grid-template-columns:repeat(3,minmax(0,1fr))} .panel{padding:16px 14px} .cell .st{display:none} .cell{padding:3px 4px} #chatLog{height:clamp(220px,calc(100dvh - 450px),640px)} .top-actions{flex:1 1 100%} .btn-pop{flex:1} .pop-head{padding:14px 14px 0} .tabs{padding:12px 14px 0} .pop-body{padding:14px 14px 18px}}
-@media(max-width:480px){.show{grid-template-columns:minmax(0,1fr)} .pic{max-width:220px}}
-@media(prefers-reduced-motion:reduce){.live,.btn-go:not(:disabled)::after{animation:none}}
-
-/* Aanmelden: links wat een account bewaart, rechts de dienstpas */
-#gate{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:36px;align-items:center;padding-block:clamp(8px,7vh,72px)}
-.gate-intro{display:flex;flex-direction:column;gap:18px;min-width:0}
-.gate-intro h1{font-size:clamp(34px,6.4vw,64px);line-height:1;color:var(--gold);text-shadow:0 2px 0 #000,0 0 24px rgba(246,207,77,.25)}
-.gate-intro h1 span{display:block;color:var(--text);font-size:.32em;letter-spacing:.24em;text-transform:uppercase;margin-bottom:10px}
-.gate-intro p{margin:0;color:var(--muted);max-width:50ch;font-size:17px}
-.keeps{list-style:none;margin:0;padding:14px 0 0;border-top:1px solid var(--trim);display:grid;gap:10px;max-width:50ch}
-.keeps li{display:grid;grid-template-columns:124px minmax(0,1fr);gap:16px;align-items:baseline;color:var(--text)}
-.pass{padding:24px;gap:14px}
-.pass h2{font-size:26px;color:var(--gold);overflow-wrap:anywhere}
-.pass p{margin:0;color:var(--muted)}
-.field{display:flex;flex-direction:column;gap:6px}
-.field input{font:700 18px var(--body);color:var(--text);background:#07090d;border:1px solid #000;border-radius:2px;padding:10px 12px;box-shadow:inset 0 0 0 1px var(--bevel);width:100%;min-width:0}
-.field input:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
-.field input::placeholder{color:#6f6a5e;font-weight:400}
-#gErr{color:#ff8a7d;font-weight:700;min-height:1.45em}
-#gStats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0;padding:10px 12px}
-#gStats dd{margin:0;font-family:var(--display);font-size:22px;color:var(--gold)}
-.pass-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.pass-actions .btn-main{flex:1 1 180px}
-#gNote{font-size:14px;padding-top:12px;border-top:1px solid #2a2f3a}
-.acct{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;min-width:0;padding:14px 18px}
-.acct>div{flex:1 1 120px;min-width:0}
-.acct b{display:block;font-family:var(--display);font-weight:400;font-size:22px;color:var(--cyan);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:16ch}
-.acct button{font-size:13px;padding:5px 9px}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:1px}
-.dot.on{background:var(--hp);box-shadow:0 0 6px var(--hp)}
-@media(max-width:760px){#gate{grid-template-columns:minmax(0,1fr);gap:22px}}
-
-/* Game: schermvullend */
-#game{position:fixed;inset:0;background:#070b12;overflow:hidden;z-index:2;font-family:var(--display)}
-#stage{position:absolute;inset:0}
-#stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
-#vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 45%,rgba(2,4,10,.62) 100%)}
-#stage.leak #vig{box-shadow:inset 0 0 90px 20px rgba(220,30,20,.7)}
-#nogl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
-#hero{position:absolute;left:8px;top:calc(8px + env(safe-area-inset-top,0px));padding:2px;width:64px;background:#000;box-shadow:inset 0 0 0 1px var(--trim)}
-#hero canvas{display:block;width:58px;height:50px}
-.bar{display:block;position:relative;height:9px;background:#0a0c10;border:1px solid #000;box-shadow:0 0 0 1px #3a424f}
-.bar b{display:block;height:100%;background:linear-gradient(180deg,#6cf07d,var(--hp) 45%,#16852a);width:100%}
-.bar.lvl b{background:linear-gradient(180deg,#8fb6ff,var(--mana) 45%,#1f458f)}
-.bar span{position:absolute;inset:0;font:700 11px/14px var(--body);text-align:center;color:#fff;text-shadow:0 1px 1px #000}
-#topbar{position:absolute;left:50%;top:0;transform:translateX(-50%);padding:calc(4px + env(safe-area-inset-top,0px)) 10px 4px;display:flex;align-items:center;gap:8px;max-width:calc(100% - 160px);white-space:nowrap}
-#topbar button{font-family:var(--display);font-weight:400;font-size:15px;padding:4px 12px;color:var(--gold)}
-.seg{display:flex} .seg button{margin-left:-1px} .seg button.on{background:linear-gradient(180deg,#6a5420,#3a2c0e);color:#fff}
-.res{display:flex;align-items:center;gap:7px;padding:3px 12px;min-width:86px;justify-content:flex-end;background:#05070a;border:1px solid #000;box-shadow:inset 0 0 0 1px #4a515d;font-size:17px;color:#fff}
-.res .lbl{font:700 11px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:auto}
-.coin{width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff3b0,#e6a91e 55%,#8a5a08);box-shadow:0 0 0 1px #000;margin-right:auto}
-.heart{width:15px;height:16px;background:linear-gradient(180deg,#ff6a5c,#a4160e);clip-path:polygon(50% 100%,0 45%,0 15%,25% 0,50% 18%,75% 0,100% 15%,100% 45%);margin-right:auto}
-#clock{position:relative;width:60px;height:60px;margin:-4px 4px -22px;border-radius:50%;background:radial-gradient(circle,#0a1830 0,#05070c 70%);border:2px solid #000;box-shadow:0 0 0 2px var(--trim),0 0 0 4px #000,0 0 18px rgba(80,150,255,.35);flex:none}
-#clock svg{position:absolute;inset:3px;transform:rotate(-90deg)}
-#clock circle{fill:none;stroke-width:5} #clock .trk{stroke:#16233a} #clock .arc{stroke:#6fb4ff;stroke-linecap:round;stroke-dasharray:138.2;transition:stroke-dashoffset .3s linear}
-#clock b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:400;font-size:21px;color:#fff;text-shadow:0 0 8px #4a9cff}
-#quest{position:absolute;right:8px;top:calc(46px + env(safe-area-inset-top,0px));width:270px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
-#quest h3{font-size:19px;color:var(--gold);text-align:center}
-#quest p{margin:0;text-align:center;color:var(--gold);font-size:15px}
-#quest ul{list-style:none;margin:2px 0;padding:0;font-size:17px}
-#quest li{display:flex;justify-content:space-between;gap:10px} #quest li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#quest button{font-family:var(--display);font-weight:400;color:var(--gold);padding:5px}
-#toast{position:absolute;left:50%;top:22%;transform:translateX(-50%);color:var(--gold);font-size:22px;text-shadow:0 2px 2px #000,0 0 12px #000;pointer-events:none;text-align:center;max-width:70%}
-#console{position:absolute;left:0;right:0;bottom:0;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));display:grid;gap:8px;align-items:stretch;
-  grid-template-columns:auto auto 138px minmax(180px,1fr) auto 132px;grid-template-areas:"map cam port info card inv"}
-#mapbox{grid-area:map;padding:3px;line-height:0} #mini{display:block;width:170px;height:177px;cursor:pointer;touch-action:none}
-#camctl{grid-area:cam;display:flex;flex-direction:column;gap:4px;justify-content:center}
-#camctl button{width:34px;height:28px;padding:0;font-size:15px;color:var(--gold)}
-#portrait{grid-area:port;padding:4px;display:flex;flex-direction:column;gap:5px;justify-content:space-between}
-#pcv{display:block;width:100%;aspect-ratio:128/108}
-#info{grid-area:info;padding:8px 14px;display:flex;flex-direction:column;gap:4px;min-width:0;text-align:center}
-#info h3{font-size:19px;color:#fff} #iSub{margin:0;color:var(--text);font-size:14px}
-#iStats{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:4px 0 0;text-align:left}
-#iStats dt{font:700 12px var(--body);color:var(--gold)} #iStats dd{margin:0;font-size:17px;color:#fff}
-#iDesc{margin:auto 0 0;color:var(--muted);font:400 14px/1.3 var(--body);text-align:left}
-#card{grid-area:card;display:grid;grid-template-columns:repeat(4,58px);grid-auto-rows:54px;gap:4px;padding:6px;align-content:center}
-#card button{position:relative;padding:0;overflow:hidden;background:#06080b;box-shadow:inset 0 0 0 1px #59616e;border-radius:3px}
-#card button canvas{display:block;width:100%;height:100%}
-#card button .k{position:absolute;left:3px;top:1px;font:700 12px var(--body);color:#fff;text-shadow:0 1px 2px #000,0 0 3px #000}
-#card button .c{position:absolute;right:3px;bottom:0;font:700 12px var(--body);color:var(--gold);text-shadow:0 1px 2px #000,0 0 3px #000}
-#card button.on{box-shadow:inset 0 0 0 2px var(--gold),0 0 10px rgba(246,207,77,.6)}
-#card button.poor canvas{filter:grayscale(.8) brightness(.55)} #card button.poor .c{color:#ff6a5c}
-#card button.empty{visibility:hidden}
-#inv{grid-area:inv;padding:6px 8px;display:flex;flex-direction:column;gap:5px;align-items:center}
-#inv h4{font-size:13px;color:var(--gold);letter-spacing:.08em;text-transform:uppercase}
-#invGrid{display:grid;grid-template-columns:repeat(2,50px);gap:4px}
-#invGrid canvas{display:block;width:50px;height:46px;border:1px solid #59616e;border-radius:3px}
-#invGrid canvas.has{border-color:var(--gold);box-shadow:0 0 8px rgba(246,207,77,.5)}
-#qNext,#qRoad{font:400 13px/1.3 var(--body)!important;color:var(--muted)!important}
-#qRoad.ok{color:var(--hp)!important}
-#joy{position:absolute;width:92px;height:92px;margin:-46px 0 0 -46px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.25);pointer-events:none}
-#joy i{position:absolute;left:28px;top:28px;width:36px;height:36px;border-radius:50%;background:rgba(246,207,77,.75)}
-#tip{position:absolute;right:8px;width:300px;padding:10px 12px;pointer-events:none}
-#tip h4{font-size:17px;color:#fff} #tip .cost{color:var(--gold);font-size:15px;display:flex;align-items:center;gap:6px} #tip .cost .coin{margin:0}
-#tip p{margin:4px 0 0;font:400 14px/1.35 var(--body);color:var(--text)}
-#result{position:fixed;inset:0;background:rgba(3,5,8,.82);display:flex;align-items:center;justify-content:center;padding:16px;z-index:5}
-#result .card{padding:26px;max-width:440px;width:100%;display:flex;flex-direction:column;gap:14px;text-align:center}
-#result h2{font-size:32px;color:var(--gold)}
-#result dl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:0}
-#result dd{margin:0;font-family:var(--display);font-size:24px;color:#fff}
-@media(max-width:1020px){
-  #console{grid-template-columns:auto auto minmax(140px,1fr) auto;grid-template-areas:"map cam info card"}
-  #portrait,#inv{display:none}
-}
-@media(max-width:760px){
-  #hero{display:none}
-  #topbar{left:0;right:0;transform:none;max-width:none;flex-wrap:wrap;justify-content:center;gap:4px;padding-inline:6px}
-  #topbar button{padding:3px 8px;font-size:13px} .res{min-width:0;padding:2px 8px;font-size:15px} .res .lbl{display:none} .res.wide{display:none}
-  #clock{width:44px;height:44px;margin:-2px 2px -10px} #clock b{font-size:16px}
-  #quest{top:calc(84px + env(safe-area-inset-top,0px));width:150px;padding:6px 8px} #quest ul{display:none} #quest h3{font-size:15px} #quest p{font-size:13px}
-  #toast{font-size:17px;top:30%}
-  #console{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"map info" "card card";gap:6px;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))}
-  #camctl{display:none}
-  #mini{width:100px;height:104px}
-  #info{padding:6px 8px} #info h3{font-size:16px} #iDesc{display:none} #iStats dd{font-size:15px}
-  #card{grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:46px;padding:4px}
-  #tip{left:6px;right:6px;width:auto}
-}
-</style>
-<canvas id="embers" aria-hidden="true"></canvas>
-<div id="app">
-  <section id="gate" hidden>
-    <div class="gate-intro">
-      <h1><span>Meld je aan voor dienst</span>Red Alert Towerdefense</h1>
-      <p>Met een account ga je verder waar je was gebleven, op elk apparaat waar je bent ingelogd.</p>
-      <ul class="keeps">
-        <li><span class="label">Skillpunten</span><span>Alles wat je verdient en leert blijft staan.</span></li>
-        <li><span class="label">Je held</span><span>Je gekozen held staat klaar bij het volgende potje.</span></li>
-        <li><span class="label">Leaderboard</span><span>Je beste score komt onder je roepnaam te staan.</span></li>
-      </ul>
-    </div>
-    <form id="gateForm" class="panel plate pass" novalidate>
-      <h2 id="gTitle">Account maken</h2>
-      <p id="gLead"></p>
-      <dl id="gStats" class="inset" hidden>
-        <div><dt class="label">Vrije punten</dt><dd class="num" id="gXp">0</dd></div>
-        <div><dt class="label">Besteed</dt><dd class="num" id="gSk">0</dd></div>
-        <div><dt class="label">Potjes</dt><dd class="num" id="gGm">0</dd></div>
-      </dl>
-      <div class="field" id="gField">
-        <label class="label" for="gName">Roepnaam</label>
-        <input id="gName" name="roepnaam" type="text" maxlength="16" autocomplete="nickname" spellcheck="false" placeholder="Bijvoorbeeld Tanya" aria-describedby="gErr">
-      </div>
-      <p id="gErr" role="alert"></p>
-      <div class="pass-actions">
-        <button class="btn-main" id="gGo" type="submit">Maak account</button>
-        <button type="button" id="gGuest">Speel als gast</button>
-      </div>
-      <p id="gNote"></p>
-    </form>
-  </section>
-
-  <section id="home">
-    <header class="top">
-      <svg class="crest" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b0"/><stop offset=".5" stop-color="#e6a91e"/><stop offset="1" stop-color="#8a5a08"/></linearGradient><radialGradient id="cr" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#b3261c"/><stop offset="1" stop-color="#2a0705"/></radialGradient></defs><circle cx="50" cy="50" r="46" fill="url(#cr)" stroke="url(#cg)" stroke-width="4"/><circle cx="50" cy="50" r="39" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="2"/><polygon fill="url(#cg)" stroke="#3d0906" stroke-width="1" points="50.0,20.0 57.3,40.9 79.5,41.4 61.9,54.9 68.2,76.1 50.0,63.5 31.8,76.1 38.1,54.9 20.5,41.4 42.7,40.9"/></svg>
-      <h1>Red Alert <em>Towerdefense</em></h1>
-      <div class="top-actions">
-        <button class="btn-pop" id="skillsBtn" aria-haspopup="dialog">Skills<small class="num" id="skHint">0</small></button>
-        <button class="btn-pop" id="infoBtn" aria-haspopup="dialog">Spelinfo</button>
-      </div>
-    </header>
-    <div class="panel plate">
-      <div class="phead"><i class="live off" id="lobbyDot"></i><h2>Lobbychat</h2><small id="lobbyNote">verbinden…</small></div>
-      <div class="chat inset">
-        <div id="chatLog" role="log" aria-live="polite" aria-label="Lobbychat" tabindex="0"></div>
-        <form id="chatForm" autocomplete="off"><input id="chatIn" type="text" maxlength="160" placeholder="Typ een bericht…" aria-label="Bericht aan de lobby" enterkeyhint="send"><button id="chatSend" type="submit">Stuur</button></form>
-      </div>
-      <div class="deploy">
-        <button class="btn-go" id="startBtn">Start spel</button>
-        <p id="lobbyHelp"></p>
-        <p class="heroline"><span>Je speelt als <b id="heroNow"></b>.</span><button class="linkbtn" id="heroBtn" type="button">Andere held kiezen</button></p>
-      </div>
-    </div>
-
-    <dialog class="pop" id="popSkills" aria-labelledby="popSkillsT">
-      <div class="pop-in plate">
-        <div class="pop-head"><h2 id="popSkillsT">Skills en held</h2><button class="pop-x" type="button" aria-label="Sluiten">×</button></div>
-        <div class="tabs" role="tablist">
-          <button type="button" role="tab" data-t="tSkills" aria-selected="true">Skills</button>
-          <button type="button" role="tab" data-t="tHero" aria-selected="false">Held</button>
-        </div>
-        <div class="pop-body">
-          <div class="tab" id="tSkills" role="tabpanel">
-            <div class="cmd inset">
-              <dl>
-                <div><dt class="label">Vrije punten</dt><dd class="num" id="xp">0</dd></div>
-                <div><dt class="label">Besteed</dt><dd class="num" id="skn">0</dd></div>
-                <div><dt class="label">Potjes</dt><dd class="num" id="gms">0</dd></div>
-              </dl>
-              <div class="cmd-row"><p id="xpNote"></p><button class="linkbtn" id="tReset" type="button">Alle punten terugzetten</button></div>
-            </div>
-            <p class="lead">Elke rang kost 1 skillpunt. Je verdient punten in een potje: 1 per 20 gehaalde levels, 1 per gehaalde miniboss en 3 zodra je level 100 bereikt. Diepere rijen gaan open per 5 punten in die boom. Wat je leert geldt vanaf je volgende potje. <span id="skNote"></span></p>
-            <div class="trees">
-              <section class="tree" aria-labelledby="trT"><div class="tree-head"><h3 id="trT">Arsenaal</h3><span>maakt je torens beter</span><b class="num" id="ptsT">0</b></div><div class="tgrid" id="treeT"></div></section>
-              <section class="tree hero" aria-labelledby="trH"><div class="tree-head"><h3 id="trH">Veldheer</h3><span>maakt je held sterker</span><b class="num" id="ptsH">0</b></div><div class="tgrid" id="treeH"></div></section>
-            </div>
-            <div class="tinfo inset" id="tInfo" aria-live="polite">
-              <div class="txt"><div class="tinfo-t"><h3 id="tiName"></h3><span class="rk num" id="tiRank"></span></div><p id="tiNow"></p><p class="nx" id="tiNext"></p><p class="rq" id="tiReq"></p></div>
-              <button class="btn-main" id="tiBuy" type="button">Leer rang</button>
-            </div>
-          </div>
-          <div class="tab" id="tHero" role="tabpanel" hidden>
-            <div class="show">
-              <div class="pic"><canvas id="heroBig" width="256" height="216"></canvas></div>
-              <div>
-                <h3 id="hName"></h3>
-                <span class="role" id="hRole"></span>
-                <p id="hDesc"></p>
-                <div id="hStats"></div>
-              </div>
-            </div>
-            <div class="herogrid" id="heroes"></div>
-          </div>
-        </div>
-      </div>
-    </dialog>
-
-    <dialog class="pop" id="popInfo" aria-labelledby="popInfoT">
-      <div class="pop-in plate">
-        <div class="pop-head"><h2 id="popInfoT">Spelinfo</h2><button class="pop-x" type="button" aria-label="Sluiten">×</button></div>
-        <div class="tabs" role="tablist">
-          <button type="button" role="tab" data-t="tManual" aria-selected="true">Uitleg</button>
-          <button type="button" role="tab" data-t="tPlayers" aria-selected="false">Spelers</button>
-          <button type="button" role="tab" data-t="tWorld" aria-selected="false">Wereldkaart</button>
-          <button type="button" role="tab" data-t="tBoard" aria-selected="false">Leaderboard</button>
-          <button type="button" role="tab" data-t="tAcct" aria-selected="false">Account</button>
-        </div>
-        <div class="pop-body">
-          <div class="tab" id="tManual" role="tabpanel">
-            <p class="lead">Kies een held, leg je eigen weg door je vesting en verdedig je hoofdkwartier samen tegen honderd golven. Na elke tiende golf volgt een minigame, na de honderdste het eindmonster.</p>
-            <div class="manual">
-          <div><h3>Lopen</h3><p>Je bestuurt je held in third-person. WASD loopt, slepen met de muis draait de camera, scrollen zoomt. Op een telefoon stuur je met de duimknuppel links. Via de bruggen loop je naar andere vestingen.</p></div>
-          <div><h3>Vechten</h3><p>Je held valt automatisch de dichtstbijzijnde vijand binnen bereik aan. Hoe dat gaat hangt af van de held: van katana en hamer tot scherpschuttersgeweer.</p></div>
-          <div><h3>Weg</h3><p>Elk potje begint met een bouwfase van vijf minuten. Kies Weg op de commandokaart en sleep een pad van de linkerpoort naar de rechterpoort. Weg is gratis. Ligt er geen doorlopende weg, dan steekt de vijand recht het gras over.</p></div>
-          <div><h3>Samen</h3><p>Na de bouwfase begint het spel voor iedereen tegelijk. Speler 1 kiest de snelheid voor het hele potje. Een nieuwe ronde begint pas als iedereen de vorige heeft afgeslagen.</p></div>
-          <div><h3>Bouwen</h3><p>Kies een turret op de commandokaart rechtsonder en klik op een vrij vak in je eigen vesting. Je held loopt erheen en zet hem neer. Na vijf upgrades kies je link of turbo; de derde turbo turret vormt The Geers.</p></div>
-          <div><h3>Ultiem wapen</h3><p>Bouw tien keer The Geers en het ultieme wapen komt vrij: op elk vrij vak van je vesting verschijnt een Omega-toren. Die is vernietigend sterk en vertraagt elke vijand in bereik.</p></div>
-          <div><h3>Minigames</h3><p>Na elke tiende golf gaat iedereen tegelijk naar een minigame. Wie wint krijgt een stuk harnas met een bonus voor de rest van het potje; is je harnas compleet, dan krijg je credits. Wie sneuvelt gaat terug naar zijn vesting en bouwt verder.</p></div>
-          <div><h3>Level 10 · De Kolos</h3><p>Iedereen vecht samen tegen de Kolos. Hij wordt sterker met elke speler die meedoet. Ren weg uit de rode cirkels. Op 75% en 50% laadt hij in het midden een ultra-aanval op: alleen op een groene plek overleef je de klap. Wie overeind staat als hij valt, krijgt harnas.</p></div>
-          <div><h3>Level 20 · Doolhof</h3><p>Ren door het doolhof naar de poort aan de overkant terwijl torens op je schieten. Muren houden kogels tegen. Met F zet je even een schild op, en je held schiet zelf de torens kapot die hij kan zien. De overkant halen levert credits op.</p></div>
-          <div><h3>Level 30 tot 90 · PvP en PvE</h3><p>In deze minigames vecht je tegen monsters en tegen elkaar: helden kunnen elkaar raken, en wie sneuvelt ligt eruit. De hoogste score van wie nog staat wint. Speel je alleen, dan moet je het doel halen dat in beeld staat.</p></div>
-          <div><h3>Level 30 · Kristalkoorts</h3><p>Raap de meeste kristallen; een gouden telt voor drie. Elk kristal kan maar door één held gepakt worden. Drones jagen ondertussen op je.</p></div>
-          <div><h3>Level 40 · Heuvelkoning</h3><p>Sta op de gouden plek om punten te verdienen. Staat er nog een held op, dan scoort niemand. Mechs bewaken de heuvel, en hij verhuist om de zestien seconden.</p></div>
-          <div><h3>Level 50 · Doolhofrace</h3><p>Het doolhof in omgekeerde richting, met taaiere torens. Wie het eerst de overkant haalt wint. Helden kunnen elkaar raken als er geen muur tussen staat.</p></div>
-          <div><h3>Level 60 · Premiejacht</h3><p>Elk monster dat je doodt is premie waard: een hond 1, een conscript 2, een tank 5 en het gouden doelwit 12. Een kill geeft je ook wat levenspunten terug.</p></div>
-          <div><h3>Level 70 · Kernroof</h3><p>Haal een kern aan de rand van de arena en breng hem naar het midden. Wie een kern draagt loopt trager en krijgt inslagen op zijn hielen. Twee mechs bewaken het midden.</p></div>
-          <div><h3>Level 80 · Vuurstorm</h3><p>De groene kring krimpt en het regent inslagen. Buiten de kring verlies je snel levenspunten. Elke seconde overeind is een punt, een andere held uitschakelen tien.</p></div>
-          <div><h3>Level 90 · Kolosjacht</h3><p>De Kolos is terug en sterker. Je velt hem samen, maar alleen wie hem de meeste schade toebracht wint, en helden kunnen elkaar raken.</p></div>
-          <div><h3>Level 100 · De Titaan</h3><p>Het eindmonster: groter en veel sterker dan de Kolos. Elke 10% levens die hij verliest volgt een speciale aanval, om de beurt: de ultra-aanval (ren naar een groene plek), schokgolven (ga bij elke ring in de groene opening staan) en doodsstralen (loop mee tussen de draaiende stralen). Elke ronde worden ze zwaarder. Valt de Titaan, dan heeft iedereen gewonnen. Lukt het niet binnen vijf minuten, of sneuvelt iedereen, dan is het potje verloren.</p></div>
-          <div><h3>Overzicht</h3><p>Een klik op de minimap zet de camera los boven die plek, zodat je bij anderen kunt meekijken. H of je heldenportret brengt de camera terug.</p></div>
-        </div>
-          </div>
-          <div class="tab" id="tPlayers" role="tabpanel" hidden>
-            <ul class="roster" id="lobby"></ul>
-          </div>
-          <div class="tab" id="tWorld" role="tabpanel" hidden>
-            <p class="lead" id="worldNote"></p>
-            <div class="world" id="world"></div>
-            <ul class="legend"><li><i class="me"></i>jouw vesting</li><li><i class="lobby"></i>in de lobby, verwachte plek</li><li><i class="play"></i>in gevecht</li><li><i></i>vrij</li></ul>
-          </div>
-          <div class="tab" id="tBoard" role="tabpanel" hidden>
-            <p class="lead">Beste score per speler.</p>
-            <ul class="rows" id="board"></ul>
-          </div>
-          <div class="tab" id="tAcct" role="tabpanel" hidden>
-            <div class="acct inset">
-              <div><span class="label"><i class="dot" id="aDot"></i><span id="aState">Niet ingelogd</span></span><b id="aName">Gast</b></div>
-              <button id="aEdit">Account maken</button>
-              <button id="aOut" hidden>Afmelden</button>
-            </div>
-            <p class="lead">Met een account bewaart het spel je skillpunten, skills en held, en komt je beste score onder je roepnaam op het leaderboard.</p>
-          </div>
-        </div>
-      </div>
-    </dialog>
-  </section>
-
-  <section id="game" hidden>
-    <div id="stage"><div id="vig"></div><div id="joy" hidden><i></i></div><div id="nogl" hidden>Dit spel heeft 3D-weergave (WebGL) nodig, en die is in deze browser niet beschikbaar.</div></div>
-    <button id="hero" title="Je held: camera terug achter je held (H)" aria-label="Held selecteren en camera terug achter je held"><canvas id="heroCv" width="116" height="100"></canvas><i class="bar"><b id="heroHp"></b></i></button>
-    <div id="topbar" class="frame">
-      <button id="quitBtn">Opgeven</button>
-      <div class="seg" id="speed"><button data-s="1" class="on">1×</button><button data-s="2">2×</button><button data-s="3">3×</button></div>
-      <div id="clock" title="Ronde"><svg viewBox="0 0 50 50"><circle class="trk" cx="25" cy="25" r="22"/><circle class="arc" id="arc" cx="25" cy="25" r="22"/></svg><b class="num" id="hRoundBig">1</b></div>
-      <div class="res" title="Credits"><i class="coin"></i><b class="num" id="hGold">0</b></div>
-      <div class="res" title="Levens"><i class="heart"></i><b class="num" id="hLives">0</b></div>
-      <div class="res" title="Ronde"><span class="lbl">Ronde</span><b class="num" id="hRound">1/100</b></div>
-      <div class="res wide" title="Score"><span class="lbl">Score</span><b class="num" id="hScore">0</b></div>
-    </div>
-    <div id="quest" class="inset">
-      <h3 id="qTitle">Golf 1</h3>
-      <p id="qSub"></p>
-      <p id="qRoad" hidden></p>
-      <p id="qNext"></p>
-      <ul id="qPlayers"></ul>
-      <button id="waveBtn">Stuur golf</button>
-    </div>
-    <div id="toast" hidden></div>
-    <div id="tip" class="inset" hidden><h4 id="tipN"></h4><div class="cost" id="tipC"></div><p id="tipD"></p></div>
-    <div id="console" class="frame">
-      <div id="mapbox" class="inset"><canvas id="mini" width="400" height="416" aria-label="Minimap van de 20 vestingen"></canvas></div>
-      <div id="camctl">
-        <button id="cRotL" aria-label="Camera linksom draaien" title="Draai linksom (Q)">⟲</button>
-        <button id="cRotR" aria-label="Camera rechtsom draaien" title="Draai rechtsom (E)">⟳</button>
-        <button id="cIn" aria-label="Inzoomen" title="Inzoomen">+</button>
-        <button id="cOut" aria-label="Uitzoomen" title="Uitzoomen">−</button>
-      </div>
-      <div id="portrait" class="inset"><canvas id="pcv" width="128" height="108"></canvas><i class="bar lvl"><b id="pBar"></b><span id="pBarT"></span></i></div>
-      <div id="info" class="inset">
-        <h3 id="iName">Builder</h3>
-        <p id="iSub"></p>
-        <dl id="iStats" hidden><div><dt>Schade</dt><dd class="num" id="iDmg"></dd></div><div><dt>Per sec</dt><dd class="num" id="iRate"></dd></div><div><dt>Bereik</dt><dd class="num" id="iRange"></dd></div></dl>
-        <p id="iDesc"></p>
-      </div>
-      <div id="card" class="inset"></div>
-      <div id="inv" class="inset"><h4>Harnas</h4><div id="invGrid"></div></div>
-    </div>
-  </section>
-
-  <div id="result" hidden>
-    <div class="card frame">
-      <h2 id="rTitle"></h2>
-      <p id="rText" style="margin:0;color:var(--muted)"></p>
-      <dl><div><dt class="label">Ronde</dt><dd class="num" id="rRound"></dd></div><div><dt class="label">Score</dt><dd class="num" id="rScore"></dd></div><div><dt class="label">Skillpunten</dt><dd class="num" id="rXp"></dd></div></dl>
-      <button class="btn-main" id="rBack">Terug naar de lobby</button>
-    </div>
-  </div>
-</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-const Engine=(()=>{
-const N=13,ROUNDS=100,MID=6,C_IN=MID*N,C_OUT=MID*N+N-1,PREP=300,DIRS=[[1,0],[0,-1],[0,1],[-1,0]];
-// Balans: alles wat de moeilijkheid bepaalt staat hier.
-// Honderd rondes: de curve van vijftig is uitgerekt. Ronde 2r is nu ongeveer zo zwaar als ronde r was, en twee rondes leveren samen op wat één ronde opleverde.
-const B={hp0:14,lin:.06,g:1.063,g2:1.0296,late:80,gold0:2.5,goldLin:.035,startGold:10000/* TESTWAARDE: terug naar 260 voor de definitieve versie */,lives:20,
-  bonA:12,bonB:4};
-const ROCK=new Set(); // geen bomen of rotsen meer: het hele veld is vrij
-// Er is geen vast pad. Vijanden komen links in het midden binnen en gaan rechts in het midden weg.
-// search zoekt de kortste route over de vakken die `pass` toelaat.
-function search(pass){const n=N*N,dist=new Float64Array(n).fill(Infinity),prev=new Int16Array(n).fill(-1),done=new Uint8Array(n);
-  if(!pass(C_IN)||!pass(C_OUT))return null;dist[C_IN]=0;
-  for(;;){let u=-1,bd=Infinity;for(let i=0;i<n;i++)if(!done[i]&&dist[i]<bd){bd=dist[i];u=i;}
-    if(u<0)return null;if(u===C_OUT)break;done[u]=1;const x=u%N,y=(u-x)/N;
-    for(const[dx,dy]of DIRS){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=N||ny>=N)continue;const v=ny*N+nx;
-      if(!done[v]&&pass(v)&&bd+1<dist[v]){dist[v]=bd+1;prev[v]=u;}}}
-  const cells=[];for(let c=C_OUT;c>=0;c=prev[c])cells.push(c);return cells.reverse();}
-// Eerst alleen over de gelegde weg. Ligt er geen doorlopende weg, dan recht over het gras, om turrets en rotsen heen.
-function route(road,taken){const free=c=>!ROCK.has(c)&&!taken(c),via=search(c=>road.has(c)&&free(c));
-  if(via)return{cells:via,road:true};const g=search(free);if(g)return{cells:g,road:false};
-  const row=[];for(let x=0;x<N;x++)row.push(MID*N+x);return{cells:row,road:false};}
-function mkPath(cells,road){const pts=[[-.5,MID+.5]];for(const c of cells){const x=c%N;pts.push([x+.5,(c-x)/N+.5]);}pts.push([N+.5,MID+.5]);
-  return{cells,set:new Set(cells),pts,len:pts.length-1,road:!!road};}
-function posAt(P,d){d=Math.max(0,Math.min(P.len,d));const i=Math.min(P.len-1,Math.floor(d)),a=P.pts[i],b=P.pts[i+1],f=d-i;
-  return[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,b[0]-a[0],b[1]-a[1]];}
-// De route zoals die nu zou worden: voor de voorvertoning tijdens de bouwfase.
-function preview(G){if(G.pvk!==G.rv){G.pv=route(G.road,c=>!!G.map[c]);G.pvk=G.rv;}return G.pv;}
-const canRoad=(G,c)=>G.phase==='prep'&&c>=0&&c<N*N&&!ROCK.has(c)&&!G.map[c];
-function setRoad(G,c,on){if(!canRoad(G,c)||on===G.road.has(c))return false;if(on)G.road.add(c);else G.road.delete(c);G.rv++;return true;}
-// Einde bouwfase: de route ligt vast. Weg die niet op de route ligt verdwijnt, zodat je daar weer kunt bouwen.
-function lock(G){if(G.phase!=='prep')return;const r=route(G.road,c=>!!G.map[c]);G.path=mkPath(r.cells,r.road);
-  G.trail=new Set(r.cells.filter(c=>!G.road.has(c)));G.road=new Set(r.cells.filter(c=>G.road.has(c)));G.rv++;G.phase='build';G.timer=10;}
-// Volgende ronde: pas als iedereen klaar is (dat bepaalt de spellaag).
-function next(G){if(G.phase==='wait'&&!G.final){G.phase='build';G.timer=8;}}
-
-const T={
- sentry:{n:'Sentry Gun',d:'Snel en goedkoop. Zwak tegen pantser.',cost:60,dmg:9,rate:3,range:2.6},
- flak:{n:'Flak Kanon',d:'Explosieve schade in een gebied.',cost:110,dmg:20,rate:1,range:2.8,splash:1},
- cryo:{n:'Cryo Toren',d:'Bevriest vijanden: ze staan even stil.',cost:130,dmg:5,rate:.7,range:2.3,splash:1.1,fz:.9},
- toxin:{n:'Toxine Sproeier',d:'Gif vertraagt vijanden en vreet levens weg.',cost:120,dmg:4,rate:1.1,range:2.5,splash:.8,pd:10,slow:.3},
- tesla:{n:'Tesla Spoel',d:'Bliksem springt over naar 3 vijanden.',cost:200,dmg:32,rate:.9,range:2.6,chain:3},
- prism:{n:'Prisma Toren',d:'Straal wordt sterker op hetzelfde doel.',cost:240,dmg:5.5,rate:8,range:3.2},
- rocket:{n:'Raketbatterij',d:'Groot bereik en een grote klap.',cost:260,dmg:75,rate:.4,range:4.6,splash:1.4,minr:1.2},
- rail:{n:'Railgun',d:'Enorme schade, dwars door pantser.',cost:300,dmg:230,rate:.35,range:5},
- wave:{n:'Golfkanon',d:'Schiet door een hele rij vijanden heen.',cost:340,dmg:95,rate:.5,range:3.6},
- uplink:{n:'Commandopost',d:'Versterkt de schade van turrets in de buurt.',cost:220,range:1.6},
- geers:{n:'The Geers',d:'Drie turbo turrets, samengesmolten tot een.',cost:0,range:5.5},
- omega:{n:'Omega-toren',d:'Het ultieme wapen: vernietigende stralen die elke vijand in bereik vertragen.',cost:0,range:3.2}
-};
-const TYPES=['sentry','flak','cryo','toxin','tesla','prism','rocket','rail','wave','uplink'];
-const EN={
- inf:{n:'Conscript',hp:1,sp:1.25,b:1},
- dog:{n:'Aanvalshond',hp:.55,sp:2.2,b:.8},
- tank:{n:'Hammer Tank',hp:3.2,sp:.8,arm:.35,b:2.6},
- drone:{n:'Terror Drone',hp:.32,sp:1.6,b:.4},
- mech:{n:'Veldmech',hp:1.8,sp:1,regen:.025,b:1.8},
- haz:{n:'Hazmat-trooper',hp:2.2,sp:1.05,immune:true,b:2.2},
- boss:{n:'Luchtschip',hp:28,sp:.55,arm:.25,b:25,leak:10,boss:true}
-};
-// Talenten: tree T = torens, H = held. t = rij (0-6, gaat open bij 5*t punten in die boom), c = kolom (0-3), max = aantal rangen,
-// v = waarde per rang die in de tekst op {v} komt, req = talent recht erboven dat eerst vol moet zijn.
-const SKILLS=[
- {id:'dmg',tree:'T',t:0,c:0,max:5,ic:'blast',n:'Holle punten',d:'+{v}% schade voor alle torens',v:3},
- {id:'bulk',tree:'T',t:0,c:1,max:5,ic:'crate',n:'Massaproductie',d:'Torens bouwen {v}% goedkoper',v:2.5},
- {id:'chest',tree:'T',t:0,c:2,max:3,ic:'coin',n:'Oorlogskas',d:'+{v} startcredits',v:50},
- {id:'rate',tree:'T',t:1,c:0,max:5,ic:'clock',n:'Overklok',d:'+{v}% vuursnelheid',v:2.5},
- {id:'bounty',tree:'T',t:1,c:1,max:5,ic:'coin',n:'Oorlogsbuit',d:'+{v}% credits per kill',v:4},
- {id:'fort',tree:'T',t:1,c:3,max:4,ic:'shield',n:'Versterkte basis',d:'+{v} levens',v:2},
- {id:'range',tree:'T',t:2,c:0,max:5,ic:'cross',n:'Lange optiek',d:'+{v}% bereik',v:2},
- {id:'engineer',tree:'T',t:2,c:1,max:3,ic:'wrench',n:'Ingenieurskorps',d:'Upgrades {v}% goedkoper',v:5},
- {id:'freeze',tree:'T',t:2,c:2,max:3,ic:'snow',n:'Diepvries',d:'Bevriezing duurt {v}% langer',v:12},
- {id:'toxin',tree:'T',t:2,c:3,max:3,ic:'drop',n:'Neurotoxine',d:'Gif doet {v}% meer schade en vertraagt sterker',v:14},
- {id:'ap',tree:'T',t:3,c:0,max:5,ic:'sword',n:'Pantserbrekers',d:'Negeert {v}% van vijandelijk pantser',v:10},
- {id:'bonus',tree:'T',t:3,c:1,max:4,ic:'up',n:'Frontpremie',d:'+{v}% rondebonus',v:10},
- {id:'splash',tree:'T',t:3,c:2,max:4,ic:'blast',n:'Brede lading',d:'Explosies {v}% groter',v:5},
- {id:'salvage',tree:'T',t:3,c:3,max:2,ic:'wrench',n:'Sloopdienst',d:'Verkopen levert {v}% meer op',v:10},
- {id:'link',tree:'T',t:4,c:0,max:5,ic:'link',n:'Linkversterker',d:'Linkbonus {v}% sterker',v:10},
- {id:'interest',tree:'T',t:4,c:1,max:5,ic:'coin',n:'Oorlogsobligaties',d:'{v}% rente op je credits na elke ronde (max 100)',v:1},
- {id:'turbo',tree:'T',t:4,c:2,max:5,ic:'bolt',n:'Turbo-injectie',d:'Turbo {v}% goedkoper',v:5},
- {id:'repair',tree:'T',t:4,c:3,max:2,ic:'plus',n:'Reparatieploeg',d:'+{v} leven na elke 10 rondes',v:1},
- {id:'boss',tree:'T',t:5,c:1,max:5,ic:'skull',n:'Bazenjager',d:'Torens doen +{v}% schade tegen bazen',v:6},
- {id:'geers',tree:'T',t:5,c:2,max:5,ic:'star',n:'Geers-overdrive',d:'The Geers doet {v}% meer schade',v:7,req:'turbo'},
- {id:'war',tree:'T',t:6,c:1,max:1,ic:'trophy',n:'Totale oorlog',d:'Alle torens: +10% schade en +10% vuursnelheid',v:0,req:'boss'},
- {id:'hdmg',tree:'H',t:0,c:0,max:5,ic:'sword',n:'Wapentraining',d:'Je held doet +{v}% schade',v:4},
- {id:'hhp',tree:'H',t:0,c:1,max:5,ic:'heart',n:'Taai',d:'+{v}% levenspunten voor je held',v:5},
- {id:'hspd',tree:'H',t:0,c:2,max:5,ic:'boot',n:'Snelle voeten',d:'Je held loopt {v}% sneller',v:2},
- {id:'hrate',tree:'H',t:1,c:0,max:5,ic:'clock',n:'Vuurdiscipline',d:'Je held valt {v}% sneller aan',v:3},
- {id:'harm',tree:'H',t:1,c:1,max:5,ic:'shield',n:'Dikke huid',d:'Je held krijgt {v}% minder schade',v:3},
- {id:'hrange',tree:'H',t:1,c:3,max:3,ic:'cross',n:'Verrekijker',d:'+{v}% bereik voor je held',v:4},
- {id:'hap',tree:'H',t:2,c:0,max:3,ic:'bolt',n:'Pantserdoorn',d:'Aanvallen van je held negeren {v}% pantser',v:15},
- {id:'hregen',tree:'H',t:2,c:1,max:3,ic:'plus',n:'Tweede adem',d:'In missies en de arena herstelt je held {v}% levenspunten per seconde',v:.5},
- {id:'hgold',tree:'H',t:2,c:2,max:3,ic:'coin',n:'Premiejager',d:'Kills door je held leveren {v}% extra credits op',v:10},
- {id:'hboss',tree:'H',t:2,c:3,max:5,ic:'skull',n:'Bazenbreker',d:'Je held doet +{v}% schade tegen bazen en de Kolos',v:5},
- {id:'hcrit',tree:'H',t:3,c:0,max:5,ic:'blast',n:'Zwakke plek',d:'{v}% kans op een kritieke treffer met dubbele schade',v:4},
- {id:'hdodge',tree:'H',t:3,c:1,max:3,ic:'dodge',n:'Scherpe reflexen',d:'{v}% kans om een treffer te ontwijken',v:5},
- {id:'shdur',tree:'H',t:3,c:2,max:3,ic:'shield',n:'Schildgenerator',d:'Je schild op het parcours houdt {v} seconde langer stand',v:.5},
- {id:'hpvp',tree:'H',t:3,c:3,max:5,ic:'sword',n:'Arenavechter',d:'+{v}% schade tegen andere helden',v:4},
- {id:'hcritd',tree:'H',t:4,c:0,max:3,ic:'star',n:'Dodelijke precisie',d:'Kritieke treffers doen nog eens {v}% extra schade',v:25,req:'hcrit'},
- {id:'shcd',tree:'H',t:4,c:2,max:3,ic:'clock',n:'Snelle lader',d:'Je schild laadt {v} seconde sneller op',v:1,req:'shdur'},
- {id:'mission',tree:'H',t:4,c:3,max:3,ic:'up',n:'Missiepremie',d:'+{v} credits als je een missie of de arena wint',v:150},
- {id:'leech',tree:'H',t:5,c:0,max:3,ic:'drop',n:'Bloeddorst',d:'Zolang je held aanvalt herstelt hij {v}% levenspunten per seconde',v:1},
- {id:'second',tree:'H',t:5,c:1,max:1,ic:'heart',n:'Tweede kans',d:'Eén keer per missie staat je held na een dodelijke klap weer op met 30% levenspunten. Werkt niet tegen de ultra-aanval van de Kolos.',v:0},
- {id:'legend',tree:'H',t:6,c:1,max:1,ic:'trophy',n:'Legende',d:'Je held: +15% schade, +15% levenspunten en +10% snelheid',v:0,req:'second'}
-];
-const SKILL_MAX=SKILLS.reduce((a,s)=>a+s.max,0),TIER=5;
-function mods(sk){sk=sk&&!Array.isArray(sk)?sk:{};const r=id=>sk[id]|0,war=r('war')?1.1:1,lg=r('legend');return{
-  gold:1+.04*r('bounty'),up:1-.05*r('engineer'),start:50*r('chest'),build:1-.025*r('bulk'),lives:2*r('fort'),
-  dmg:(1+.03*r('dmg'))*war,rate:(1+.025*r('rate'))*war,range:1+.02*r('range'),freeze:1+.12*r('freeze'),tox:1+.14*r('toxin'),toxSlow:.035*r('toxin'),
-  interest:.01*r('interest'),bonus:1+.1*r('bonus'),sell:.7+.1*r('salvage'),link:1+.1*r('link'),turbo:1-.05*r('turbo'),geers:1+.07*r('geers'),
-  ap:.1*r('ap'),splash:1+.05*r('splash'),repair:r('repair'),boss:1+.06*r('boss'),
-  hDmg:(1+.04*r('hdmg'))*(lg?1.15:1),hHp:(1+.05*r('hhp'))*(lg?1.15:1),hSpd:(1+.02*r('hspd'))*(lg?1.1:1),hRate:1+.03*r('hrate'),hArm:.03*r('harm'),
-  hRange:1+.04*r('hrange'),hAp:.15*r('hap'),hRegen:.005*r('hregen'),hGold:.1*r('hgold'),hBoss:1+.05*r('hboss'),hCrit:.04*r('hcrit'),hCritDmg:.25*r('hcritd'),
-  hDodge:.05*r('hdodge'),shDur:.5*r('shdur'),shCd:r('shcd'),hPvp:1+.04*r('hpvp'),mission:150*r('mission'),leech:.01*r('leech'),second:r('second')>0};}
-const skillTotal=sk=>SKILLS.reduce((a,s)=>a+(sk[s.id]|0),0);
-const skillSpent=(sk,tree)=>SKILLS.reduce((a,s)=>a+(s.tree===tree?(sk[s.id]|0):0),0);
-// lock: 'tier' = te weinig punten in deze boom, 'req' = het talent erboven is nog niet vol
-function skillState(sk,s){const rank=sk[s.id]|0,q=s.req&&SKILLS.find(x=>x.id===s.req);
-  return{rank,lock:skillSpent(sk,s.tree)<TIER*s.t?'tier':q&&(sk[q.id]|0)<q.max?'req':null,q};}
-// Skillpunten voor het halen van ronde r: 1 per 20 levels, 1 per miniboss (elke tiende ronde) en 3 zodra je daarmee level 100 bereikt.
-const pointsFor=r=>(r%20===0?1:0)+(r%10===0?1:0)+(r===99?3:0);
-const hpMul=r=>B.hp0*(1+B.lin*r)*Math.pow(B.g,r)*(r>B.late?Math.pow(B.g2,r-B.late):1);
-
-function create(skills){const m=mods(skills);
-  return{m,gold:B.startGold+m.start,lives:B.lives+m.lives,round:1,cleared:0,phase:'prep',timer:PREP,wt:0,q:[],road:new Set(),trail:new Set(),path:null,rv:0,pv:null,pvk:-1,
-    tw:[],map:{},en:[],fx:[],ev:[],fxOn:false,score:0,kills:0,time:0,nid:1,geers:0};}
-
-function makeWave(r){const q=[];let t=0;const n=8+Math.floor(r*.4),R=Math.round;
-  const add=(type,cnt,gap,hm)=>{for(let i=0;i<cnt;i++){q.push({t,type,hm:hm||1});t+=gap;}t+=1.2;};
-  if(r%10===0){add('inf',R(n*.5),.55);add('tank',R(n*.3),.9);add('boss',1+Math.floor(r/40),4);if(r===ROUNDS)add('boss',1,1,3);}
-  else switch(r%5){
-    case 1:add('inf',n,.55);break;
-    case 2:add('inf',R(n*.6),.55);add('dog',R(n*.6),.4);break;
-    case 3:add('drone',R(n*1.8),.25);break;
-    case 4:add('tank',R(n*.4),.9);add(r>=14?'mech':'inf',R(n*.35),.7);break;
-    default:add(r>=18?'haz':'inf',R(n*.4),.7);add('dog',R(n*.5),.4);add('tank',R(n*.25),.9);}
-  return q.reverse();}
-function startWave(G){if(G.phase!=='build')return;G.phase='wave';G.wt=0;G.q=makeWave(G.round);G.ev.push({k:'wave',r:G.round});}
-function spawn(G,s){const d=EN[s.type],r=G.round,hp=d.hp*hpMul(r)*s.hm,p=posAt(G.path,0);
-  G.en.push({id:G.nid++,type:s.type,hp,max:hp,d:0,sp:d.sp,arm:d.arm||0,regen:d.regen||0,immune:!!d.immune,boss:!!d.boss,
-    big:s.hm>1,leak:d.leak||1,b:Math.max(1,Math.round(B.gold0*d.b*s.hm*(1+B.goldLin*r)*G.m.gold)),sc:Math.round(d.b*s.hm*r*5),
-    x:p[0],y:p[1],dx:p[2],dy:p[3],fz:0,fi:0,sT:0,sl:0,pT:0,pD:0});}
-function kill(G,e){if(e.dead)return;e.dead=true;G.gold+=e.b;G.score+=e.sc;G.kills++;if(G.fxOn)G.fx.push({k:'die',b:[e.x,e.y],boss:e.boss});}
-function hit(G,e,dmg,pierce){if(e.dead)return;const arm=e.arm*(1-G.m.ap)*(1-(pierce||0));
-  e.hp-=dmg*(1-arm)*(e.boss?G.m.boss:1);if(e.hp<=0)kill(G,e);}
-function aoe(G,x,y,r,fn){const r2=r*r;for(const e of G.en){if(e.dead)continue;const dx=e.x-x,dy=e.y-y;if(dx*dx+dy*dy<=r2)fn(e);}}
-
-function stats(G,t){const b=T[t.type],m=G.m,au=1+(t.aura||0);
-  if(t.type==='geers')return{dmg:t.gdps*m.geers*m.dmg*au/5,rate:5,range:b.range*m.range};
-  if(t.type==='omega')return{dmg:hpMul(G.round)*.6*m.dmg*au,rate:2,range:b.range*m.range};
-  const ln=t.spec==='link'?Math.min(4,t.nb||0):0,tb=t.spec==='turbo';
-  if(t.type==='uplink')return{dmg:0,rate:0,range:(1.6+.15*t.lvl)*m.range*(1+.1*ln),aura:(.18+.04*t.lvl)*(tb?1.5:1)*(1+.15*m.link*ln)};
-  const up=Math.pow(1.4,t.lvl);
-  return{dmg:b.dmg*up*m.dmg*au*(1+.25*m.link*ln)*(tb?1.3:1),rate:b.rate*(1+.05*t.lvl)*m.rate*(tb?1.8:1),
-    range:b.range*(1+.04*t.lvl)*m.range*(1+.05*ln),
-    fz:b.fz?b.fz*(1+.12*t.lvl)*m.freeze:0,pd:b.pd?b.pd*up*m.tox*au:0,slow:b.slow?Math.min(.6,b.slow+m.toxSlow+.02*t.lvl):0};}
-function recalc(G){
-  for(const t of G.tw){t.nb=0;t.aura=0;const x=t.c%N,y=(t.c-x)/N;
-    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;
-      if(nx<0||ny<0||nx>=N||ny>=N)continue;const o=G.map[ny*N+nx];if(o&&(o.lvl>=5||o.type==='geers'))t.nb++;}}
-  for(const u of G.tw){if(u.type!=='uplink')continue;u.s=stats(G,u);
-    for(const t of G.tw){if(t.type==='uplink')continue;const dx=t.x-u.x,dy=t.y-u.y;
-      if(dx*dx+dy*dy<=u.s.range*u.s.range&&u.s.aura>t.aura)t.aura=u.s.aura;}}
-  for(const t of G.tw)t.s=stats(G,t);}
-function canBuild(G,c){if(!(c>=0&&c<N*N)||ROCK.has(c)||G.map[c]||c===C_IN||c===C_OUT)return false;
-  if(G.path)return!G.path.set.has(c);if(G.road.has(c))return false;
-  return!!search(k=>k!==c&&!ROCK.has(k)&&!G.map[k]);} // een turret mag de doorgang nooit helemaal afsluiten
-const buildCost=(G,type)=>Math.round(T[type].cost*G.m.build);
-const upCost=(G,t)=>Math.round(T[t.type].cost*(.5+.25*t.lvl)*G.m.up);
-const specCost=(G,t,k)=>Math.round(T[t.type].cost*(k==='turbo'?3*G.m.turbo:1.5));
-const sellValue=(G,t)=>Math.round(t.spent*G.m.sell);
-function build(G,c,type){if(!canBuild(G,c)||!T[type]||type==='geers')return null;const cost=buildCost(G,type);if(G.gold<cost)return null;
-  G.gold-=cost;const x=c%N,t={id:G.nid++,c,x:x+.5,y:(c-x)/N+.5,type,lvl:0,spec:null,cd:0,ang:.8,ramp:1,tg:0,spent:cost,nb:0,aura:0};
-  G.tw.push(t);G.map[c]=t;G.rv++;recalc(G);return t;}
-function upgrade(G,t){if(t.type==='geers'||t.lvl>=5)return false;const c=upCost(G,t);if(G.gold<c)return false;
-  G.gold-=c;t.spent+=c;t.lvl++;recalc(G);return true;}
-function remove(G,t){G.tw.splice(G.tw.indexOf(t),1);delete G.map[t.c];G.rv++;}
-function sell(G,t){G.gold+=sellValue(G,t);remove(G,t);recalc(G);}
-const rawDps=t=>{const b=T[t.type];return b.dmg?b.dmg*Math.pow(1.4,5)*1.3*b.rate*1.25*1.8*(t.type==='prism'?1.6:1):150;};
-function spec(G,t,k){if(t.type==='geers'||t.lvl<5||t.spec||(k!=='turbo'&&k!=='link'))return false;const c=specCost(G,t,k);if(G.gold<c)return false;
-  G.gold-=c;t.spent+=c;t.spec=k;
-  if(k==='turbo'){const tb=G.tw.filter(o=>o.spec==='turbo'&&o!==t);
-    if(tb.length>=2){const parts=[tb[0],tb[1],t];t.gdps=1.1*parts.reduce((s,o)=>s+rawDps(o),0);
-      t.spent=parts.reduce((s,o)=>s+o.spent,0);remove(G,tb[0]);remove(G,tb[1]);
-      t.type='geers';t.spec='geers';t.lvl=5;G.geers++;G.ev.push({k:'geers',c:t.c});
-      // tien keer The Geers: het ultieme wapen vult elk vrij vak met een Omega-toren
-      if(G.geers>=10&&!G.omega){G.omega=true;let n=0;for(let c=0;c<N*N;c++)if(canBuild(G,c)){const x=c%N,o={id:G.nid++,c,x:x+.5,y:(c-x)/N+.5,type:'omega',lvl:5,spec:'omega',cd:0,ang:.8,ramp:1,tg:0,spent:0,nb:0,aura:0};G.tw.push(o);G.map[c]=o;n++;}G.rv++;G.ev.push({k:'omega',n});}}}
-  recalc(G);return true;}
-
-function fire(G,t,e,s){const m=G.m,fx=G.fxOn?G.fx:null,a=[t.x,t.y],b=[e.x,e.y];
-  switch(t.type){
-    case'omega':hit(G,e,hpMul(G.round)*.6*m.dmg*(1+(t.aura||0)),.5);if(!e.dead){const sl=.45*(e.boss?.5:1);e.sl=e.sT>0?Math.max(e.sl,sl):sl;e.sT=2;}fx&&fx.push({k:'omega',a,b});break;
-    case'sentry':hit(G,e,s.dmg,0);fx&&fx.push({k:'shot',a,b});break;
-    case'rail':hit(G,e,s.dmg,1);fx&&fx.push({k:'rail',a,b});break;
-    case'flak':case'rocket':{const r=T[t.type].splash*m.splash;aoe(G,e.x,e.y,r,x=>hit(G,x,s.dmg,0));fx&&fx.push({k:t.type==='rocket'?'rocket':'boom',a,b,r});break;}
-    case'cryo':{const r=T.cryo.splash*m.splash;aoe(G,e.x,e.y,r,x=>{hit(G,x,s.dmg,0);
-      if(!x.dead&&!x.immune&&x.fi<=0){const d=s.fz*(x.boss?.4:1);x.fz=d;x.fi=d+2.2;}});fx&&fx.push({k:'ice',a,b,r});break;}
-    case'toxin':{const r=T.toxin.splash*m.splash;aoe(G,e.x,e.y,r,x=>{hit(G,x,s.dmg,0);if(x.dead)return;
-      x.pD=x.pT>0?Math.max(x.pD,s.pd):s.pd;x.pT=4;if(!x.immune){const sl=s.slow*(x.boss?.5:1);x.sl=x.sT>0?Math.max(x.sl,sl):sl;x.sT=4;}});
-      fx&&fx.push({k:'tox',a,b,r});break;}
-    case'tesla':{const pts=[a,b],done=new Set([e.id]);let cur=e,d=s.dmg;hit(G,e,d,.5);
-      for(let i=1;i<T.tesla.chain;i++){let nx=null,bd=3.3;for(const o of G.en){if(o.dead||done.has(o.id))continue;
-          const dx=o.x-cur.x,dy=o.y-cur.y,dd=dx*dx+dy*dy;if(dd<bd){bd=dd;nx=o;}}
-        if(!nx)break;d*=.7;done.add(nx.id);pts.push([nx.x,nx.y]);hit(G,nx,d,.5);cur=nx;}
-      fx&&fx.push({k:'bolt',pts});break;}
-    case'prism':if(t.tg!==e.id){t.tg=e.id;t.ramp=1;}hit(G,e,s.dmg*t.ramp,0);t.ramp=Math.min(2.5,t.ramp+.5/s.rate);fx&&fx.push({k:'beam',a,b});break;
-    case'wave':{const L=Math.hypot(e.x-t.x,e.y-t.y)||1,ux=(e.x-t.x)/L,uy=(e.y-t.y)/L,w=.5*m.splash;
-      for(const o of G.en){if(o.dead)continue;const px=o.x-t.x,py=o.y-t.y,pr=px*ux+py*uy;if(pr<0||pr>s.range)continue;
-        if(Math.abs(px*uy-py*ux)<=w)hit(G,o,s.dmg,.3);}
-      fx&&fx.push({k:'wave',a,b:[t.x+ux*s.range,t.y+uy*s.range]});break;}
-  }}
-function step(G,dt){
-  if(G.phase==='over'||G.phase==='won'||G.phase==='prep')return;
-  G.time+=dt;
-  if(G.phase==='build'){G.timer-=dt;if(G.timer<=0)startWave(G);}
-  if(G.phase==='wave'){G.wt+=dt;while(G.q.length&&G.q[G.q.length-1].t<=G.wt)spawn(G,G.q.pop());}
-  for(const e of G.en){if(e.dead)continue;
-    if(e.fi>0)e.fi-=dt;
-    if(e.pT>0){e.pT-=dt;e.hp-=e.pD*dt;if(e.hp<=0){kill(G,e);continue;}}
-    else if(e.regen&&e.hp<e.max)e.hp=Math.min(e.max,e.hp+e.max*e.regen*dt);
-    let sp=e.sp;
-    if(e.fz>0){e.fz-=dt;sp=0;}else if(e.sT>0){e.sT-=dt;sp*=1-e.sl;}
-    e.d+=sp*dt;
-    if(e.d>=G.path.len){e.dead=true;G.lives-=e.leak;G.ev.push({k:'leak',n:e.leak});continue;}
-    const p=posAt(G.path,e.d);e.x=p[0];e.y=p[1];e.dx=p[2];e.dy=p[3];}
-  for(const t of G.tw){if(t.type==='uplink')continue;
-    t.cd-=dt;if(t.cd>0)continue;
-    const s=t.s,r2=s.range*s.range,mr=T[t.type].minr||0,m2=mr*mr;
-    if(t.type==='geers'){const inr=[];for(const e of G.en){if(e.dead)continue;const dx=e.x-t.x,dy=e.y-t.y;if(dx*dx+dy*dy<=r2)inr.push(e);}
-      if(!inr.length){t.cd=0;continue;}inr.sort((p,q)=>q.d-p.d);t.cd=Math.max(t.cd,-dt)+1/s.rate;
-      t.ang=Math.atan2(inr[0].y-t.y,inr[0].x-t.x);
-      for(let i=0;i<3&&i<inr.length;i++){const e=inr[i];if(G.fxOn)G.fx.push({k:'geers',a:[t.x,t.y],b:[e.x,e.y]});
-        if(!e.immune){e.sl=Math.max(e.sT>0?e.sl:0,.25);e.sT=Math.max(e.sT,.6);}hit(G,e,s.dmg,.5);}
-      continue;}
-    let best=null,bv=-1;
-    for(const e of G.en){if(e.dead)continue;const dx=e.x-t.x,dy=e.y-t.y,d2=dx*dx+dy*dy;if(d2>r2||d2<m2)continue;
-      let v=t.type==='rail'?e.hp:e.d;
-      if(t.type==='cryo'&&!e.immune&&e.fi<=0)v+=1000;else if(t.type==='toxin'&&e.pT<=.5)v+=1000;
-      if(v>bv){bv=v;best=e;}}
-    if(!best){t.cd=0;t.ramp=1;continue;}
-    t.cd=Math.max(t.cd,-dt)+1/s.rate;t.ang=Math.atan2(best.y-t.y,best.x-t.x);
-    fire(G,t,best,s);}
-  let w=0;for(let i=0;i<G.en.length;i++)if(!G.en[i].dead)G.en[w++]=G.en[i];G.en.length=w;
-  if(G.lives<=0){G.lives=0;G.phase='over';return;}
-  if(G.phase==='wave'&&!G.q.length&&!G.en.length){const r=G.round,bonus=Math.round((B.bonA+B.bonB*r)*G.m.bonus),
-      int=Math.min(100,Math.floor(G.gold*G.m.interest));
-    G.gold+=bonus+int;G.score+=50*r;G.cleared=r;if(r%10===0)G.lives+=G.m.repair;
-    G.ev.push({k:'clear',r,bonus:bonus+int});
-    // Na de laatste golf wacht nog het eindmonster: de spellaag beslist daarna over winst of verlies.
-    if(r>=ROUNDS){G.final=true;G.phase='wait';}else{G.round++;G.phase='wait';}}
-}
-function win(G){if(G.phase==='won'||G.phase==='over')return;G.phase='won';G.score+=5000+200*G.lives;}
-function lose(G){if(G.phase==='won'||G.phase==='over')return;G.phase='over';}
-return{N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,B,T,TYPES,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
-  buildCost,upCost,specCost,sellValue,stats,mods,skillTotal,skillSpent,skillState,SKILL_MAX,TIER,pointsFor,hpMul,makeWave,hit,recalc,win,lose};
-})();
-</script><script>
 (()=>{
 const E=Engine,{N,T,TYPES,EN,SKILLS,ROUNDS}=E,T3=window.THREE;
 const $=s=>document.querySelector(s);
@@ -820,7 +38,7 @@ const maxHp=()=>HEROES[save.hero].hp*HM.hHp*(armour>=2?1.4:1);
 function hurt(d){if(HM.hDodge&&Math.random()<HM.hDodge)return;hero.hp-=d*(1-HM.hArm);}
 function revive(){if(!HM.second||!arena||arena.sc)return false;arena.sc=true;hero.hp=maxHp()*.3;toast('Tweede kans: je held staat weer op');return true;}
 const keys={};
-let user=null,db=null,room=null,uid=null,peers=[],names={},board=null,connAt=0,ready=false,boardFail=false;
+let room=null,uid=null,peers=[],board=null,connAt=0,ready=false,boardFail=false;
 const seenGo=new Set(),rx=new Map();
 function lcg(seed){let s=seed;return()=>(s=(s*16807)%2147483647)/2147483647;}
 
@@ -835,61 +53,67 @@ function award(n){if(!(n>0))return;save.pts+=n;save.earned+=n;gamePts+=n;persist
 const blank=()=>({v:2,pts:0,earned:0,skills:{},games:0,best:0,hero:0,at:0});
 const putLocal=()=>{try{localStorage.setItem('ratd-save',JSON.stringify(save));}catch{}};
 function loadLocal(){try{const d=clean(JSON.parse(localStorage.getItem('ratd-save')));if(d)save=d;}catch{}}
-const saveRef=()=>db&&uid?db.collection('data/users/'+uid).doc('save'):null;
-// Alleen een account schrijft naar de cloud; een gast speelt lokaal en overschrijft dus nooit accountvoortgang.
-function persist(){save.at=Date.now();putLocal();const r=acct&&acct.cloud?saveRef():null;if(r)r.set({...save,skills:{...save.skills}}).catch(()=>{});}
+// Voortgang staat altijd in de browser. Wie is ingelogd bewaart hem ook op de server; een gast speelt lokaal
+// en overschrijft dus nooit accountvoortgang. Meerdere wijzigingen kort na elkaar gaan als één verzoek de deur uit.
+let saveBusy=false,saveAgain=false;
+function pushSave(){if(!acct||!Net.hasToken())return;if(saveBusy){saveAgain=true;return;}saveBusy=true;
+  Net.api('PUT','/save',{save:{...save,skills:{...save.skills}}}).then(r=>{setCloud(true);if(r.kept){cloudSave=clean(r.save);if(adopt())refreshUI();}},authFail)
+    .then(()=>{saveBusy=false;if(saveAgain){saveAgain=false;pushSave();}});}
+function persist(){save.at=Date.now();putLocal();pushSave();}
 const newer=d=>!!d&&(d.earned>save.earned||(d.earned===save.earned&&d.at>save.at));
 function adopt(){if(newer(cloudSave)){save={...cloudSave,skills:{...cloudSave.skills}};putLocal();return true;}return false;}
-function loadCloud(){const r=saveRef();if(!r)return Promise.resolve();
-  return r.get().then(s=>{cloudSave=s.exists?clean(s.data()):null;
-    if(acct&&!adopt()&&acct.cloud&&save.earned>0&&(!cloudSave||save.earned>cloudSave.earned||save.at>cloudSave.at))r.set({...save,skills:{...save.skills}}).catch(()=>{});
-    refreshUI();}).catch(()=>{});}
+
 
 /* ---------- account ---------- */
-// Een account is een roepnaam in players/<id>, gekoppeld aan de Claude-login van de speler. Er zijn geen wachtwoorden.
-let acct=null,guest=false,cloudAcct=null,cloudSave=null,cloudChecked=false,gateMode='new',callsigns={},keyOwner={};
-const nameKey=n=>n.trim().toLowerCase().replace(/\s+/g,' ');
+// Een account is een roepnaam met een wachtwoord en staat op de server. Na inloggen bewaart de browser een sessietoken,
+// zodat je de volgende keer meteen verder kunt. cloud = de server heeft deze sessie bevestigd.
+let acct=null,guest=false,cloudSave=null,gateMode='new',gateBusy=false;
 function cleanName(v){const n=String(v==null?'':v).replace(/\s+/g,' ').trim();return /^[\p{L}\p{N}][\p{L}\p{N} _-]{2,15}$/u.test(n)?n:null;}
-function loadAcct(){try{const a=JSON.parse(localStorage.getItem('ratd-acct')),n=a&&cleanName(a.name);if(n)acct={name:n,cloud:!!a.cloud};}catch{}}
-function storeAcct(){try{if(acct)localStorage.setItem('ratd-acct',JSON.stringify(acct));else localStorage.removeItem('ratd-acct');}catch{}}
-const playerRef=()=>db&&uid?db.collection('players').doc(uid):null;
-const gateBack=()=>!!cloudAcct&&!acct&&gateMode!=='rename';
+function loadAcct(){if(!Net.hasToken())return;try{const a=JSON.parse(localStorage.getItem('ratd-acct')),n=a&&cleanName(a.name);if(n&&typeof a.id==='string'){acct={id:a.id,name:n,cloud:false};uid=a.id;}}catch{}}
+function storeAcct(){try{if(acct)localStorage.setItem('ratd-acct',JSON.stringify({id:acct.id,name:acct.name}));else localStorage.removeItem('ratd-acct');}catch{}}
+function setCloud(on){if(acct&&acct.cloud!==on){acct.cloud=on;renderAcct();}}
+// Antwoord van registreren, inloggen of /me: de server zegt wie je bent en wat er voor je is opgeslagen.
+function signedIn(r){acct={id:r.user.id,name:r.user.name,cloud:true};uid=acct.id;guest=false;storeAcct();cloudSave=r.save?clean(r.save):null;if(!adopt())pushSave();refreshUI();}
+function signedOut(){Net.setToken(null);acct=null;uid=null;cloudSave=null;storeAcct();if(room)room.reauth();}
+// Een verzoek mislukte. Is de sessie verlopen, dan terug naar het inlogscherm; is de server weg, dan speel je door op dit apparaat.
+function authFail(err){if(err&&err.status===401){const had=!!acct;signedOut();if(had&&!G){showGate('login');setText($('#gErr'),'Je sessie is verlopen. Log opnieuw in.');}}else setCloud(false);}
 function showGate(mode){closePops();gateMode=mode||'new';$('#home').hidden=true;$('#gate').hidden=false;setText($('#gErr'),'');
-  $('#gName').value=gateMode==='rename'&&acct?acct.name:'';renderGate();if(!gateBack())try{$('#gName').focus({preventScroll:true});}catch{}}
+  $('#gName').value=gateMode==='rename'&&acct?acct.name:'';$('#gPass').value='';renderGate();try{$('#gName').focus({preventScroll:true});}catch{}}
 function showHome(){$('#gate').hidden=true;$('#home').hidden=false;renderHome();renderLobby();}
 function refreshUI(){renderHome();if(!$('#gate').hidden)renderGate();}
-function renderGate(){const back=gateBack(),ren=gateMode==='rename',st=back&&cloudSave?cloudSave:save,cloud=!!(db&&uid);
-  setText($('#gTitle'),back?'Welkom terug, '+cloudAcct.name:ren?'Roepnaam wijzigen':'Account maken');
-  setText($('#gLead'),back?'Je account is gevonden. Je voortgang staat klaar.':ren?'Kies een nieuwe roepnaam. Je voortgang blijft staan.'
-    :save.earned>0?'Kies een roepnaam. De voortgang op dit apparaat gaat mee naar je account.':'Kies een roepnaam. Vanaf dan bewaart het spel je skillpunten, skills en held.');
-  $('#gField').hidden=back;$('#gErr').hidden=back;$('#gStats').hidden=ren||!(st.earned>0||st.games>0);
-  setText($('#gXp'),fmt(st.pts));setText($('#gSk'),E.skillTotal(st.skills)+' / '+E.SKILL_MAX);setText($('#gGm'),String(st.games));
-  setText($('#gGo'),back?'Ga verder':ren?'Roepnaam opslaan':'Maak account');
-  const g=$('#gGuest');g.hidden=false;setText(g,ren?'Annuleren':back?'Speel als gast':'Speel als gast');
-  setText($('#gNote'),!cloudChecked?'Account zoeken…':cloud?'Je account hangt aan je Claude-login. Een wachtwoord is niet nodig: waar je bent ingelogd, ga je verder.'
-    :'Je bent hier niet ingelogd, dus je account en voortgang blijven op dit apparaat.');}
-function renderAcct(){const e=$('#aEdit'),o=$('#aOut');
+function renderGate(){const ren=gateMode==='rename',login=gateMode==='login';
+  setText($('#gTitle'),ren?'Roepnaam wijzigen':login?'Inloggen':'Account maken');
+  setText($('#gLead'),ren?'Kies een nieuwe roepnaam. Je voortgang blijft staan.':login?'Log in met je roepnaam en wachtwoord. Je voortgang staat klaar.'
+    :save.earned>0?'Kies een roepnaam en een wachtwoord. De voortgang op dit apparaat gaat mee naar je account.':'Kies een roepnaam en een wachtwoord. Vanaf dan bewaart het spel je skillpunten, skills en held.');
+  $('#gPassField').hidden=ren;$('#gPass').autocomplete=login?'current-password':'new-password';$('#gPass').placeholder=login?'Je wachtwoord':'Minstens 8 tekens';
+  $('#gStats').hidden=ren||login||!(save.earned>0||save.games>0);
+  setText($('#gXp'),fmt(save.pts));setText($('#gSk'),E.skillTotal(save.skills)+' / '+E.SKILL_MAX);setText($('#gGm'),String(save.games));
+  const go=$('#gGo');setText(go,gateBusy?'Even geduld…':ren?'Roepnaam opslaan':login?'Log in':'Maak account');go.disabled=gateBusy;
+  setText($('#gGuest'),ren?'Annuleren':'Speel als gast');
+  const sw=$('#gSwitch');sw.hidden=ren;setText(sw,login?'Nieuw account maken':'Ik heb al een account');
+  setText($('#gNote'),ren?'':'Je account werkt op elk apparaat: log in met dezelfde roepnaam en hetzelfde wachtwoord. Een vergeten wachtwoord kan niet worden hersteld, dus bewaar het goed.');}
+function renderAcct(){
   setText($('#aName'),acct?acct.name:'Gast');$('#aDot').classList.toggle('on',!!(acct&&acct.cloud));
-  setText($('#aState'),acct?(acct.cloud?'Account · opgeslagen':'Account · alleen dit apparaat'):'Niet ingelogd');
-  setText(e,acct?'Roepnaam wijzigen':'Account maken');o.hidden=!(acct&&acct.cloud);}
-function pushAcct(){const r=playerRef(),a=acct;if(!r||!a)return;
-  r.set({name:a.name,key:nameKey(a.name),at:Date.now()}).then(()=>{if(acct!==a)return;a.cloud=true;cloudAcct={name:a.name};storeAcct();adopt();persist();refreshUI();}).catch(()=>renderAcct());}
-function checkAccount(){const r=playerRef(),done=()=>{cloudChecked=true;refreshUI();};if(!r){done();return;}
-  r.get().then(s=>{const n=s.exists?cleanName((s.data()||{}).name):null;cloudAcct=n?{name:n}:null;
-    if(acct&&cloudAcct){acct={name:cloudAcct.name,cloud:true};storeAcct();}else if(acct)pushAcct();}).catch(()=>{}).then(loadCloud).then(done);}
-function subPlayers(){try{db.collection('players').limit(500).onSnapshot(s=>{callsigns={};keyOwner={};
-  for(const d of s.docs){const n=cleanName((d.data()||{}).name);if(n){callsigns[d.id]=n;keyOwner[nameKey(n)]=d.id;}}renderLobby();renderBoard();renderChat();},()=>{});}catch{}}
+  setText($('#aState'),acct?(acct.cloud?'Ingelogd · voortgang opgeslagen':'Ingelogd · server niet bereikbaar'):'Niet ingelogd');
+  setText($('#aEdit'),acct?'Roepnaam wijzigen':'Account maken');$('#aLogin').hidden=!!acct;$('#aOut').hidden=!acct;}
 function bindAccount(){
-  $('#gateForm').addEventListener('submit',ev=>{ev.preventDefault();
-    if(gateBack()){acct={name:cloudAcct.name,cloud:true};guest=false;storeAcct();adopt();showHome();return;}
-    const n=cleanName($('#gName').value);
-    if(!n){setText($('#gErr'),'Gebruik 3 tot 16 tekens: letters, cijfers, spaties, - of _.');return;}
-    const own=keyOwner[nameKey(n)];if(own&&own!==uid){setText($('#gErr'),'Die roepnaam is al bezet. Kies een andere.');return;}
-    acct={name:n,cloud:false};guest=false;storeAcct();pushAcct();showHome();});
-  $('#gName').addEventListener('input',()=>setText($('#gErr'),''));
+  const busy=on=>{gateBusy=on;renderGate();},fail=err=>{busy(false);setText($('#gErr'),err.message);};
+  $('#gateForm').addEventListener('submit',ev=>{ev.preventDefault();if(gateBusy)return;
+    const n=cleanName($('#gName').value),pw=$('#gPass').value;
+    if(!n){setText($('#gErr'),'Gebruik voor je roepnaam 3 tot 16 tekens: letters, cijfers, spaties, - of _.');return;}
+    if(gateMode==='rename'){if(!acct){showHome();return;}busy(true);
+      Net.api('PATCH','/account',{name:n}).then(r=>{busy(false);acct.name=r.user.name;acct.cloud=true;storeAcct();showHome();},fail);return;}
+    if(gateMode==='new'&&pw.length<8){setText($('#gErr'),'Kies een wachtwoord van minstens 8 tekens.');return;}
+    if(!pw){setText($('#gErr'),'Vul je wachtwoord in.');return;}
+    busy(true);
+    Net.api('POST',gateMode==='login'?'/login':'/register',{name:n,password:pw}).then(r=>{busy(false);Net.setToken(r.token);signedIn(r);$('#gPass').value='';if(room)room.reauth();showHome();},fail);});
+  for(const id of['#gName','#gPass'])$(id).addEventListener('input',()=>setText($('#gErr'),''));
+  $('#gSwitch').onclick=()=>{const n=$('#gName').value;showGate(gateMode==='login'?'new':'login');$('#gName').value=n;};
   $('#gGuest').onclick=()=>{if(gateMode!=='rename')guest=true;showHome();};
   $('#aEdit').onclick=()=>showGate(acct?'rename':'new');
-  $('#aOut').onclick=()=>{acct=null;guest=false;storeAcct();save=blank();try{localStorage.removeItem('ratd-save');}catch{}showGate('new');loadCloud();};}
+  $('#aLogin').onclick=()=>showGate('login');
+  // Afmelden haalt ook de voortgang van dit apparaat weg: die staat op de server en komt terug als je weer inlogt.
+  $('#aOut').onclick=()=>{Net.api('POST','/logout').catch(()=>{});signedOut();guest=false;save=blank();try{localStorage.removeItem('ratd-save');}catch{}showGate('login');};}
 
 /* ================= 3D ================= */
 const stage=$('#stage');
@@ -1423,8 +647,7 @@ function beginGame(idx,mid){closePops();mySlot=freeSlot(idx);G=E.create(save.ski
   iconDraw($('#heroCv'),'hero'+save.hero);}
 function endGame(){ended=true;const won=G.phase==='won';
   save.games++;save.best=Math.max(save.best,G.score);persist();
-  if(db&&uid&&acct&&acct.cloud){const ref=db.collection('scores').doc(uid),sc=G.score,rd=G.cleared;
-    ref.get().then(s=>{const old=s.exists?+s.data().score||0:0;if(sc>old)return ref.set({score:sc,round:rd,won,at:Date.now()});}).catch(()=>{});}
+  if(acct&&Net.hasToken())Net.api('POST','/scores',{score:G.score,round:G.cleared,won}).catch(authFail);
   myState='done';pushPresence(true);
   setText($('#rTitle'),won?'Overwinning':G.final?'De Titaan wint':'Basis gevallen');
   setText($('#rText'),won?`Alle ${ROUNDS} golven afgeslagen en de Titaan is geveld. Het hoofdkwartier staat nog.`:G.final?`Alle ${ROUNDS} golven afgeslagen, maar de Titaan bleef overeind.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`:`Je hield stand tot en met ronde ${G.cleared}.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`);
@@ -1867,29 +1090,23 @@ function buildHud(){const card=$('#card');for(let i=0;i<12;i++){const b=document
     document.documentElement.style.setProperty('--stonetex','url('+cv.toDataURL()+')');}catch{}}
 
 /* ---------- lobby, leaderboard, skills ---------- */
-const nameOf=p=>own(p)?'Jij':callsigns[p.by||(p.presence&&p.presence.u)]||names[p.by||(p.presence&&p.presence.u)]||'Commandant '+String(p.peer).slice(-3).toUpperCase();
-function resolveNames(ids){if(!user)return;const need=[...new Set(ids.filter(i=>typeof i==='string'&&i&&!(i in names)))];if(!need.length)return;
-  need.forEach(i=>names[i]='');user.profiles(need).then(ps=>{for(const i of need)names[i]=(ps[i]&&ps[i].name)||'';renderLobby();renderBoard();renderChat();}).catch(()=>{});}
+const nameOf=p=>own(p)?'Jij':p.name||'Commandant '+String(p.peer).slice(-3).toUpperCase();
 const lobbyPeers=()=>peers.filter(p=>p.kind==='viewer'&&p.presence&&p.presence.st==='lobby').sort((a,b)=>((+a.presence.t||0)-(+b.presence.t||0))||(a.peer<b.peer?-1:1)).slice(0,SLOTS);
 function row(cells,cls){const li=document.createElement('li');if(cls)li.className=cls;for(const[k,v,cl]of cells){const s=document.createElement('span');s.className=k+(cl?' '+cl:'');s.textContent=v;li.append(s);}return li;}
-/* Lobbychat: ieders laatste drie berichten reizen mee in presence, zodat ook wie net binnenkomt ze ziet. */
-let chatLog=[],myChat=[];const chatSeen=new Set();
+/* Lobbychat: berichten gaan via de server. Die bewaart de laatste zestig, zodat ook wie net binnenkomt ze ziet. */
+let chatLog=[];const chatSeen=new Set();
 const cleanMsg=s=>String(s).replace(/[\u0000-\u001f\u007f\u2028-\u202e]/g,' ').trim().slice(0,160);
-const chatSort=()=>{chatLog.sort((a,b)=>a.ts-b.ts);if(chatLog.length>80)chatLog=chatLog.slice(-80);};
-function chatAdd(key,ts,text,p){if(chatSeen.has(key))return false;chatSeen.add(key);
-  chatLog.push({ts:Math.min(ts,Date.now()+60000),text,me:!p||own(p),id:p?(p.by||(p.presence&&p.presence.u)||null):null,peer:p?p.peer:''});return true;}
-function chatScan(){let add=false;for(const p of peers){if(p.kind!=='viewer'||(own(p)&&p.sameTab))continue;const c=p.presence&&p.presence.c;if(!Array.isArray(c))continue;
-    for(const m of c.slice(-3)){if(!Array.isArray(m))continue;const ts=+m[0],text=typeof m[1]==='string'?cleanMsg(m[1]):'';if(!isFinite(ts)||!text)continue;if(chatAdd(p.peer+'|'+ts,ts,text,p))add=true;}}
-  if(add){chatSort();renderChat();}}
+function onChat(list,history){let add=false;for(const m of list){if(!m||chatSeen.has(m.id))continue;const text=typeof m.text==='string'?cleanMsg(m.text):'';if(!text)continue;
+    chatSeen.add(m.id);chatLog.push({ts:+m.ts||Date.now(),text,by:m.by||null,peer:m.peer||'',name:typeof m.name==='string'?m.name:''});add=true;}
+  if(!add)return;chatLog.sort((a,b)=>a.ts-b.ts);if(chatLog.length>80)chatLog=chatLog.slice(-80);renderChat(history);}
 function renderChat(toEnd){const box=$('#chatLog'),stick=toEnd||box.scrollHeight-box.scrollTop-box.clientHeight<40;box.textContent='';
-  if(!chatLog.length){const p=document.createElement('p');p.className='empty';p.textContent=room?'Nog geen berichten. Zeg hallo tegen de andere commandanten.':connAt===-1?'De chat is hier niet bereikbaar.':'Chat verbinden…';box.append(p);return;}
-  for(const m of chatLog){const d=document.createElement('div');d.className='msg'+(m.me?' me':'');const dt=new Date(m.ts),t=document.createElement('time');
+  if(!chatLog.length){const p=document.createElement('p');p.className='empty';p.textContent=room?'Nog geen berichten. Zeg hallo tegen de andere commandanten.':connAt===-1?'De chat is nu niet bereikbaar.':'Chat verbinden…';box.append(p);return;}
+  for(const m of chatLog){const me=(uid&&m.by===uid)||(!!room&&m.peer===room.peer),d=document.createElement('div');d.className='msg'+(me?' me':'');const dt=new Date(m.ts),t=document.createElement('time');
     t.textContent=String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
-    const b=document.createElement('b');b.textContent=m.me?'Jij':(m.id&&(callsigns[m.id]||names[m.id]))||'Commandant '+String(m.peer).slice(-3).toUpperCase();
+    const b=document.createElement('b');b.textContent=me?'Jij':m.name||'Commandant';
     const x=document.createElement('span');x.textContent=m.text;d.append(t,b,x);box.append(d);}
   if(stick)box.scrollTop=box.scrollHeight;}
-$('#chatForm').onsubmit=ev=>{ev.preventDefault();const inp=$('#chatIn'),text=cleanMsg(inp.value);if(!text||!room)return;const ts=Date.now();
-  myChat=[...myChat.slice(-2),[ts,text]];inp.value='';chatAdd('me|'+ts,ts,text,null);chatSort();renderChat(true);room.presence({c:myChat}).catch(()=>{});};
+$('#chatForm').onsubmit=ev=>{ev.preventDefault();const inp=$('#chatIn'),text=cleanMsg(inp.value);if(!text||!room)return;if(room.chat(text)){inp.value='';const box=$('#chatLog');box.scrollTop=box.scrollHeight;}};
 const heroOf=p=>own(p)?save.hero:Math.max(0,Math.min(5,(p.presence&&p.presence.h)|0));
 function paintRoster(list){const ul=$('#lobby'),sig=JSON.stringify(list);if(ul.dataset.k===sig)return;ul.dataset.k=sig;ul.textContent='';
   for(const r of list){const li=document.createElement('li');li.className=(r.me?'me ':'')+(r.cl==='host'?'host':'');const cv=document.createElement('canvas');cv.width=92;cv.height=78;iconDraw(cv,'hero'+r.h);
@@ -1899,12 +1116,12 @@ function paintMap(cells){const el=$('#world'),sig=JSON.stringify(cells);if(el.da
   cells.forEach((c,i)=>{const d=document.createElement('div');d.className='cell'+(c?' '+c.st+(c.me?' me':''):'');const k=document.createElement('span');k.className='n';k.textContent=String(i+1);d.append(k);
     if(c){n++;const w=document.createElement('span');w.className='who';w.textContent=c.name;const s=document.createElement('span');s.className='st';s.textContent=c.sub;d.append(w,s);d.title=`Vesting ${i+1}: ${c.name}, ${c.sub}`;}else d.title=`Vesting ${i+1}: vrij`;el.append(d);});
   setText($('#worldNote'),`${n} van ${SLOTS} vestingen bezet`);}
-function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array(SLOTS).fill(null);$('#chatIn').disabled=$('#chatSend').disabled=!room;$('#lobbyDot').className='live'+(room?'':' off');
+function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array(SLOTS).fill(null);$('#chatIn').disabled=$('#chatSend').disabled=!room;$('#lobbyDot').className='live'+(room&&room.open?'':' off');
   if(!room){paintRoster([{name:'Jij',chip:connAt===-1?'Solo':'Verbinden',cl:'',score:'',h:save.hero,me:true}]);cells[0]={name:'Jij',st:'lobby',me:true,sub:'jouw vesting'};paintMap(cells);
     setText($('#lobbyNote'),connAt===-1?'solo':'verbinden…');
     setText(btn,'Start spel');btn.disabled=false;setText(help,connAt===-1?'De gezamenlijke lobby is hier niet bereikbaar. Je speelt alleen in de wereld.':'');return;}
   const lp=lobbyPeers(),host=lp[0],me=lp.find(p=>own(p)),others=lp.filter(p=>!own(p)),all=peers.filter(p=>p.kind==='viewer'),list=[];
-  setText($('#lobbyNote'),`${all.length} speler${all.length===1?'':'s'} online`);
+  setText($('#lobbyNote'),room.open?`${all.length} speler${all.length===1?'':'s'} online`:'verbinding verbroken, opnieuw verbinden…');
   [...lp,...all.filter(p=>!lp.includes(p))].forEach(p=>{const pr=p.presence||{};let chip,cl='';
     if(pr.st==='lobby'){if(p===host){chip='Eerste speler';cl='host';}else if(pr.rd){chip='Klaar';cl='ok';}else chip='Wacht';}
     else if(pr.st==='playing'){chip='Ronde '+(+pr.r||1);cl='play';}else chip=pr.st==='done'?'Uitgespeeld':'Kijkt';
@@ -1926,7 +1143,7 @@ $('#startBtn').onclick=()=>{if(!room){beginGame(0,Date.now());return;}const lp=l
   if(!others.length||(lp[0]&&own(lp[0]))){hostStart();return;}
   ready=!ready;room.presence({rd:ready}).catch(()=>{});renderLobby();};
 function onPeers(ch){peers=ch.peers;const now=performance.now();syncPeers();for(const p of ch.joined)rx.set(p.peer,now);for(const p of ch.updated)rx.set(p.peer,now);for(const p of ch.left)rx.delete(p.peer);
-  resolveNames(peers.map(p=>p.by||(p.presence&&p.presence.u)));chatScan();
+  
   const settled=now-connAt>3000;let start=0;
   for(const p of peers){const g=p.presence&&p.presence.go;if(typeof g==='number'&&!seenGo.has(g)){seenGo.add(g);if(!own(p)&&settled)start=g;}}
   const lp=lobbyPeers(),me=lp.find(p=>own(p));
@@ -1937,7 +1154,7 @@ function onPeers(ch){peers=ch.peers;const now=performance.now();syncPeers();for(
   if($('#game').hidden)renderLobby();}
 let lastPush=0;
 function pushPresence(force){if(!room)return;const now=performance.now();if(!force&&now-lastPush<320)return;lastPush=now;
-  const p={st:myState,rd:ready};if(G){if(myChat.length){myChat=[];p.c=null;}p.sl=mySlot;p.r=G.round;p.l=G.lives;p.s=G.score;p.sp=speed;p.tw=encT();p.mt=matchId;p.bd=built;p.ps=G.phase==='prep'?0:1;p.cl=G.cleared;p.nx=nx;p.sw=sentWave;p.pa=encP();p.wn=G.phase==='won'?1:0;
+  const p={st:myState,rd:ready};if(G){p.sl=mySlot;p.r=G.round;p.l=G.lives;p.s=G.score;p.sp=speed;p.tw=encT();p.mt=matchId;p.bd=built;p.ps=G.phase==='prep'?0:1;p.cl=G.cleared;p.nx=nx;p.sw=sentWave;p.pa=encP();p.wn=G.phase==='won'?1:0;
     if(myState==='playing')p.en=encE();else p.en='';Object.assign(p,heroPatch());}
   room.presence(p).catch(()=>{});}
 const rd1=v=>Math.round(v*10)/10;
@@ -1957,12 +1174,10 @@ function syncPeers(){const mine=peers.find(p=>own(p));if(mine)myPeer=mine.peer;c
   for(const[k,r]of rheroes)if(!seen.has(k)){if(r.obj)scene.remove(r.obj);if(r.lab)scene.remove(r.lab);rheroes.delete(k);}}
 function renderBoard(){const ul=$('#board');ul.textContent='';
   if(!board||!board.length){const p=document.createElement('p');p.className='empty';
-    p.textContent=board?'Nog geen scores. Speel het eerste potje en zet je naam bovenaan.':boardFail?`Het gedeelde leaderboard is hier niet bereikbaar. Jouw beste score: ${fmt(save.best)}.`:'Scores laden…';ul.append(p);return;}
-  board.forEach((r,i)=>ul.append(row([['rk',String(i+1)],['nm',(callsigns[r.id]||names[r.id]||'Commandant')+(r.id===uid?' (jij)':'')],['chip',r.won?'Gewonnen':'Ronde '+(+r.round||0),r.won?'ok':''],['num',fmt(r.score)]],r.id===uid?'me':'')));}
-function subBoard(){const col=db.collection('scores');
-  const on=s=>{board=s.docs.map(d=>({id:d.id,...(d.data()||{})})).filter(r=>typeof r.score==='number').sort((a,b)=>b.score-a.score).slice(0,20);resolveNames(board.map(r=>r.id));renderBoard();};
-  const fail=()=>{boardFail=true;renderBoard();};
-  try{col.orderBy('score','desc').limit(20).onSnapshot(on,()=>{try{col.onSnapshot(on,fail);}catch{fail();}});}catch{fail();}}
+    p.textContent=board?'Nog geen scores. Speel het eerste potje en zet je naam bovenaan.':boardFail?`Het leaderboard is nu niet bereikbaar. Jouw beste score: ${fmt(save.best)}.`:'Scores laden…';ul.append(p);return;}
+  board.forEach((r,i)=>ul.append(row([['rk',String(i+1)],['nm',(r.name||'Commandant')+(r.id===uid?' (jij)':'')],['chip',r.won?'Gewonnen':'Ronde '+(+r.round||0),r.won?'ok':''],['num',fmt(r.score)]],r.id===uid?'me':'')));}
+// Het leaderboard komt van de server: bij het verbinden, en opnieuw zodra iemand een betere score zet.
+function onBoard(rows){board=(Array.isArray(rows)?rows:[]).filter(r=>r&&typeof r.score==='number').slice(0,20);boardFail=false;renderBoard();}
 const TICON={sword:'M5 19 17 7M14 4h6v6M4 15l5 5',bolt:'M13 2 5 14h6l-1 8 8-12h-6z',coin:'M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z',
  cross:'M12 5a7 7 0 100 14 7 7 0 000-14zM12 2v5M12 17v5M2 12h5M17 12h5',shield:'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
  heart:'M12 20s-7-4.5-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.5-7 10-7 10z',wrench:'M14 6a4 4 0 00-5 5l-6 6 3 3 6-6a4 4 0 005-5l-3 3-2-2z',
@@ -2037,16 +1252,19 @@ $('#skillsBtn').onclick=()=>openPop('#popSkills','tSkills');$('#infoBtn').onclic
   requestAnimationFrame(tick);})();
 
 /* ---------- start ---------- */
-const use=n=>{try{return window.claude&&window.claude.use?window.claude.use(n).catch(()=>null):Promise.resolve(null);}catch{return Promise.resolve(null);}};
 loadLocal();loadAcct();bindAccount();buildHud();
 try{if(init3D()){bindCanvas();renderIcons();}}catch(err){gl3=false;console.error(err);}
 renderHome();renderLobby();renderChat();if(!acct)showGate('new');requestAnimationFrame(frame);
 if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>enterArena(m,r),MINI,KIND,setHero:i=>{save.hero=i;},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
-use('user').then(async u=>{user=u;if(u){try{uid=await u.id();}catch{}}if(room&&uid)room.presence({u:uid}).catch(()=>{});return use('db');})
-  .then(d=>{db=d;if(db){subBoard();subPlayers();}else{boardFail=true;renderBoard();}checkAccount();});
-use('room').then(r=>{if(!r){connAt=-1;renderLobby();renderChat();return;}room=r;renderChat();connAt=performance.now();
-  myT=Date.now();r.presence({t:myT,st:myState,rd:false,u:uid||null,h:save.hero}).catch(()=>{});r.onPeers(onPeers,()=>{});renderLobby();});
-})();
-</script>
+// Sessie controleren: klopt het token nog, dan komt de voortgang van de server binnen.
+if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
+// Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.
+myT=Date.now();
+const lobby=Net.connect({onPeers,onChat,onBoard,
+  onOpen(r){room=r;connAt=performance.now();renderChat();renderLobby();},
+  onFail(){if(!room){connAt=-1;renderLobby();renderChat();}},
+  onClose(){renderLobby();}});
+lobby.presence({t:myT,st:myState,rd:false,h:save.hero});
+Net.api('GET','/scores').then(r=>{if(!board)onBoard(r.rows);},()=>{if(!board){boardFail=true;renderBoard();}});
 
-</body></html>
+})();

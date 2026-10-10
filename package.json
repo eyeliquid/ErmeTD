@@ -1,0 +1,14 @@
+{
+  "name": "red-alert-towerdefense",
+  "private": true,
+  "description": "Tower defense in een 3D-wereld, online te spelen met accounts, een lobby en een leaderboard.",
+  "scripts": {
+    "postinstall": "npm --prefix server install",
+    "start": "npm --prefix server start",
+    "dev": "npm --prefix server run dev",
+    "test": "npm --prefix server test"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
