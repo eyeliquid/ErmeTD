@@ -13,7 +13,7 @@ const RESUME_MS = 120000;    // zo lang mag je na een haperende verbinding je ou
 const MAX_KEYS = 48, MAX_VALUE = 4096, MAX_MSG = 16 * 1024;
 const MSG_PER_SEC = 80, CHAT_GAP_MS = 700, CHAT_KEEP = 60;
 
-function attach(server, { db, sess, cfg, getBoard }) {
+function attach(server, { db, sess, cfg, getBoard, settings }) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MSG });
   const peers = new Map();    // id -> peer
   const resumable = new Map(); // id -> {key, until}
@@ -72,7 +72,7 @@ function attach(server, { db, sess, cfg, getBoard }) {
     clearTimeout(p.helloTimer);
     send(p, {
       t: 'welcome', peer: p.id, key: p.key, you: { by: p.by, name: p.name }, now: Date.now(),
-      peers: [...peers.values()].map(pub), chat: q.chatLast.all().reverse(), board: getBoard(),
+      peers: [...peers.values()].map(pub), chat: q.chatLast.all().reverse(), board: getBoard(), settings: settings.get(),
     });
     peers.set(p.id, p);
     broadcast({ t: 'join', peer: pub(p) }, p);
@@ -80,7 +80,7 @@ function attach(server, { db, sess, cfg, getBoard }) {
 
   function chat(p, m) {
     const text = cleanMsg(m.text), now = Date.now();
-    if (!text || now - p.lastChat < CHAT_GAP_MS) return;
+    if (!text || now - p.lastChat < CHAT_GAP_MS || !settings.get().chatEnabled) return;
     p.lastChat = now;
     const row = q.chatAdd.run(p.by, p.name, text, now);
     const id = Number(row.lastInsertRowid);
@@ -157,6 +157,11 @@ function attach(server, { db, sess, cfg, getBoard }) {
   return {
     count: () => peers.size,
     boardChanged() { broadcast({ t: 'board', rows: getBoard() }); },
+    // Accounts die nu een verbinding open hebben.
+    users() { const s = new Set(); for (const p of peers.values()) if (p.by) s.add(p.by); return s; },
+    settingsChanged() { broadcast({ t: 'settings', settings: settings.get() }); },
+    // Een account is verwijderd: zijn verbindingen gaan dicht.
+    kick(userId) { for (const p of peers.values()) if (p.by === userId) p.ws.close(1008, 'account verwijderd'); },
     // Een speler heeft zijn roepnaam gewijzigd: alle open verbindingen van dat account krijgen de nieuwe naam.
     renamed(userId, name) {
       let any = false;

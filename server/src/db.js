@@ -40,6 +40,11 @@ const SCHEMA = [
      text    TEXT NOT NULL,
      at      INTEGER NOT NULL
    );`,
+  // versie 2: spelinstellingen uit de webadmin
+  `CREATE TABLE settings (
+     key   TEXT PRIMARY KEY,
+     value TEXT NOT NULL
+   );`,
 ];
 
 function open(file) {

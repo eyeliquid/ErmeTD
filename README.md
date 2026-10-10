@@ -26,6 +26,7 @@ docker compose up -d --build
 ```
 client/                 frontend: gewone bestanden, geen bouwstap
   index.html            de pagina
+  admin.html            de webadmin (met css/admin.css en js/admin.js)
   css/style.css         opmaak
   js/config.js          adres van de backend (leeg = dezelfde server)
   js/engine.js          spelregels: torens, vijanden, golven, skills
@@ -37,6 +38,8 @@ server/                 backend: Node.js, Express, WebSocket, SQLite
   src/api.js            HTTP-API onder /api
   src/room.js           realtime lobby op /ws
   src/auth.js           wachtwoorden en sessies
+  src/admin.js          beheer-API onder /api/admin
+  src/settings.js       spelinstellingen uit de webadmin
   src/db.js             database en migraties
   src/validate.js       controle van wat spelers insturen
   test/                 tests van de API en de lobby
@@ -55,6 +58,19 @@ De server serveert ook de frontend, dus één adres is genoeg. `engine.js` wordt
 
 Het spel zelf rekent in de browser van elke speler; de server geeft door wat spelers elkaar laten zien en bewaakt wie wie is. De server controleert de vorm en de grenzen van wat binnenkomt, maar speelt een potje niet na. Een speler die zijn eigen browser aanpast kan dus een score insturen die hij niet heeft gehaald.
 
+## Webadmin
+
+Op `/admin` staat een beheerpagina achter een wachtwoord. Zet dat wachtwoord op de server in `ADMIN_PASSWORD` (minstens 10 tekens); zonder die instelling staat de webadmin uit.
+
+```bash
+ADMIN_PASSWORD='kies-een-lang-wachtwoord' npm start
+```
+
+- **Spelers.** Alle accounts met aanmaakdatum, laatst gezien, potjes, beste score, ronde en skillpunten, en wie nu online is. Per speler kun je een nieuw wachtwoord instellen, de score wissen of het account verwijderen.
+- **Instellingen.** Startcredits, levens, bouwtijd, vijandsterkte en credits per kill; nieuwe accounts aan of uit; de lobbychat aan of uit; een mededeling boven de chat. Ze staan in de database, gaan direct naar elke browser en gelden vanaf het volgende potje.
+
+Na vijf foute wachtwoorden moet dat IP-adres een kwartier wachten. Een beheersessie duurt acht uur en vervalt als de server herstart. Zet de server online achter https, anders gaat het wachtwoord leesbaar over de lijn.
+
 ## API
 
 Alles onder `/api`, in JSON. Waar "ingelogd" staat hoort de kop `Authorization: Bearer <token>` erbij.
@@ -69,6 +85,7 @@ Alles onder `/api`, in JSON. Waar "ingelogd" staat hoort de kop `Authorization: 
 | PUT | `/save` | ingelogd · voortgang opslaan; geeft terug wat nu geldt |
 | GET | `/scores` | de top 20 |
 | POST | `/scores` | ingelogd · score insturen; alleen een betere score telt |
+| GET | `/settings` | de spelinstellingen uit de webadmin |
 | GET | `/health` | draait de server, en hoeveel spelers zijn online |
 
 ## Online zetten
@@ -91,4 +108,4 @@ npm test        # tests van de API en de lobby
 
 Open de pagina met `#dev` achter het adres om de testhulpmiddelen in `window.__ratd` beschikbaar te maken.
 
-Het startgoud staat nog op een testwaarde: zie `startGold` bovenin `client/js/engine.js`.
+Het startgoud staat nog op een testwaarde (10.000). Zet het in de webadmin onder Instellingen op 260 voor de definitieve versie.

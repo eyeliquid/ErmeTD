@@ -4,13 +4,14 @@ const express = require('express');
 const { hashPassword, verifyPassword, newId } = require('./auth');
 const { limiter } = require('./ratelimit');
 const { nameKey, cleanName, cleanPassword, cleanSave, cleanScore } = require('./validate');
+const { createAdmin } = require('./admin');
 
 class HttpError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
 }
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-function createApi({ db, sess, hooks }) {
+function createApi({ db, sess, hooks, settings, cfg }) {
   const q = {
     userByKey: db.prepare('SELECT id, name, pass_hash FROM users WHERE name_key = ?'),
     userAdd: db.prepare('INSERT INTO users (id, name, name_key, pass_hash, created_at) VALUES (?, ?, ?, ?, ?)'),
@@ -28,7 +29,7 @@ function createApi({ db, sess, hooks }) {
   const loadSave = id => { const r = q.saveGet.get(id); try { return r ? cleanSave(JSON.parse(r.data)) : null; } catch { return null; } };
 
   // Rem op gokken naar wachtwoorden en op het massaal aanmaken van accounts.
-  const loginLimit = limiter(10, 10 * 60000), registerLimit = limiter(8, 60 * 60000), writeLimit = limiter(120, 60000);
+  const loginLimit = limiter(10, 10 * 60000), registerLimit = limiter(cfg.registerPerHour, 60 * 60000), writeLimit = limiter(120, 60000);
   // Bestaat een roepnaam niet, dan wordt toch een hash uitgerekend: zo verraadt de reactietijd niet welke namen bestaan.
   const dummy = hashPassword('niet-bestaand-account');
 
@@ -52,7 +53,11 @@ function createApi({ db, sess, hooks }) {
 
   api.get('/health', (req, res) => res.json({ ok: true, online: hooks.online() }));
 
+  // De spelinstellingen uit de webadmin: iedereen mag ze lezen, het spel past zich erop aan.
+  api.get('/settings', (req, res) => res.json({ settings: settings.get() }));
+
   api.post('/register', limited(registerLimit, req => req.ip), wrap(async (req, res) => {
+    if (!settings.get().registrationOpen) throw new HttpError(403, 'closed', 'Er kunnen nu geen nieuwe accounts worden gemaakt.');
     const name = cleanName(req.body.name), password = cleanPassword(req.body.password);
     if (!name) throw new HttpError(400, 'name', 'Gebruik voor je roepnaam 3 tot 16 tekens: letters, cijfers, spaties, - of _.');
     if (!password) throw new HttpError(400, 'password', 'Kies een wachtwoord van minstens 8 tekens.');
@@ -107,6 +112,8 @@ function createApi({ db, sess, hooks }) {
     if (better) { q.scorePut.run(req.user.id, s.score, s.round, s.won, Date.now()); hooks.boardChanged(); }
     res.json({ best: better ? s.score : old.score, improved: better });
   });
+
+  api.use('/admin', createAdmin({ db, cfg, settings, hooks, HttpError }).router);
 
   api.use((req, res, next) => next(new HttpError(404, 'notfound', 'Onbekend adres.')));
   // eslint-disable-next-line no-unused-vars

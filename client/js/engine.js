@@ -1,8 +1,9 @@
 const Engine=(()=>{
-const N=13,ROUNDS=100,MID=6,C_IN=MID*N,C_OUT=MID*N+N-1,PREP=300,DIRS=[[1,0],[0,-1],[0,1],[-1,0]];
-// Balans: alles wat de moeilijkheid bepaalt staat hier.
+const N=13,ROUNDS=100,MID=6,C_IN=MID*N,C_OUT=MID*N+N-1,DIRS=[[1,0],[0,-1],[0,1],[-1,0]];
+let PREP=300; // bouwtijd in seconden; instelbaar via de webadmin (zie tune)
+// Balans: alles wat de moeilijkheid bepaalt staat hier. startGold, lives, hpX en goldX zijn instelbaar via de webadmin (zie tune).
 // Honderd rondes: de curve van vijftig is uitgerekt. Ronde 2r is nu ongeveer zo zwaar als ronde r was, en twee rondes leveren samen op wat één ronde opleverde.
-const B={hp0:14,lin:.06,g:1.063,g2:1.0296,late:80,gold0:2.5,goldLin:.035,startGold:10000/* TESTWAARDE: terug naar 260 voor de definitieve versie */,lives:20,
+const B={hp0:14,lin:.06,g:1.063,g2:1.0296,late:80,gold0:2.5,goldLin:.035,startGold:10000/* TESTWAARDE: zet in de webadmin op 260 voor de definitieve versie */,lives:20,hpX:1,goldX:1,
   bonA:12,bonB:4};
 const ROCK=new Set(); // geen bomen of rotsen meer: het hele veld is vrij
 // Er is geen vast pad. Vijanden komen links in het midden binnen en gaan rechts in het midden weg.
@@ -117,7 +118,7 @@ function skillState(sk,s){const rank=sk[s.id]|0,q=s.req&&SKILLS.find(x=>x.id===s
   return{rank,lock:skillSpent(sk,s.tree)<TIER*s.t?'tier':q&&(sk[q.id]|0)<q.max?'req':null,q};}
 // Skillpunten voor het halen van ronde r: 1 per 20 levels, 1 per miniboss (elke tiende ronde) en 3 zodra je daarmee level 100 bereikt.
 const pointsFor=r=>(r%20===0?1:0)+(r%10===0?1:0)+(r===99?3:0);
-const hpMul=r=>B.hp0*(1+B.lin*r)*Math.pow(B.g,r)*(r>B.late?Math.pow(B.g2,r-B.late):1);
+const hpMul=r=>B.hpX*B.hp0*(1+B.lin*r)*Math.pow(B.g,r)*(r>B.late?Math.pow(B.g2,r-B.late):1);
 
 function create(skills){const m=mods(skills);
   return{m,gold:B.startGold+m.start,lives:B.lives+m.lives,round:1,cleared:0,phase:'prep',timer:PREP,wt:0,q:[],road:new Set(),trail:new Set(),path:null,rv:0,pv:null,pvk:-1,
@@ -136,7 +137,7 @@ function makeWave(r){const q=[];let t=0;const n=8+Math.floor(r*.4),R=Math.round;
 function startWave(G){if(G.phase!=='build')return;G.phase='wave';G.wt=0;G.q=makeWave(G.round);G.ev.push({k:'wave',r:G.round});}
 function spawn(G,s){const d=EN[s.type],r=G.round,hp=d.hp*hpMul(r)*s.hm,p=posAt(G.path,0);
   G.en.push({id:G.nid++,type:s.type,hp,max:hp,d:0,sp:d.sp,arm:d.arm||0,regen:d.regen||0,immune:!!d.immune,boss:!!d.boss,
-    big:s.hm>1,leak:d.leak||1,b:Math.max(1,Math.round(B.gold0*d.b*s.hm*(1+B.goldLin*r)*G.m.gold)),sc:Math.round(d.b*s.hm*r*5),
+    big:s.hm>1,leak:d.leak||1,b:Math.max(1,Math.round(B.gold0*B.goldX*d.b*s.hm*(1+B.goldLin*r)*G.m.gold)),sc:Math.round(d.b*s.hm*r*5),
     x:p[0],y:p[1],dx:p[2],dy:p[3],fz:0,fi:0,sT:0,sl:0,pT:0,pD:0});}
 function kill(G,e){if(e.dead)return;e.dead=true;G.gold+=e.b;G.score+=e.sc;G.kills++;if(G.fxOn)G.fx.push({k:'die',b:[e.x,e.y],boss:e.boss});}
 function hit(G,e,dmg,pierce){if(e.dead)return;const arm=e.arm*(1-G.m.ap)*(1-(pierce||0));
@@ -249,8 +250,13 @@ function step(G,dt){
 }
 function win(G){if(G.phase==='won'||G.phase==='over')return;G.phase='won';G.score+=5000+200*G.lives;}
 function lose(G){if(G.phase==='won'||G.phase==='over')return;G.phase='over';}
-return{N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,B,T,TYPES,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
+// Instellingen van de server (webadmin) overnemen. Geldt voor potjes die hierna beginnen.
+function tune(s){if(!s||typeof s!=='object')return;const n=(v,lo,hi,d)=>{v=+v;return Number.isFinite(v)?Math.max(lo,Math.min(hi,v)):d;};
+  B.startGold=Math.round(n(s.startGold,0,100000,B.startGold));B.lives=Math.round(n(s.lives,1,999,B.lives));
+  B.hpX=n(s.enemyHp,.25,5,B.hpX);B.goldX=n(s.goldMul,.25,5,B.goldX);PREP=API.PREP=Math.round(n(s.prepSeconds,10,1800,PREP));}
+const API={N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,tune,B,T,TYPES,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
   buildCost,upCost,specCost,sellValue,stats,mods,skillTotal,skillSpent,skillState,SKILL_MAX,TIER,pointsFor,hpMul,makeWave,hit,recalc,win,lose};
+return API;
 })();
 
 // Dezelfde spelregels draaien op de server (controle van opgeslagen voortgang).
