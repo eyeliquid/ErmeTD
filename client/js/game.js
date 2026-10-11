@@ -155,6 +155,8 @@ function decal(col,size,op){const m=new T3.Mesh(raw('decal',()=>new T3.PlaneGeom
   m.scale.setScalar(size);return m;}
 function mesh(g,mat){const m=new T3.Mesh(g,mat||MAT);m.castShadow=true;m.receiveShadow=true;return m;}
 const AIM={sentry:1,flak:1,toxin:1,rocket:1,rail:1,wave:1};
+function gearParts(r,h,teeth,col){const a=[cy(r*.8,r*.8,h,col,0,0,0,20)];
+  for(let i=0;i<teeth;i++){const an=i/teeth*Math.PI*2;a.push(bx(r*.34,h,r*.24,col,Math.cos(an)*r*.88,0,Math.sin(an)*r*.88,-an));}return a;}
 function makeTower(type,slot,lvl,spec){const g=new T3.Group(),head=new T3.Group(),th='#'+TEAM[slot].getHexString(),anims=[];g.add(head);
   const base=fn=>g.add(mesh(geo(type+'b'+slot,()=>[cy(.47,.5,.12,'#3a3f47',0,.06,0,10),cy(.4,.47,.06,'#5a616c',0,.15,0,10),...fn()])));
   const hd=fn=>head.add(mesh(geo(type+'h'+slot,fn)));
@@ -180,6 +182,11 @@ function makeTower(type,slot,lvl,spec){const g=new T3.Group(),head=new T3.Group(
       gl('wring',()=>new T3.TorusGeometry(.14,.03,6,18).rotateY(Math.PI/2),'#ff3b2e',.52,.57,0,head,.6);break;}
     case'uplink':{base(()=>[bx(.5,.3,.5,'#3b5670',0,.32,0),cy(.035,.05,.85,'#aab4be',0,.88,0,8)]);hd(()=>[P(new T3.CylinderGeometry(.32,.06,.14,18),'#c9d2da',.05,1.08,0,0,0,-.9),bx(.1,.08,.1,th,0,.94,0)]);
       gl('beacon',()=>new T3.SphereGeometry(.06,8,6),'#ff5a3c',0,1.34,0,null,.7);anims.push(t=>head.rotation.y=t*.9+slot);break;}
+    // The Geers is geen bouwbare toren meer, maar de superturret in twee losse minigames gebruikt dit model nog.
+    case'geers':{base(()=>[cy(.5,.56,.28,'#5b4a1e',0,.32,0,12),cy(.1,.1,1,'#3a3f45',0,.9,0,8)]);
+      const g1=mesh(geo('gear1',()=>gearParts(.56,.12,10,'#c79a2a')));g1.position.y=.68;g.add(g1);
+      const g2=mesh(geo('gear2',()=>gearParts(.38,.12,8,'#e6c04a')));g2.position.y=.98;g.add(g2);
+      const c=gl('core',()=>new T3.SphereGeometry(.15,14,10),'#ff7a4e',0,1.4,0,null,2.2);anims.push(t=>{g1.rotation.y=t*1.6;g2.rotation.y=-t*2.6;c.scale.setScalar(1+.15*Math.sin(t*9));});break;}
   }
   // teamcirkel op de grond, zoals de selectiecirkels in een RTS
   const ring=new T3.Mesh(raw('tring',()=>new T3.RingGeometry(.5,.58,36).rotateX(-Math.PI/2)),glow(spec==='turbo'?'#ff8a2a':spec==='link'?'#45d2ff':th));ring.position.y=.03;g.add(ring);
@@ -1152,7 +1159,9 @@ function frame(ts){requestAnimationFrame(frame);const dt=Math.min(.1,(ts-last)/1
 function logic(dt){if(window.__ratdPause)return;
   if(G&&lab){if(!lab.over){if(arena)updArena(dt);G.ev.length=0;G.fx.length=0;updHero(dt);}return;}
   if(G&&!ended){sync();if(arena)updArena(dt);else if(G.phase!=='prep'){acc+=dt*speed;let n=0;while(acc>=STEP&&n<14){E.step(G,STEP);acc-=STEP;n++;}if(n>=14)acc=0;}
-    botsTick(dt);events();updHero(dt);pushHero();if(G.phase==='over'||G.phase==='won')endGame();}}
+    botsTick(dt);events();updHero(dt);pushHero();if(G.phase==='over'||G.phase==='won')endGame();}
+  // muziek: rustig tijdens het potje, sneller en voller in een minigame; stil in de lobby en na afloop
+  Music.sync(G&&!ended?{level:arena?arena.r:G.round,mini:!!arena}:null);}
 // Een tabblad op de achtergrond krijgt geen frames meer. Het spel loopt dan hier door, anders wacht iedereen op jou.
 setInterval(()=>{const now=performance.now();if(now-last<600)return;let dt=Math.min(3,(now-last)/1000);last=now;
   while(dt>.001){const d=Math.min(.1,dt);logic(d);dt-=d;}if(G)pushPresence();},500);
@@ -1426,6 +1435,7 @@ $('#waveBtn').onclick=waveAct;
 $('#speed').onclick=ev=>{const b=ev.target.closest('button');if(!b||!G||ended)return;if(lead()){toast('Alleen speler 1 kiest de snelheid');return;}speed=+b.dataset.s;paintSpeed();pushPresence(true);};
 let quitArm=0;$('#quitBtn').onclick=()=>{const b=$('#quitBtn');if(lab){toLobby();openMini();return;}if(!G||ended)return;if(Date.now()-quitArm<3000){quitArm=0;b.textContent='Opgeven';G.phase='over';}
   else{quitArm=Date.now();b.textContent='Zeker weten?';setTimeout(()=>{if(quitArm){quitArm=0;b.textContent='Opgeven';}},3000);}};
+{const mb=$('#musicBtn'),show=()=>{const o=Music.isOn();mb.textContent=o?'Muziek aan':'Muziek uit';mb.setAttribute('aria-pressed',o);};mb.onclick=()=>{Music.setOn(!Music.isOn());show();mb.blur();};show();}
 $('#rBack').onclick=toLobby;
 function buildHud(){const card=$('#card');for(let i=0;i<12;i++){const b=document.createElement('button');b.id='card-'+i;b.className='empty';
     const cv=document.createElement('canvas');cv.width=116;cv.height=108;const k=document.createElement('span');k.className='k';const c=document.createElement('span');c.className='c num';b.append(cv,k,c);
