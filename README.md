@@ -13,7 +13,7 @@ npm install
 npm start
 ```
 
-Open daarna <http://localhost:3000>. Open het adres in een tweede venster om met twee spelers te testen.
+Open daarna <http://localhost:3000>. Open het adres in een tweede venster om met twee spelers te testen. Start je alleen, dan doen acht bots mee.
 
 Met Docker kan het ook:
 
@@ -66,6 +66,7 @@ De waarden staan in `DIFF` bovenin `client/js/engine.js`.
 - **Voortgang.** Skillpunten, skills, held, gekozen moeilijkheidsgraad en aantal potjes staan per account op de server en gaan mee naar elk apparaat. Een gast speelt alleen lokaal.
 - **Leaderboard.** De beste score per account. Een nieuwe score verschijnt direct bij iedereen die online is.
 - **Lobby en samen spelen.** Elke browser houdt een WebSocket open. De server houdt per speler een stukje toestand bij (lobbystatus, vesting, held, minigamescore) en stuurt wijzigingen 20 keer per seconde gebundeld door. Chatberichten gaan ook via de server; de laatste zestig blijven bewaard.
+- **Bots.** Wie alleen start krijgt acht bots erbij. Elke bot kiest een andere held dan de speler en heeft dezelfde talenten. Bots worden nagespeeld in de browser van die speler (`client/js/game.js`, onder "bots"): elke bot heeft een eigen vesting met dezelfde spelregels en doet mee aan de rondes en de minigames. Andere spelers in de wereld zien ze niet, maar houden hun vestingen wel vrij. Start er een tweede mens mee, dan komen er geen bots.
 - **Haperende verbinding.** De browser verbindt vanzelf opnieuw en krijgt dezelfde plek terug. Wie echt weg is valt binnen een halve minuut af, zodat een potje niet op hem blijft wachten.
 
 Het spel zelf rekent in de browser van elke speler; de server geeft door wat spelers elkaar laten zien en bewaakt wie wie is. De server controleert de vorm en de grenzen van wat binnenkomt, maar speelt een potje niet na. Een speler die zijn eigen browser aanpast kan dus een score insturen die hij niet heeft gehaald.
