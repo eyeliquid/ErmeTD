@@ -72,6 +72,15 @@ Elke toren doorloopt dezelfde keten, en die leidt naar De Slapende Geers.
 
 De voorwaarden worden gecontroleerd op het moment dat je bouwt of upgradet. Prijzen, schade en de bonussen van ultra en turbo staan in `T`, `stats` en `specCost` in `client/js/engine.js`.
 
+## Duwen en sprinten
+
+In elke minigame heeft de held twee extra's, rechtsonder op de commandokaart.
+
+- **Duwen (C).** Duwt andere spelers binnen 2,4 meter een klein stukje van je af. 6 seconden cooldown. Het doet geen schade.
+- **Sprint (Shift).** 3 seconden lang 60% sneller. 10 seconden cooldown.
+
+Vijf talenten in de boom Veldheer maken ze sterker: Brede schouders (verder duwen), Elleboogwerk (duwen laadt sneller), Lange adem (langer sprinten), Snel op adem (sprint laadt sneller) en Naverbrander (sneller sprinten). De vaste waarden staan in `MOVES` in `client/js/engine.js`.
+
 ## Minigames uitproberen
 
 In de lobby staat de knop **Minigames**. Daar kies je een minigame en speel je hem los, alleen, met je gekozen held en je skills. Het telt nergens voor mee: geen skillpunten, geen score, geen potje erbij. Andere spelers zien je in de lobby als "Test minigames".
