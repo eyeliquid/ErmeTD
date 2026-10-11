@@ -1,5 +1,5 @@
 (()=>{
-const E=Engine,{N,T,TYPES,EN,SKILLS,ROUNDS}=E,T3=window.THREE;
+const E=Engine,{N,T,TYPES,ALL,EN,SKILLS,ROUNDS}=E,T3=window.THREE;
 const $=s=>document.querySelector(s);
 const fmt=n=>Math.round(n).toLocaleString('nl-NL');
 const STEP=1/30,FW=20,COLS=5,ROWS=5,SLOTS=COLS*ROWS;
@@ -182,16 +182,34 @@ function makeTower(type,slot,lvl,spec){const g=new T3.Group(),head=new T3.Group(
       gl('wring',()=>new T3.TorusGeometry(.14,.03,6,18).rotateY(Math.PI/2),'#ff3b2e',.52,.57,0,head,.6);break;}
     case'uplink':{base(()=>[bx(.5,.3,.5,'#3b5670',0,.32,0),cy(.035,.05,.85,'#aab4be',0,.88,0,8)]);hd(()=>[P(new T3.CylinderGeometry(.32,.06,.14,18),'#c9d2da',.05,1.08,0,0,0,-.9),bx(.1,.08,.1,th,0,.94,0)]);
       gl('beacon',()=>new T3.SphereGeometry(.06,8,6),'#ff5a3c',0,1.34,0,null,.7);anims.push(t=>head.rotation.y=t*.9+slot);break;}
-    // The Geers is geen bouwbare toren meer, maar de superturret in twee losse minigames gebruikt dit model nog.
+    // De Geers Toren: de beloning voor een turbo van elke soort. Twee losse minigames gebruiken dit model ook.
     case'geers':{base(()=>[cy(.5,.56,.28,'#5b4a1e',0,.32,0,12),cy(.1,.1,1,'#3a3f45',0,.9,0,8)]);
       const g1=mesh(geo('gear1',()=>gearParts(.56,.12,10,'#c79a2a')));g1.position.y=.68;g.add(g1);
       const g2=mesh(geo('gear2',()=>gearParts(.38,.12,8,'#e6c04a')));g2.position.y=.98;g.add(g2);
       const c=gl('core',()=>new T3.SphereGeometry(.15,14,10),'#ff7a4e',0,1.4,0,null,2.2);anims.push(t=>{g1.rotation.y=t*1.6;g2.rotation.y=-t*2.6;c.scale.setScalar(1+.15*Math.sin(t*9));});break;}
+    // De Slapende Geers: 3 bij 3 vakken. Een slapend hoofd met slaapmuts boven op traag draaiende tandwielen; de Z's stijgen op.
+    case'sleeper':{g.add(mesh(geo('slpb'+slot,()=>[bx(2.86,.14,2.86,'#3a3f47',0,.07,0),bx(2.62,.1,2.62,'#5a616c',0,.19,0),cy(1.12,1.24,.3,'#5b4a1e',0,.39,0,18),
+        ...[[-1,-1],[1,-1],[-1,1],[1,1]].flatMap(([x,z])=>[cy(.15,.2,.56,'#4a515c',x*1.16,.5,z*1.16,8),bx(.2,.08,.2,th,x*1.16,.82,z*1.16)])])));
+      const g1=mesh(geo('slg1',()=>gearParts(1.18,.16,14,'#c79a2a')));g1.position.y=.64;g.add(g1);
+      const g2=mesh(geo('slg2',()=>gearParts(.82,.16,10,'#e6c04a')));g2.position.y=.86;g.add(g2);
+      const hdm=mesh(geo('slhead',()=>[sp(.62,'#8a6a1c',0,0,0,[1,.82,1]),bx(.24,.04,.06,'#15171a',-.23,.1,.55,.25),bx(.24,.04,.06,'#15171a',.23,.1,.55,-.25),sp(.09,'#6b4f14',0,-.06,.6),
+        P(new T3.ConeGeometry(.4,.8,12),'#6a3d8f',-.16,.66,-.08,0,0,.5),sp(.11,'#e9e3f2',-.5,.98,-.08),tor(.44,.07,'#e9e3f2',.36)]));hdm.position.y=1.42;g.add(hdm);
+      gl('slcore',()=>new T3.TorusGeometry(1,.05,6,32).rotateX(Math.PI/2),'#b58cff',0,.58,0,null,3.4);
+      const zs=[0,1,2].map(i=>{const z=new T3.Mesh(geo('zzz',()=>[bx(.3,.07,.07,'#fff',0,.15,0),bx(.44,.07,.07,'#fff',0,0,0,0,.76),bx(.3,.07,.07,'#fff',0,-.15,0)]),glow('#d9c2ff'));g.add(z);return z;});
+      anims.push(t=>{g1.rotation.y=t*.35;g2.rotation.y=-t*.55;const br=Math.sin(t*1.3+slot);hdm.scale.set(1+.03*br,1+.07*br,1+.03*br);hdm.rotation.z=.05*Math.sin(t*.65);
+        zs.forEach((z,i)=>{const u=(t*.3+i/3)%1;z.position.set(.55+u*.9+.12*Math.sin(t*2+i),2.2+u*1.7,.2);z.scale.setScalar((.5+u*1.1)*(u>.85?(1-u)/.15:1));z.rotation.y=Math.sin(t+i)*.5;});});break;}
   }
   // teamcirkel op de grond, zoals de selectiecirkels in een RTS
-  const ring=new T3.Mesh(raw('tring',()=>new T3.RingGeometry(.5,.58,36).rotateX(-Math.PI/2)),glow(spec==='turbo'?'#ff8a2a':spec==='link'?'#45d2ff':th));ring.position.y=.03;g.add(ring);
+  const size=(T[type]&&T[type].size)||1,tcol=spec==='turbo'?'#ff8a2a':spec==='ultra'?'#b56bff':th;
+  const ring=new T3.Mesh(raw('tring',()=>new T3.RingGeometry(.5,.58,36).rotateX(-Math.PI/2)),glow(tcol));ring.position.y=.03;ring.scale.setScalar(size===1?1:size*.98);g.add(ring);
+  // ultra: paarse cirkel en een zwevende kroon. Turbo: oranje, met een tweede cirkel en een dubbele kroon.
+  if(spec){const top=type==='uplink'||type==='prism'||type==='tesla'?1.95:1.3,mk=(y,r)=>{const c=new T3.Mesh(raw('crown',()=>new T3.TorusGeometry(.26,.025,6,24).rotateX(Math.PI/2)),glow(tcol));c.position.y=y;c.scale.setScalar(r);g.add(c);return c;};
+    const c1=mk(top,1),c2=spec==='turbo'?mk(top+.12,.7):null;
+    if(c2){const r2=new T3.Mesh(raw('tring'),glow('#ffd23a'));r2.position.y=.032;r2.scale.setScalar(1.2);g.add(r2);}
+    const hl=halo(tcol,spec==='turbo'?1.5:1.1,.5);hl.position.y=top;g.add(hl);
+    anims.push(t=>{c1.position.y=top+.04*Math.sin(t*3+slot);c1.rotation.z=.18*Math.sin(t*2);if(c2){c2.position.y=top+.12+.04*Math.sin(t*3+slot+1);c2.rotation.x=.18*Math.sin(t*2.3);}});}
   if(lvl>0)g.add(new T3.Mesh(geo('pip'+lvl,()=>{const a=[];for(let i=0;i<lvl;i++){const an=Math.PI/2+(i-(lvl-1)/2)*.36;a.push(bx(.09,.09,.09,'#ffc83a',Math.cos(an)*.5,.24,Math.sin(an)*.5,-an));}return a;}),glow('#ffc83a')));
-  g.scale.setScalar(1+.045*lvl);g.userData={head,anims,aim:!!AIM[type]};return g;}
+  g.scale.setScalar(type==='geers'?.88+.018*lvl:size>1?1:1+.045*lvl);g.userData={head,anims,aim:!!AIM[type]};return g;}
 const ENGEO={
   inf:()=>[bx(.16,.26,.14,'#8f2a22',0,.27,0),bx(.07,.14,.07,'#2a2420',0,.07,.04),bx(.07,.14,.07,'#2a2420',0,.07,-.04),sp(.085,'#c9a888',0,.48,0),sp(.1,'#4a5530',0,.52,0,[1,.6,1]),brl(.02,.28,'#15171a',.14,.33,.08),bx(.12,.16,.06,'#3a3f2a',-.08,.3,0)],
   dog:()=>[bx(.36,.14,.13,'#6a4a30',0,.2,0),bx(.13,.12,.11,'#4d3422',.22,.27,0),bx(.1,.04,.04,'#4d3422',-.22,.26,0),...[[.12,.04],[.12,-.04],[-.12,.04],[-.12,-.04]].map(([x,z])=>bx(.05,.14,.05,'#4d3422',x,.07,z))],
@@ -411,7 +429,7 @@ function getFx(kind){let m=pool[kind].pop();
 function fxBeam(a,b,col,w,life){if(live.length>340)return;const m=getFx('beam');m.material.color.set(col);m.material.opacity=1;m.position.copy(a);m.lookAt(b);
   Object.assign(m.userData,{t:0,life,w,L:a.distanceTo(b)});m.scale.set(w,w,m.userData.L);live.push(m);}
 function fxBall(p,col,r0,r1,life,op){if(live.length>340)return;const m=getFx('ball');m.material.color.set(col);m.position.copy(p);Object.assign(m.userData,{t:0,life,r0,r1,op});m.scale.setScalar(r0);live.push(m);}
-function fxRing(p,col,r,life){if(live.length>340)return;const m=getFx('ring');m.material.color.set(col);m.position.set(p.x,.06,p.z);Object.assign(m.userData,{t:0,life,r0:r*.3,r1:r,op:.9});m.scale.setScalar(r*.3);live.push(m);}
+function fxRing(p,col,r,life,op){if(live.length>340)return;const m=getFx('ring');m.material.color.set(col);m.position.set(p.x,.06,p.z);Object.assign(m.userData,{t:0,life,r0:r*.3,r1:r,op:op||.9});m.scale.setScalar(r*.3);live.push(m);}
 const V=(x,y,z)=>new T3.Vector3(x,y,z);
 function spawnFx(f,ox,oz){const A=h=>V(ox+f.a[0],h,oz+f.a[1]),B=f.b?V(ox+f.b[0],.36,oz+f.b[1]):null;
   switch(f.k){
@@ -422,6 +440,8 @@ function spawnFx(f,ox,oz){const A=h=>V(ox+f.a[0],h,oz+f.a[1]),B=f.b?V(ox+f.b[0],
     case'rocket':missiles.push({a:A(.9),b:B,r:f.r,t:0,m:null});break;
     case'boom':fxBeam(A(.84),B,'#ffd9a0',.04,.09);fxBall(B,'#ff8a2c',.2,f.r*.85,.32,.8);fxBall(B,'#fff0c0',.1,f.r*.4,.14,.9);break;
     case'ice':fxBeam(A(1.1),B,'#bff3ff',.06,.16);fxRing(B,'#9fe8ff',f.r,.42);fxBall(B,'#bff3ff',.1,f.r*.6,.3,.45);break;
+    case'geers':fxBeam(A(1.25),B,'#ffc14a',.07,.12);fxBall(B,'#ff7a2c',.15,f.r*.6,.26,.55);break;
+    case'snore':fxRing(B,'#7a4fd0',f.r,.8,.3);break;
     case'tox':fxBeam(A(1.04),B,'#8be85a',.05,.14);fxBall(B,'#5fc22e',.2,f.r*.9,.55,.5);break;
     case'bolt':{let p=V(ox+f.pts[0][0],1.46,oz+f.pts[0][1]);for(let i=1;i<f.pts.length;i++){const q=V(ox+f.pts[i][0],.38,oz+f.pts[i][1]);let a=p;
         for(let k=1;k<=3;k++){const u=k/3,j=k<3?.24:0,b=V(p.x+(q.x-p.x)*u+(Math.random()-.5)*j,p.y+(q.y-p.y)*u+(Math.random()-.5)*j,p.z+(q.z-p.z)*u+(Math.random()-.5)*j);fxBeam(a,b,'#cfefff',.06,.16);a=b;}
@@ -447,7 +467,7 @@ function updFx(dt,time){
 /* --- vestingen: eigen spel + andere spelers --- */
 const ECODE={inf:'i',dog:'d',tank:'t',drone:'r',mech:'m',haz:'h',boss:'b'},EDEC=Object.fromEntries(Object.entries(ECODE).map(([k,v])=>[v,k]));
 const b36=n=>Math.max(0,Math.min(1295,n)).toString(36).padStart(2,'0');
-const encT=()=>G.tw.map(t=>b36(t.c)+TYPES.indexOf(t.type)+t.lvl+(t.spec?t.spec[0]:'n')).join('');
+const encT=()=>G.tw.map(t=>b36(t.c)+ALL.indexOf(t.type).toString(36)+t.lvl.toString(36)+(t.spec?t.spec[0]:'n')).join('');
 const encE=()=>G.en.slice(0,150).map(e=>ECODE[e.type]+b36(Math.round(e.d*10))+Math.max(0,Math.min(9,Math.ceil(e.hp/e.max*9)))+(e.fz>0?'f':e.pT>0?'p':'n')).join('');
 // Weg in presence: tijdens de bouwfase 'P' + de wegvakken, daarna 'L' + de route op volgorde (gras = vak + 169).
 const encP=()=>G.path?'L'+G.path.cells.map(c=>b36(c+(G.road.has(c)?0:N*N))).join(''):'P'+[...G.road].map(b36).join('');
@@ -457,8 +477,8 @@ function fieldPath(s){if(typeof s!=='string'||!s)return{road:NOSET,trail:NOSET,p
   for(let i=1;i+2<=s.length&&cells.length<N*N;i+=2){const v=parseInt(s.slice(i,i+2),36);if(!(v>=0&&v<2*N*N))continue;const c=v%(N*N);cells.push(c);(v<N*N?road:trail).add(c);}
   o={road,trail,path:s[0]==='L'&&cells.length?E.mkPath(cells,!trail.size):null};if(pcache.size>120)pcache.clear();pcache.set(s,o);return o;}
 function decode(p){const pr=p.presence||{},fp=fieldPath(pr.pa),tw=[],en=[],s=typeof pr.tw==='string'?pr.tw:'',q=typeof pr.en==='string'?pr.en:'';
-  for(let i=0;i+5<=s.length&&tw.length<170;i+=5){const k=parseInt(s.slice(i,i+2),36),type=TYPES[+s[i+2]];if(!(k>=0&&k<N*N)||!type)continue;
-    const x=k%N;tw.push({c:k,x:x+.5,y:(k-x)/N+.5,type,lvl:Math.min(5,+s[i+3]||0),spec:{l:'link',t:'turbo'}[s[i+4]]||null,ang:null});}
+  for(let i=0;i+5<=s.length&&tw.length<170;i+=5){const k=parseInt(s.slice(i,i+2),36),type=ALL[parseInt(s[i+2],36)];if(!(k>=0&&k<N*N)||!type)continue;
+    const x=k%N;tw.push({c:k,x:x+.5,y:(k-x)/N+.5,type,lvl:Math.min(E.maxLvl({type}),parseInt(s[i+3],36)||0),spec:{u:'ultra',t:'turbo'}[s[i+4]]||null,ang:null});}
   const el=Math.min(1.2,(performance.now()-(rx.get(p.peer)||0))/1000)*(pr.st==='playing'?Math.min(3,+pr.sp||1):0);
   for(let i=0;fp.path&&i+5<=q.length&&en.length<150;i+=5){const type=EDEC[q[i]];if(!type)continue;const fl=q[i+4];
     const d=parseInt(q.slice(i+1,i+3),36)/10+(fl==='f'?0:EN[type].sp*el*.85);if(!(d<fp.path.len))continue;const pp=E.posAt(fp.path,d);
@@ -589,14 +609,11 @@ function render3D(time,dt){if(!gl3)return;
     if(G.phase==='prep'){const sc=1.9+.35*Math.sin(time*4);gateIn.visible=gateOut.visible=true;gateIn.position.set(ox+.5,.05,oz+E.MID+.5);gateOut.position.set(ox+N-.5,.05,oz+E.MID+.5);gateIn.scale.setScalar(sc);gateOut.scale.setScalar(sc);}
     const showRange=(x,y,rg)=>{rangeM.visible=selM.visible=true;rangeM.position.set(ox+x,.06,oz+y);rangeM.scale.setScalar(rg);selM.position.set(ox+x,.05,oz+y);selM.scale.setScalar(rg);};
     if(sel&&sel.s)showRange(sel.x,sel.y,sel.s.range);
-    if(hover>=0){const x=hover%N,y=(hover-x)/N,tool=roadMode||!!buildSel,ok=roadMode?E.canRoad(G,hover):!!buildSel&&E.canBuild(G,hover);hoverM.visible=true;hoverM.position.set(ox+x+.5,.04,oz+y+.5);
+    if(hover>=0){const x=hover%N,y=(hover-x)/N,tool=roadMode||!!buildSel,ok=roadMode?E.canRoad(G,hover):!!buildSel&&E.canBuild(G,hover,buildSel);hoverM.visible=true;hoverM.position.set(ox+x+.5,.04,oz+y+.5);hoverM.scale.setScalar(buildSel&&!roadMode?T[buildSel].size||1:1);
       hoverM.material.color.set(tool?(ok?'#35cf4a':'#e8372a'):'#ffffff');hoverM.material.opacity=tool?.5:.16;
       if(buildSel&&ok)showRange(x+.5,y+.5,T[buildSel].range*G.m.range);}
-    for(const o of orders){const x=o.c%N,m=poolMesh(ghosts,gi++,()=>new T3.Mesh(new T3.CylinderGeometry(.42,.42,.9,8),new T3.MeshBasicMaterial({color:'#f6cf4d',wireframe:true,toneMapped:false})));m.position.set(ox+x+.5,.45,oz+(o.c-x)/N+.5);m.rotation.y=time;}
-    for(const t of G.tw)if(t.spec==='link'){const x=t.c%N,y=(t.c-x)/N;
-      for(const o of G.tw){if(o===t||o.lvl<5)continue;const px=o.c%N,py=(o.c-px)/N;if(Math.abs(px-x)>1||Math.abs(py-y)>1)continue;
-        const m=poolMesh(links,li++,()=>new T3.Mesh(raw('fxbeam',()=>new T3.BoxGeometry(1,1,1).translate(0,0,.5)),glow('#45d2ff')));
-        m.position.set(ox+t.x,.2,oz+t.y);m.lookAt(ox+o.x,.2,oz+o.y);const w=.05+.02*Math.sin(time*7);m.scale.set(w,w,Math.hypot(o.x-t.x,o.y-t.y));}}}
+    for(const o of orders){const x=o.c%N,m=poolMesh(ghosts,gi++,()=>new T3.Mesh(new T3.CylinderGeometry(.42,.42,.9,8),new T3.MeshBasicMaterial({color:'#f6cf4d',wireframe:true,toneMapped:false})));m.position.set(ox+x+.5,.45,oz+(o.c-x)/N+.5);m.rotation.y=time;m.scale.set(T[o.type].size||1,1,T[o.type].size||1);}
+  }
   for(;gi<ghosts.length;gi++)ghosts[gi].visible=false;for(;li<links.length;li++)links[li].visible=false;
   updFx(dt,time);renderer.render(scene,camera);return fs;}
 
@@ -607,7 +624,7 @@ function renderIcons(){if(!T3)return;let r;try{r=new T3.WebGLRenderer({antialias
   const sc=new T3.Scene(),c=new T3.PerspectiveCamera(30,128/108,.1,20);c.position.set(2.1,2.3,2.6);c.lookAt(0,.68,0);
   sc.add(new T3.HemisphereLight('#9fb4e6','#2b2432',.8));const d=new T3.DirectionalLight('#ffd0a0',1.9);d.position.set(-3,4,2);sc.add(d);
   const shot=(k,o)=>{sc.add(o);r.render(sc,c);sc.remove(o);const cv=document.createElement('canvas');cv.width=256;cv.height=216;cv.getContext('2d').drawImage(r.domElement,0,0,256,216);ICON[k]=cv;};
-  for(const type of TYPES){const t=makeTower(type,SLOTS,0,null);t.userData.head.rotation.y=type==='uplink'?0:.5;shot(type,t);}
+  for(const type of ALL){const t=makeTower(type,SLOTS,0,null);t.userData.head.rotation.y=type==='uplink'?0:.5;if(type==='sleeper'){t.scale.setScalar(.42);for(const a of t.userData.anims)a(1.9);}shot(type,t);}
   HEROES.forEach((h,i)=>{const o=makeHero(i,SLOTS);o.scale.setScalar(1.45);o.rotation.y=.75;o.position.y=-.1;animHero(o,.5,0);shot('hero'+i,o);});
   r.dispose();if(r.forceContextLoss)r.forceContextLoss();}
 function iconDraw(cv,ic){const g=cv.getContext('2d'),W=cv.width,H=cv.height;g.clearRect(0,0,W,H);
@@ -617,6 +634,7 @@ function iconDraw(cv,ic){const g=cv.getContext('2d'),W=cv.width,H=cv.height;g.cl
     if(ic==='up'){g.strokeStyle='#f6cf4d';g.lineWidth=7;for(const y of[-8,6]){g.beginPath();g.moveTo(-15,y+10);g.lineTo(0,y-6);g.lineTo(15,y+10);g.stroke();}}
     else if(ic==='shield'){g.beginPath();g.moveTo(0,-22);g.lineTo(18,-14);g.lineTo(16,6);g.quadraticCurveTo(10,18,0,23);g.quadraticCurveTo(-10,18,-16,6);g.lineTo(-18,-14);g.closePath();g.fillStyle='#1f6f94';g.fill();g.strokeStyle='#9fe8ff';g.lineWidth=3;g.stroke();g.beginPath();g.moveTo(0,-13);g.lineTo(0,14);g.moveTo(-10,-3);g.lineTo(10,-3);g.lineWidth=2;g.stroke();}
     else if(ic==='road'){g.beginPath();g.moveTo(-27,13);g.bezierCurveTo(-4,13,-8,-12,10,-12);g.lineTo(27,-12);g.strokeStyle='#15100c';g.lineWidth=18;g.stroke();g.strokeStyle='#8a5a44';g.lineWidth=13;g.stroke();g.strokeStyle='#f6cf4d';g.lineWidth=2;g.setLineDash([5,5]);g.stroke();g.setLineDash([]);}
+    else if(ic==='ultra'){g.fillStyle='#b56bff';g.strokeStyle='#f1e2ff';g.lineWidth=1.5;g.beginPath();for(let i=0;i<10;i++){const an=-Math.PI/2+i*Math.PI/5,r=i%2?9:22;g.lineTo(Math.cos(an)*r,Math.sin(an)*r);}g.closePath();g.fill();g.stroke();}
     else if(ic==='link'){g.strokeStyle='#59c8f2';g.lineWidth=6;g.beginPath();g.ellipse(-8,0,12,9,0,0,7);g.stroke();g.beginPath();g.ellipse(8,0,12,9,0,0,7);g.stroke();}
     else if(ic==='turbo'){g.fillStyle='#ff8a2a';g.beginPath();g.moveTo(6,-22);g.lineTo(-14,4);g.lineTo(-2,4);g.lineTo(-7,22);g.lineTo(14,-5);g.lineTo(2,-5);g.closePath();g.fill();g.strokeStyle='#fff0b0';g.lineWidth=1.5;g.stroke();}
     else if(ic==='sell'){for(const y of[10,3,-4]){g.fillStyle='#8a5a08';g.beginPath();g.ellipse(0,y+3,17,7,0,0,7);g.fill();g.fillStyle='#e6a91e';g.beginPath();g.ellipse(0,y,17,7,0,0,7);g.fill();}g.fillStyle='#fff3b0';g.beginPath();g.ellipse(-3,-6,7,2.5,0,0,7);g.fill();}
@@ -719,7 +737,7 @@ function walkable(x,z){if(arena&&arena.block&&arena.block(x,z))return false;if(M
   if(lz>=5.85&&lz<=7.15&&((lx>13&&c<COLS-1)||(lx<0&&c>0)))return true;
   if(lx>=7.85&&lx<=9.15&&((lz>13&&r<ROWS-1)||(lz<0&&r>0)))return true;return false;}
 function towerAt(x,z){if(!G)return false;const[ox,oz]=slotO(mySlot),lx=x-ox,lz=z-oz,cx=Math.floor(lx),cz=Math.floor(lz);if(cx<0||cz<0||cx>=N||cz>=N)return false;
-  const t=G.map[cz*N+cx];return!!t&&Math.hypot(lx-t.x,lz-t.y)<.5;}
+  const t=G.map[cz*N+cx];return!!t&&Math.hypot(lx-t.x,lz-t.y)<(t.size>1?t.size*.47:.5);}
 function stepHero(dx,dz,manual){const h=hero,ok=(x,z)=>walkable(x,z)&&!(manual&&towerAt(x,z)&&!towerAt(h.x,h.z));
   if(ok(h.x+dx,h.z+dz)){h.x+=dx;h.z+=dz;return true;}if(ok(h.x+dx,h.z)){h.x+=dx;return true;}if(ok(h.x,h.z+dz)){h.z+=dz;return true;}return false;}
 function updHero(dt){const h=hero,H=HEROES[save.hero],v1=H.spd*HM.hSpd*(armour>=4?1.2:1)*(arena&&arena.slow||1),sp=v1*dt,yaw=camMode==='hero'?hcam.yaw:cam.yaw,f=[-Math.sin(yaw),-Math.cos(yaw)],r=[Math.cos(yaw),-Math.sin(yaw)];
@@ -736,7 +754,7 @@ function updHero(dt){const h=hero,H=HEROES[save.hero],v1=H.spd*HM.hSpd*(armour>=
   else{let tg=null;const o=arena?null:orders[0];
     if(o){const[ox,oz]=slotO(mySlot),x=o.c%N;tg=[ox+x+.5,oz+(o.c-x)/N+.5];}else if(h.tx!=null)tg=[h.tx,h.tz];
     if(tg){const dx=tg[0]-h.x,dz=tg[1]-h.z,d=Math.hypot(dx,dz);
-      if(o&&d<1.6){orders.shift();const t=E.build(G,o.c,o.type);if(t){G.fx.push({k:'build',a:[t.x,t.y],b:[t.x,t.y]});h.atk=1;}else toast(E.canBuild(G,o.c)?'Te weinig credits voor '+T[o.type].n:'Hier kun je niet meer bouwen');}
+      if(o&&d<1.6){orders.shift();const t=E.build(G,o.c,o.type);if(t){G.fx.push({k:'build',a:[t.x,t.y],b:[t.x,t.y]});h.atk=1;}else toast(!E.unlocked(G,o.type)?T[o.type].n+' is niet meer vrijgespeeld':E.canBuild(G,o.c,o.type)?'Te weinig credits voor '+T[o.type].n:'Hier kun je niet meer bouwen');}
       else if(d<=sp){if(walkable(tg[0],tg[1])){h.x=tg[0];h.z=tg[1];}h.tx=null;}
       else{h.a=Math.atan2(dz,dx);h.moving=true;if(!stepHero(dx/d*sp,dz/d*sp,false)){h.tx=null;if(o){orders.shift();toast('Je held kan daar niet komen');}}}}}
   if(h.moving)h.walk+=dt*H.spd*2.1;else h.walk*=.8;h.atk=Math.max(0,h.atk-dt*4);
@@ -1110,17 +1128,30 @@ const shieldSlot=()=>({ic:'shield',key:'F',n:'Schild',d:`Houdt ${String(2.5+HM.s
 function cardSlots(){const a=[];if(!G)return a;
   if(arena){if(arena.mode==='run')a[0]=shieldSlot();else if(arena.K.card)return arena.K.card(arena)||a;return a;}
   if(sel){const t=sel;
-    if(t.lvl<5)a[0]={ic:'up',key:'U',n:'Upgrade naar niveau '+(t.lvl+1),cost:E.upCost(G,t),d:'40% meer schade, en iets meer bereik en vuursnelheid.',act:()=>{if(!E.upgrade(G,t))toast('Te weinig credits');}};
-    if(t.lvl>=5&&!t.spec){a[0]={ic:'link',key:'L',n:'Link',cost:E.specCost(G,t,'link'),d:`+25% schade per naburige volledig geüpgradede turret. Nu ${Math.min(4,t.nb)} in de buurt.`,act:()=>{if(!E.spec(G,t,'link'))toast('Te weinig credits');}};
-      a[1]={ic:'turbo',key:'T',n:'Turbo',cost:E.specCost(G,t,'turbo'),d:'80% sneller en 30% meer schade.',act:()=>{if(!E.spec(G,t,'turbo'))toast('Te weinig credits');}};}
-    a[8]={ic:'sell',key:'V',n:'Verkopen',gain:E.sellValue(G,t),d:'Sloop deze turret en krijg een deel van je credits terug.',act:()=>{E.sell(G,t);sel=null;}};
+    const mx=E.maxLvl(t),pay=fn=>()=>{if(!fn())toast('Te weinig credits');};
+    if(t.lvl<mx)a[0]={ic:'up',key:'U',n:'Upgrade naar niveau '+(t.lvl+1),cost:E.upCost(G,t),d:t.type==='geers'?'22% meer schade, en iets meer bereik en vuursnelheid.':'40% meer schade, en iets meer bereik en vuursnelheid.',act:pay(()=>E.upgrade(G,t))};
+    else if(E.hasTiers(t.type)){
+      if(!t.spec)a[0]={ic:'ultra',key:'U',n:'Ultra '+T[t.type].n,cost:E.specCost(G,t,'ultra'),d:(t.type==='uplink'?'De ultra versie: groter bereik en een sterkere versterking.':'De ultra versie: flink meer schade, 15% sneller en 10% meer bereik.')+' Daarna kan hij turbo worden.',act:pay(()=>E.spec(G,t,'ultra'))};
+      else if(t.spec==='ultra'){const ok=E.canTurbo(G,t),c=E.specCost(G,t,'turbo');
+        a[0]={ic:'turbo',key:'T',n:'Turbo '+T[t.type].n,cost:c,poor:!ok||G.gold<c,d:ok?(t.type==='uplink'?'De turbo versie: anderhalf keer zo veel versterking.':'De turbo versie: 80% sneller en 30% meer schade, boven op ultra.'):'Nog niet mogelijk: er moet eerst een andere ultra toren staan.',
+          act:()=>{if(!ok)toast('Maak eerst nog een andere toren ultra');else if(!E.spec(G,t,'turbo'))toast('Te weinig credits');}};}}
+    a[8]={ic:'sell',key:'V',n:'Verkopen',gain:E.sellValue(G,t),d:'Sloop deze toren en krijg een deel van je credits terug.',act:()=>{E.sell(G,t);sel=null;}};
     a[11]={ic:'back',key:'Esc',n:'Terug',d:'Terug naar de bouwkaart.',act:()=>{sel=null;}};return a;}
   TYPES.forEach((type,i)=>a[i]={ic:type,key:String((i+1)%10),n:T[type].n,cost:E.buildCost(G,type),d:T[type].d,vs:type,fit:E.VS[type]?E.waveFit(type,G.round):1,on:buildSel===type,act:()=>{buildSel=buildSel===type?null:type;roadMode=false;}});
   if(G.phase==='prep')a[10]={ic:'road',key:'R',n:'Weg',free:true,d:'Sleep over je vesting om weg te leggen van de linkerpoort naar de rechterpoort. Sleep over bestaande weg om die weer weg te halen.',on:roadMode,act:roadTool};
-  a[11]={ic:'cancel',key:'Esc',n:'Annuleer',d:'Stop met bouwen en wis alle bouwopdrachten.',act:()=>{buildSel=null;roadMode=false;orders=[];}};return a;}
+  else{ // na de bouwfase komt hier de Geers Toren; hij gaat open als elke torensoort een turbo heeft
+    const miss=E.missingTurbo(G),ok=!miss.length,c=E.buildCost(G,'geers');
+    a[10]={ic:'geers',key:'G',n:T.geers.n,cost:c,poor:!ok||G.gold<c,on:buildSel==='geers',d:T.geers.d+(ok?'':` Komt vrij als elke torensoort een turbo heeft. Nog nodig: ${miss.map(k=>SHORT[k]).join(', ')}.`),
+      act:()=>{if(!ok){toast(`Nog ${miss.length} turbo${miss.length===1?'':'’s'} nodig: ${miss.map(k=>SHORT[k]).join(', ')}`);return;}buildSel=buildSel==='geers'?null:'geers';roadMode=false;}};}
+  // rechtsonder: annuleren zolang er iets te annuleren valt, anders De Slapende Geers
+  if(buildSel||roadMode||orders.length||G.phase==='prep')a[11]={ic:'cancel',key:'Esc',n:'Annuleer',d:'Stop met bouwen en wis alle bouwopdrachten.',act:()=>{buildSel=null;roadMode=false;orders=[];}};
+  else{const n=E.geersCount(G),has=G.tw.some(t=>t.type==='sleeper'),ok=E.sleeperReady(G),c=E.buildCost(G,'sleeper');
+    a[11]={ic:'sleeper',key:'Z',n:T.sleeper.n,cost:has?null:c,poor:!ok||G.gold<c,d:T.sleeper.d+(has?' Hij staat er al; er kan er maar één zijn.':ok?' Klik op het middelste van 3 bij 3 vrije vakken.':` Komt vrij bij ${E.GEERS_NEED} Geers Torens. Je hebt er ${n}.`),
+      act:()=>{if(has)toast('De Slapende Geers staat er al');else if(!ok)toast(`Bouw eerst ${E.GEERS_NEED} Geers Torens. Je hebt er ${n}`);else{buildSel='sleeper';roadMode=false;}}};}
+  return a;}
 const r1=n=>(Math.round(n*10)/10).toLocaleString('nl-NL');
 /* matchups: korte torennamen voor in de golfvoorvertoning, en de regels "sterk tegen / zwak tegen" */
-const SHORT={sentry:'Sentry',flak:'Flak',cryo:'Cryo',toxin:'Toxine',tesla:'Tesla',prism:'Prisma',rocket:'Raket',rail:'Railgun',wave:'Golfkanon'};
+const SHORT={sentry:'Sentry',flak:'Flak',cryo:'Cryo',toxin:'Toxine',tesla:'Tesla',prism:'Prisma',rocket:'Raket',rail:'Railgun',wave:'Golfkanon',uplink:'Commandopost'};
 const mk=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;};
 // Wat komt eraan, en welke torens werken daar goed tegen.
 function paintNext(){const q=$('#qNext');q.textContent='';q.append(mk('b','hd','Golf '+G.round+' bestaat uit'));
@@ -1140,13 +1171,14 @@ function refresh(){if(!G)return;if(sel&&!G.tw.includes(sel))sel=null;cur=cardSlo
   paintVs($('#iVs'),sel?sel.type:roadMode?'':buildSel||'');
   const face=sel?sel.type:roadMode?'road':buildSel||'hero'+save.hero;if(pc.dataset.ic!==face){pc.dataset.ic=face;iconDraw(pc,face);}
   if(sel){const t=sel,b=T[t.type];setText($('#iName'),b.n);
-    setText($('#iSub'),`Niveau ${t.lvl} ${t.spec==='turbo'?'turbo turret':t.spec==='link'?'gelinkte turret':'turret'}`);show(t.s,t.type);
-    setText($('#iDesc'),t.spec==='link'?`Gelinkt met ${Math.min(4,t.nb)} naburige turret${t.nb===1?'':'s'}.`:b.d);
-    $('#pBar').style.width=t.lvl/5*100+'%';setText($('#pBarT'),`Niveau ${t.lvl}/5`);}
+    const mx=E.maxLvl(t),tiers=E.hasTiers(t.type),step=t.lvl+E.tierOf(t),steps=mx+(tiers?2:0);
+    setText($('#iSub'),t.type==='sleeper'?'3 bij 3 vakken':`Niveau ${t.lvl}${t.spec==='turbo'?' · turbo':t.spec==='ultra'?' · ultra':''}`);show(t.s,t.type);
+    setText($('#iDesc'),t.type==='sleeper'?`Vertraagt alles binnen bereik met ${Math.round(t.s.slow*100)}%. ${b.d}`:t.spec==='turbo'?'Turbo: de hoogste trap van deze toren. '+b.d:t.spec==='ultra'?(E.canTurbo(G,t)?'Ultra: klaar voor turbo. ':'Ultra: voor turbo moet er nog een andere ultra toren staan. ')+b.d:b.d);
+    $('#pBar').style.width=(steps?step/steps*100:100)+'%';setText($('#pBarT'),t.type==='sleeper'?'Ontwaakt nooit':t.spec?(t.spec==='turbo'?'Turbo':'Ultra'):`Niveau ${t.lvl}/${mx}`);}
   else if(roadMode){const pv=E.preview(G);setText($('#iName'),'Weg');setText($('#iSub'),'Gratis · alleen in de bouwfase');st.hidden=true;
     setText($('#iDesc'),'Sleep over je vesting om weg te leggen. De vijand komt binnen bij de rode poort links en loopt naar de blauwe poort rechts.');$('#pBar').style.width=(pv.road?100:0)+'%';setText($('#pBarT'),pv.road?'Weg loopt door':G.road.size+' vakken gelegd');}
-  else if(buildSel){const b=T[buildSel];setText($('#iName'),b.n);setText($('#iSub'),`Bouwen · ${E.buildCost(G,buildSel)} credits`);show(E.stats(G,{type:buildSel,lvl:0,spec:null,aura:0,nb:0}),buildSel);
-    setText($('#iDesc'),b.d+' Klik op een vrij vak om te bouwen.');$('#pBar').style.width='0%';setText($('#pBarT'),'Bouwplan');}
+  else if(buildSel){const b=T[buildSel];setText($('#iName'),b.n);setText($('#iSub'),`Bouwen · ${E.buildCost(G,buildSel)} credits`);show(E.stats(G,{type:buildSel,lvl:0,spec:null,aura:0}),buildSel);
+    setText($('#iDesc'),b.d+(b.size>1?' Klik op het middelste van 3 bij 3 vrije vakken.':' Klik op een vrij vak om te bouwen.'));$('#pBar').style.width='0%';setText($('#pBarT'),'Bouwplan');}
   else{const H=HEROES[save.hero];setText($('#iName'),H.n);setText($('#iSub'),arena?arena.K.n:orders.length?`${orders.length} bouwopdracht${orders.length===1?'':'en'} in de rij`:H.role);
     st.hidden=false;setText($('#iDmg'),fmt(H.dmg*HM.hDmg*(armour>=3?1.3:1)*(arena?1:heroScale())));setText($('#iRate'),r1(H.rate*HM.hRate));setText($('#iRange'),r1(H.range*HM.hRange));
     setText($('#iDesc'),H.d+' Je held valt vanzelf aan binnen bereik.');$('#pBar').style.width=Math.max(0,hero.hp/maxHp()*100)+'%';setText($('#pBarT'),Math.max(0,Math.ceil(hero.hp))+' / '+Math.round(maxHp()));}
@@ -1209,13 +1241,18 @@ function botPres(b){const g=b.G,h=b.h,a=b.ar,pr=b.presence;pr.st=botLive(b)?'pla
 function botFields(fs,used){for(const b of bots){if(used.has(b.slot))continue;used.add(b.slot);const g=b.G;
     fs.push({slot:b.slot,own:false,bot:true,tw:g.tw,en:g.en,name:b.name,r:g.round,l:g.lives,done:!botLive(b),road:g.road,trail:g.trail,psig:'b'+g.rv});}}
 /* --- een bot in zijn vesting: bouwen, upgraden en meevechten --- */
-// Eén besluit per keer: een toren erbij zolang de vesting daar ruimte voor heeft, en anders de goedkoopste upgrade, link of turbo.
-function botThink(b){const g=b.G;if(b.order||g.omega)return;
+// Eén besluit per keer: een toren erbij zolang de vesting daar ruimte voor heeft, en anders de goedkoopste stap in de keten:
+// upgrade, ultra, turbo. Staat van elke soort een turbo, dan bouwt hij Geers Torens en daarna De Slapende Geers.
+function botThink(b){const g=b.G;if(b.order)return;
   if(g.tw.length<Math.min(b.cells.length,5+Math.floor(g.round*.7))){const type=BSEQ[b.seq%BSEQ.length],c=b.cells.find(k=>E.canBuild(g,k));
     if(c!==undefined&&g.gold>=E.buildCost(g,type)){b.order={c,type};b.seq++;return;}}
+  if(E.sleeperReady(g)){if(g.gold>=E.buildCost(g,'sleeper')){for(let c=0;c<N*N;c++)if(E.canBuild(g,c,'sleeper')){b.order={c,type:'sleeper'};return;}}}
+  else if(E.geersReady(g)&&E.geersCount(g)<E.GEERS_NEED){if(g.gold>=E.buildCost(g,'geers')){const c=b.cells.find(k=>E.canBuild(g,k));if(c!==undefined){b.order={c,type:'geers'};return;}}}
   let best=null,kind='',bc=1e9;
-  for(const t of g.tw){if(t.type==='geers'||t.type==='omega'||t.spec)continue;
-    const k=t.lvl<5?'up':t.type==='uplink'||t.nb>=2?'link':'turbo',c=k==='up'?E.upCost(g,t):E.specCost(g,t,k);if(c<bc){bc=c;best=t;kind=k;}}
+  for(const t of g.tw){let k,c;
+    if(t.lvl<E.maxLvl(t)){k='up';c=E.upCost(g,t);}else if(!E.hasTiers(t.type))continue;
+    else if(!t.spec){k='ultra';c=E.specCost(g,t,k);}else if(E.canTurbo(g,t)){k='turbo';c=E.specCost(g,t,k);}else continue;
+    if(c<bc){bc=c;best=t;kind=k;}}
   if(best&&g.gold>=bc){if(kind==='up')E.upgrade(g,best);else E.spec(g,best,kind);}}
 // De held van een bot valt aan zoals die van een speler. Geeft de dichtstbijzijnde vijand terug, zodat hij erheen kan lopen.
 function botShoot(b,dt){const g=b.G,h=b.h,H=HEROES[b.idx],m=g.m,[ox,oz]=slotO(b.slot),HR=H.range*m.hRange,inr=[];h.cd-=dt*speed;
@@ -1416,7 +1453,8 @@ function click(ev){if(!G||ended)return;const w=pick(ev);if(!w)return;if(arena){m
   const k=p.cell,t=G.map[k];
   if(t){sel=t;buildSel=null;roadMode=false;refresh();return;}
   if(roadMode){toast(G.phase==='prep'?'Hier kan geen weg liggen':'De bouwfase is voorbij');return;}
-  if(buildSel){if(!E.canBuild(G,k)||orders.some(o=>o.c===k)){toast('Hier kun je niet bouwen');return;}
+  if(buildSel){const cs=E.cellsOf(k,buildSel);if(!cs||!E.canBuild(G,k,buildSel)||orders.some(o=>(E.cellsOf(o.c,o.type)||[]).some(c=>cs.includes(c)))){toast(T[buildSel].size>1?'Hier is geen 3 bij 3 vakken vrij':'Hier kun je niet bouwen');return;}
+    if(buildSel==='sleeper'&&orders.some(o=>o.type==='sleeper')){toast('Er kan maar één Slapende Geers staan');return;}
     const pend=orders.reduce((s,o)=>s+E.buildCost(G,o.type),0);if(G.gold<pend+E.buildCost(G,buildSel)){toast('Te weinig credits');return;}
     orders.push({c:k,type:buildSel});refresh();return;}
   if(sel){sel=null;refresh();return;}

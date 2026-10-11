@@ -294,18 +294,58 @@ test('matchups: een toren doet anderhalf keer schade tegen sterk en de helft teg
   for (const r of [1, 7, 10, 25, 100]) assert.equal(Engine.waveMix(r).reduce((n, o) => n + o.n, 0), Engine.makeWave(r).length);
 });
 
-test('turbo turrets blijven losse torens: er is geen The Geers of Omega-toren meer', () => {
+test('de keten: 5 upgrades, ultra, turbo, Geers Toren (13 upgrades) en De Slapende Geers (3x3)', () => {
   const Engine = require('../../client/js/engine.js');
+  const { N, TYPES } = Engine;
   const G = Engine.create({});
-  G.gold = 1e6;
-  for (let i = 0; i < 4; i++) {
-    const t = Engine.build(G, 4 * Engine.N + 2 + i * 2, 'sentry');
-    for (let k = 0; k < 5; k++) Engine.upgrade(G, t);
-    assert.equal(Engine.spec(G, t, 'turbo'), true);
-  }
-  assert.equal(G.tw.length, 4);
-  assert.ok(G.tw.every((t) => t.type === 'sentry' && t.spec === 'turbo'));
-  assert.equal(Engine.T.geers, undefined);
+  G.gold = 1e9;
+  const maxed = (c, type) => { const t = Engine.build(G, c, type); for (let k = 0; k < 5; k++) assert.equal(Engine.upgrade(G, t), true); return t; };
+  // ultra pas na vijf upgrades, en geen zesde upgrade
+  const a = Engine.build(G, 1 * N + 1, 'sentry');
+  assert.equal(Engine.spec(G, a, 'ultra'), false);
+  for (let k = 0; k < 5; k++) Engine.upgrade(G, a);
+  assert.equal(Engine.upgrade(G, a), false);
+  assert.equal(Engine.spec(G, a, 'turbo'), false); // eerst ultra
+  const before = a.s.dmg;
+  assert.equal(Engine.spec(G, a, 'ultra'), true);
+  assert.ok(a.s.dmg > before);
+  // turbo vraagt om een andere ultra toren
+  assert.equal(Engine.canTurbo(G, a), false);
+  assert.equal(Engine.spec(G, a, 'turbo'), false);
+  const b = maxed(1 * N + 3, 'flak');
+  assert.equal(Engine.spec(G, a, 'turbo'), false); // b is nog geen ultra
+  Engine.spec(G, b, 'ultra');
+  assert.equal(Engine.spec(G, a, 'turbo'), true);
+  assert.equal(Engine.spec(G, b, 'turbo'), true); // een turbo telt ook als ultra
+  // Geers Toren: pas als elke soort een turbo heeft
+  assert.equal(Engine.build(G, 3 * N + 1, 'geers'), null);
+  TYPES.slice(2).forEach((type, i) => { const t = maxed(1 * N + 5 + i, type); Engine.spec(G, t, 'ultra'); assert.equal(Engine.spec(G, t, 'turbo'), true); });
+  assert.deepEqual(Engine.missingTurbo(G), []);
+  const gs = [0, 1, 2, 3].map((i) => Engine.build(G, 3 * N + 1 + i * 2, 'geers'));
+  assert.ok(gs.every(Boolean));
+  for (let k = 0; k < 13; k++) assert.equal(Engine.upgrade(G, gs[0]), true);
+  assert.equal(Engine.upgrade(G, gs[0]), false);
+  assert.equal(gs[0].lvl, 13);
+  assert.equal(Engine.spec(G, gs[0], 'ultra'), false);
+  // De Slapende Geers: vier Geers Torens, 3x3 vakken, en maar een
+  Engine.sell(G, gs[3]);
+  assert.equal(Engine.build(G, 10 * N + 5, 'sleeper'), null);
+  Engine.build(G, 3 * N + 7, 'geers');
+  assert.equal(Engine.build(G, 12 * N + 5, 'sleeper'), null); // past niet binnen het veld
+  const z = Engine.build(G, 10 * N + 5, 'sleeper');
+  assert.equal(z.cells.length, 9);
+  assert.ok(z.cells.every((c) => G.map[c] === z));
+  assert.equal(Engine.canBuild(G, 9 * N + 4), false);
+  assert.equal(Engine.build(G, 10 * N + 9, 'sleeper'), null);
+  // hij vertraagt en beschadigt alles binnen bereik, ook wie immuun is voor gif en ijs
+  Engine.lock(G); Engine.startWave(G);
+  const e = { id: 99, type: 'haz', hp: 1e6, max: 1e6, d: 6, sp: 1, arm: 0, regen: 0, immune: true, boss: false, leak: 1, b: 1, sc: 1, x: 5.5, y: 6.5, fz: 0, fi: 0, sT: 0, sl: 0, pT: 0, pD: 0 };
+  G.q = []; G.en.push(e);
+  Engine.step(G, .05);
+  assert.ok(e.hp < 1e6 && e.sT > 0 && e.sl >= .6);
+  // verkopen maakt alle negen vakken weer vrij
+  Engine.sell(G, z);
+  assert.ok(z.cells.every((c) => !G.map[c]));
   assert.equal(Engine.T.omega, undefined);
   // punten in de oude skill Geers-overdrive gaan mee naar Turbo-overdrive
   const { cleanSave } = require('../src/validate');
