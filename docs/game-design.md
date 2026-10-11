@@ -1,7 +1,7 @@
 # Game design
 
 Tower defense game in de art style van red alert 3.
-20 spelers in hun eigen veld. Je kan vrij rondlopen met een builder op je eigen veld. Met de camera kan je ook bij de actieve spelers kijken.
+25 spelers in hun eigen veld. Je kan vrij rondlopen met een builder op je eigen veld. Met de camera kan je ook bij de actieve spelers kijken.
 Als je het spel joined kom je bij elkaar in een lobby. De eerste speler kan het spel starten als iedereen compleet is. De andere spelers kunnen op een start knop drukken..en als iedereen akkoord  is start het spel.
 Er zijn 50 rondes. Elke ronder moeilijker dan de rond ervoor.
 10 verschillende turrets. Denk aan ice om te bevriezen en poison om de vijanden langzamer te laten gaan.
