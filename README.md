@@ -31,7 +31,7 @@ client/                 frontend: gewone bestanden, geen bouwstap
   js/config.js          adres van de backend (leeg = dezelfde server)
   js/engine.js          spelregels: torens, vijanden, golven, skills
   js/net.js             alle communicatie met de backend
-  js/minigames.js       30 losse minigames, nog niet gekoppeld aan levels
+  js/minigames.js       de 30 genummerde minigames
   js/game.js            3D-wereld, bediening, lobby, minigames
   vendor/three.min.js   three.js r128
 server/                 backend: Node.js, Express, WebSocket, SQLite
@@ -81,13 +81,15 @@ In elke minigame heeft de held twee extra's, rechtsonder op de commandokaart.
 
 Vijf talenten in de boom Veldheer maken ze sterker: Brede schouders (verder duwen), Elleboogwerk (duwen laadt sneller), Lange adem (langer sprinten), Snel op adem (sprint laadt sneller) en Naverbrander (sneller sprinten). De vaste waarden staan in `MOVES` in `client/js/engine.js`.
 
-## Minigames uitproberen
+## Minigames en eilanden
+
+Rond het speelveld liggen vier minigame-eilanden: onder het ronde eiland, boven het vierkante, links het kruis en rechts de vier eilandjes met bruggen. Elke minigame hoort bij één eiland (`isle` in zijn beschrijving). Het doolhof heeft een eigen baan naast het ronde eiland.
+
+Na elke tiende golf volgt een minigame. Drie levels liggen vast, in `FIXED` in `client/js/game.js`: level 10 de Kolos, level 50 De Geers draait door en level 100 de Titaan. Op de andere tientallen kiest `miniFor` een willekeurige uit alle overige, in één potje nooit twee keer dezelfde. De keuze volgt uit het potje, zodat alle spelers dezelfde krijgen.
+
+De dertig genummerde minigames staan in `client/js/minigames.js`; bovenin dat bestand staat welke velden een minigame heeft. De getallen die de moeilijkheid bepalen (duur `T`, doel `goal`, levenspunten, schade, tempo) staan per minigame bij elkaar. In een potje speelt iedereen zijn eigen ronde op hetzelfde eiland en wint de hoogste score.
 
 In de lobby staat de knop **Minigames**. Daar kies je een minigame en speel je hem los, alleen, met je gekozen held en je skills. Het telt nergens voor mee: geen skillpunten, geen score, geen potje erbij. Andere spelers zien je in de lobby als "Test minigames".
-
-De dertig genummerde minigames staan in `client/js/minigames.js` en zitten **nog niet in het spel**. Een minigame komt pas in een potje als je hem in de tabel `MINI` in `client/js/game.js` bij een level zet, bijvoorbeeld `40:'coins'`. De score loopt dan vanzelf mee tussen de spelers: iedereen speelt zijn eigen ronde in de arena en de hoogste score wint.
-
-Een minigame toevoegen of aanpassen: bovenin `minigames.js` staat welke velden een minigame heeft. De getallen die de moeilijkheid bepalen (duur `T`, doel `goal`, levenspunten, schade, tempo) staan per minigame bij elkaar.
 
 ## Hoe het online werkt
 

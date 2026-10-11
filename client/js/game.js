@@ -121,7 +121,26 @@ function bindAccount(){
 /* ================= 3D ================= */
 const stage=$('#stage');
 let renderer=null,scene,camera,sun,sea,ray,gl3=false,haloTex;
-const cam={tx:0,tz:0,d:25,yaw:0},PITCH=.86,ACX=2*FW+6.5,ACZ=ROWS*FW+12,AR=8.6;
+const cam={tx:0,tz:0,d:25,yaw:0},PITCH=.86,AR=8.6;
+// Vier minigame-eilanden rond het speelveld: onder het ronde, boven het vierkante, links het kruis en rechts de vier eilandjes.
+// Elke minigame hoort bij één eiland (isle in KIND). ACX en ACZ zijn het midden van het eiland waar nu gespeeld wordt.
+const MIDX=(COLS-1)*FW/2+6.5,MIDZ=(ROWS-1)*FW/2+6.5,ARM=2.8,HUB=4,QD=5.2,QR=3.3;
+const ISLES={round:{x:MIDX,z:ROWS*FW+12,n:'Rond eiland'},square:{x:MIDX,z:-17,n:'Vierkant eiland'},cross:{x:-17,z:MIDZ,n:'Kruiseiland'},quad:{x:COLS*FW+11.5,z:MIDZ,n:'Vier eilandjes'}};
+// Waar je kunt lopen, gezien vanuit het midden van het eiland. Het vierkant omvat de hele cirkel, dus wat op het ronde eiland past, past daar ook.
+const SHAPE={round:(x,z)=>Math.hypot(x,z)<=AR,square:(x,z)=>Math.abs(x)<=AR&&Math.abs(z)<=AR,
+  cross:(x,z)=>{x=Math.abs(x);z=Math.abs(z);return(x<=AR&&z<=ARM)||(z<=AR&&x<=ARM)||Math.hypot(x,z)<=HUB;},
+  quad:(x,z)=>{x=Math.abs(x);z=Math.abs(z);return Math.hypot(x-QD,z-QD)<=QR||Math.hypot(x,z)<=1.9||(Math.abs(x-QD)<=.8&&z<=QD)||(Math.abs(z-QD)<=.8&&x<=QD)||(Math.abs(x-z)<=1.1&&Math.max(x,z)<=QD);}};
+let ACX=ISLES.round.x,ACZ=ISLES.round.z,ISLE='round';
+function setIsle(k){ISLE=ISLES[k]?k:'round';ACX=ISLES[ISLE].x;ACZ=ISLES[ISLE].z;if(LAB.center)LAB.center(ACX,ACZ,ISLE);}
+// Ligt dit punt op het eiland van nu, met m ruimte tot de rand?
+function isleOn(x,z,m){const f=SHAPE[ISLE];x-=ACX;z-=ACZ;if(!f(x,z))return false;return!m||(f(x+m,z)&&f(x-m,z)&&f(x,z+m)&&f(x,z-m));}
+function islePt(r0,r1,rnd){rnd=rnd||Math.random;for(let i=0;i<400;i++){const an=rnd()*6.2832,d=r0+(r1-r0)*Math.sqrt(rnd()),x=ACX+Math.cos(an)*d,z=ACZ+Math.sin(an)*d;if(isleOn(x,z,.5))return[x,z];}return[ACX,ACZ];}
+// Een plek aan de rand, waar monsters het eiland op komen: [x, z, kijkrichting naar binnen].
+function isleEdge(){const q=Math.random()*4|0,u=Math.random()*2-1,an=q*Math.PI/2;let x,z;
+  if(ISLE==='round'){const a=Math.random()*6.2832;x=Math.cos(a)*(AR-.4);z=Math.sin(a)*(AR-.4);}
+  else if(ISLE==='quad'){const a=an+Math.PI/4+u*1.1;x=Math.cos(an+Math.PI/4)*QD*1.4142+Math.cos(a)*(QR-.5);z=Math.sin(an+Math.PI/4)*QD*1.4142+Math.sin(a)*(QR-.5);}
+  else{const w=(ISLE==='cross'?ARM:AR)-.6;x=Math.cos(an)*(AR-.4)-Math.sin(an)*u*w;z=Math.sin(an)*(AR-.4)+Math.cos(an)*u*w;}
+  return[ACX+x,ACZ+z,Math.atan2(-z,-x)];}
 const slotO=s=>[(s%COLS)*FW,Math.floor(s/COLS)*FW];
 const TEAM=[];
 const _m=T3&&new T3.Matrix4(),_q=T3&&new T3.Quaternion(),_e=T3&&new T3.Euler(),_v=T3&&new T3.Vector3(),_s=T3&&new T3.Vector3(),_c=T3&&new T3.Color();
@@ -373,7 +392,31 @@ function init3D(){if(!T3)return false;
     const L={g:cv.getContext('2d'),tex,spr,k:''};labels.push(L);labelDraw(L,'Vrije vesting','','#'+th.getHexString());}
   {const am=mesh(arenaGeo,STONE);am.position.set(ACX,0,ACZ);scene.add(am);
     for(let i=0;i<30;i+=5){const an=i/30*Math.PI*2;addFire(ACX+Math.cos(an)*9.6,2.3,ACZ+Math.sin(an)*9.6,.7);}
-    const sprA=nameSprite('Arena','#f6cf4d');sprA.scale.set(5,.95,1);sprA.position.set(ACX,4.2,ACZ-9.6);scene.add(sprA);}
+    const sprA=nameSprite(ISLES.round.n,'#f6cf4d');sprA.scale.set(5,.95,1);sprA.position.set(ACX,4.2,ACZ-9.6);scene.add(sprA);}
+  {const fl='#8f7a58',dk='#3a3f47',put=(k,g,ly,lz,fires)=>{const I=ISLES[k],m=mesh(g,STONE);m.position.set(I.x,0,I.z);scene.add(m);
+      const sp=nameSprite(I.n,'#f6cf4d');sp.scale.set(5,.95,1);sp.position.set(I.x,ly,I.z+lz);scene.add(sp);for(const[x,y,z]of fires)addFire(I.x+x,y,I.z+z,.7);};
+    // vierkant: een ommuurd plein met hoektorens
+    put('square',geo('isleSq',()=>{const a=[bx(20.4,1.7,20.4,sd,0,-.86,0),bx(21.6,.7,21.6,dk,0,-1.5,0),bx(18.4,.04,18.4,fl,0,.02,0)];
+      for(let q=0;q<4;q++){const an=q*Math.PI/2,c=Math.cos(an),sn=Math.sin(an);
+        for(let i=-4;i<=4;i++){const u=i*2.05,x=c*9.7-sn*u,z=sn*9.7+c*u;a.push(bx(.5,i%2?1:1.5,2.05,st,x,i%2?.5:.75,z,-an));}
+        a.push(cy(.7,.8,2.3,st,(c-sn)*9.7,.6,(sn+c)*9.7,12),cy(.84,.84,.24,sd,(c-sn)*9.7,1.85,(sn+c)*9.7,12),cy(.34,.2,.3,'#2a2d31',(c-sn)*9.7,2.1,(sn+c)*9.7,10));}
+      return a;},.5),4.2,-9.8,[[9.7,2.4,9.7],[-9.7,2.4,9.7],[9.7,2.4,-9.7],[-9.7,2.4,-9.7]]);
+    // kruis: twee balken met een ronde kern, lage muurtjes langs de armen
+    put('cross',geo('isleCr',()=>{const a=[bx(19.8,1.7,7,sd,0,-.86,0),bx(7,1.7,19.8,sd,0,-.86,0),cy(4.8,5.2,1.7,sd,0,-.86,0,28),bx(20.8,.7,8,dk,0,-1.5,0),bx(8,.7,20.8,dk,0,-1.5,0),cy(5.6,6,.7,dk,0,-1.5,0,28),
+        bx(17.9,.04,5.9,fl,0,.02,0),bx(5.9,.04,17.9,fl,0,.021,0),cy(4.2,4.2,.04,fl,0,.022,0,28),cy(1.4,1.4,.03,'#6c2a25',0,.05,0,20)];
+      for(let q=0;q<4;q++){const an=q*Math.PI/2,c=Math.cos(an),sn=Math.sin(an),at=(u,v)=>[c*u-sn*v,sn*u+c*v];
+        for(const v of[-3.15,3.15]){const[x,z]=at(6.45,v);a.push(bx(5.6,.5,.34,st,x,.25,z,-an));for(const u of[4,6.4,8.8]){const[px,pz]=at(u,v);a.push(bx(.5,.3,.34,st,px,.64,pz,-an));}}
+        const[ex,ez]=at(9.25,0);a.push(bx(.34,.5,6.64,st,ex,.25,ez,-an));for(const v of[-3.15,3.15]){const[px,pz]=at(9.25,v);a.push(cy(.3,.36,1.5,st,px,.75,pz,8),cy(.34,.2,.3,'#2a2d31',px,1.6,pz,10));}}
+      return a;},.5),4.4,-4.6,[[9.25,1.9,3.15],[-9.25,1.9,-3.15],[3.15,1.9,-9.25],[-3.15,1.9,9.25]]);
+    // vier eilandjes: vier ronde plateaus, verbonden door bruggen langs de rand en dwars door een klein midden
+    put('quad',geo('isleQd',()=>{const a=[cy(2.4,2.7,1.7,sd,0,-.86,0,18),cy(2,2,.04,fl,0,.024,0,18)];
+      for(const ry of[Math.PI/4,-Math.PI/4])a.push(bx(14.7,.5,2.5,sd,0,-.26,0,ry),bx(14.7,.04,2.2,fl,0,.016,0,ry),bx(1.2,2,1.2,sd,0,-1.4,0,ry));
+      for(let q=0;q<4;q++){const an=q*Math.PI/2,c=Math.cos(an),sn=Math.sin(an),cx=(c-sn)*QD,cz=(sn+c)*QD,ox=cx/QD*.7071,oz=cz/QD*.7071;
+        a.push(cy(3.75,4.15,1.7,sd,cx,-.86,cz,26),cy(4.3,4.6,.7,dk,cx,-1.5,cz,26),cy(3.42,3.42,.04,fl,cx,.02,cz,26),cy(1.1,1.1,.03,'#6c2a25',cx,.05,cz,16));
+        a.push(bx(1.9,.5,2*QD,sd,c*QD,-.26,sn*QD,-an),bx(1.62,.04,2*QD,fl,c*QD,.012,sn*QD,-an),bx(1,2,1,sd,c*QD,-1.4,sn*QD,-an));
+        for(let i=-3;i<=3;i++){const t=Math.atan2(oz,ox)+i*.42,x=cx+Math.cos(t)*3.6,z=cz+Math.sin(t)*3.6;a.push(bx(.4,i%2?.5:.9,1.3,st,x,i%2?.25:.45,z,-t));}
+        a.push(cy(.34,.2,.3,'#2a2d31',cx+ox*3.6,1.05,cz+oz*3.6,10));}
+      return a;},.5),4.2,-9.6,[[7.75,1.4,7.75],[-7.75,1.4,7.75],[7.75,1.4,-7.75],[-7.75,1.4,-7.75]]);}
   {const R=RUN,cg=geo('course',()=>{const a=[bx(R.L+1.6,1.7,R.W+1.6,sd,R.L/2,-.86,R.W/2),bx(R.L+2.4,.7,R.W+2.4,'#3a3f47',R.L/2,-1.5,R.W/2),bx(R.L,.04,R.W,'#8f7a58',R.L/2,.02,R.W/2),
         bx(R.L+1.2,.4,.3,st,R.L/2,.2,-.45),bx(R.L+1.2,.4,.3,st,R.L/2,.2,R.W+.45),bx(.3,.4,R.W+1.2,st,-.45,.2,R.W/2),bx(.3,.4,R.W+1.2,st,R.L+.45,.2,R.W/2),
         bx(.4,2,.4,st,R.L-2,1,.3),bx(.4,2,.4,st,R.L-2,1,R.W-.3),bx(.5,.3,R.W,st,R.L-2,2.1,R.W/2)];
@@ -411,7 +454,7 @@ const focus=()=>camMode==='hero'&&G?[hero.x,hero.z]:[cam.tx,cam.tz];
 function camUpdate(){let fx,fz;
   if(camMode==='hero'&&G){hcam.d=Math.max(3.5,Math.min(26,hcam.d));hcam.pitch=Math.max(.1,Math.min(1.3,hcam.pitch));fx=hero.x;fz=hero.z;
     const cp=Math.cos(hcam.pitch)*hcam.d;camera.position.set(fx+Math.sin(hcam.yaw)*cp,1+Math.sin(hcam.pitch)*hcam.d,fz+Math.cos(hcam.yaw)*cp);camera.lookAt(fx,1,fz);}
-  else{cam.d=Math.max(11,Math.min(64,cam.d));cam.tx=Math.max(-5,Math.min(COLS*FW,cam.tx));cam.tz=Math.max(-5,Math.min(ROWS*FW+24,cam.tz));fx=cam.tx;fz=cam.tz;
+  else{cam.d=Math.max(11,Math.min(64,cam.d));cam.tx=Math.max(-30,Math.min(COLS*FW+24,cam.tx));cam.tz=Math.max(-30,Math.min(ROWS*FW+24,cam.tz));fx=cam.tx;fz=cam.tz;
     const cp=Math.cos(PITCH)*cam.d;camera.position.set(fx+Math.sin(cam.yaw)*cp,Math.sin(PITCH)*cam.d,fz+Math.cos(cam.yaw)*cp);camera.lookAt(fx,0,fz);}
   sun.position.set(fx-34,24,fz+20);sun.target.position.set(fx,0,fz);}
 function camTo(s){const[ox,oz]=slotO(s);cam.tx=ox+6.5;cam.tz=oz+7+cam.d*.1;}
@@ -652,7 +695,7 @@ function iconDraw(cv,ic){const g=cv.getContext('2d'),W=cv.width,H=cv.height;g.cl
   g.strokeStyle='rgba(255,255,255,.18)';g.lineWidth=2;g.strokeRect(1,1,W-2,H-2);}
 
 /* --- minimap en wereld-UI --- */
-const MW=COLS*FW+2,MH=ROWS*FW+26,MX=-4,MZ=-3;
+const MW=COLS*FW+54,MH=MW*1.04,MX=-30,MZ=-31;
 function drawMini(fs){const cv=$('#mini'),g=cv.getContext('2d'),k=cv.width/MW,by=new Map(fs.map(f=>[f.slot,f]));
   g.fillStyle='#071620';g.fillRect(0,0,cv.width,cv.height);const X=x=>(x-MX)*k,Z=z=>(z-MZ)*k;
   for(let s=0;s<SLOTS;s++){const[ox,oz]=slotO(s),f=by.get(s),col='#'+TEAM[s].getHexString();
@@ -660,7 +703,11 @@ function drawMini(fs){const cv=$('#mini'),g=cv.getContext('2d'),k=cv.width/MW,by
     if(f){g.fillStyle='#4f4632';for(const c of f.trail){const x=c%N;g.fillRect(X(ox+x),Z(oz+(c-x)/N),k+.5,k+.5);}g.fillStyle='#8a5a44';for(const c of f.road){const x=c%N;g.fillRect(X(ox+x),Z(oz+(c-x)/N),k+.5,k+.5);}}
     g.strokeStyle=f?col:'#39414c';g.lineWidth=f&&f.own?3:1.5;g.strokeRect(X(ox)-1,Z(oz)-1,N*k+2,N*k+2);
     if(f){g.fillStyle=col;for(const t of f.tw)g.fillRect(X(ox+t.x)-2.5,Z(oz+t.y)-2.5,5,5);g.fillStyle='#ff4034';for(const e of f.en)g.fillRect(X(ox+e.x)-1.5,Z(oz+e.y)-1.5,e.boss?6:3,e.boss?6:3);}}
-  g.fillStyle='#3a3226';g.strokeStyle=arena?'#f6cf4d':'#7a6a48';g.lineWidth=2;g.beginPath();g.arc(X(ACX),Z(ACZ),9.5*k,0,7);g.fill();g.stroke();g.fillRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);g.strokeRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);
+  for(const id in ISLES){const I=ISLES[id],x=X(I.x),z=Z(I.z),box=(w,d)=>{g.fillRect(x-w*k,z-d*k,2*w*k,2*d*k);g.strokeRect(x-w*k,z-d*k,2*w*k,2*d*k);},disc=(dx,dz,r)=>{g.beginPath();g.arc(x+dx*k,z+dz*k,r*k,0,7);g.fill();g.stroke();};
+    g.fillStyle='#3a3226';g.strokeStyle=arena&&ISLE===id&&arena.mode!=='run'?'#f6cf4d':'#7a6a48';g.lineWidth=2;
+    if(id==='round')disc(0,0,9.5);else if(id==='square')box(9.5,9.5);else if(id==='cross'){box(9.5,3.2);box(3.2,9.5);g.fillRect(x-9.5*k+1,z-3.2*k+1,19*k-2,6.4*k-2);}
+    else{g.lineWidth=3;g.beginPath();for(const[p,q]of[[1,1],[1,-1]]){g.moveTo(x-QD*k,z-p*q*QD*k);g.lineTo(x+QD*k,z+p*q*QD*k);}g.rect(x-QD*k,z-QD*k,2*QD*k,2*QD*k);g.stroke();g.lineWidth=2;for(const[p,q]of[[1,1],[1,-1],[-1,1],[-1,-1]])disc(p*QD,q*QD,3.6);}}
+  g.fillStyle='#3a3226';g.strokeStyle=arena&&arena.mode==='run'?'#f6cf4d':'#7a6a48';g.lineWidth=2;g.fillRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);g.strokeRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);
   for(const r of rheroes.values()){g.fillStyle='#'+TEAM[r.slot].getHexString();g.strokeStyle='#fff';g.lineWidth=1;g.beginPath();g.arc(X(r.x),Z(r.z),4,0,7);g.fill();g.stroke();}
   if(G){g.fillStyle='#fff';g.strokeStyle='#000';g.lineWidth=1.5;g.beginPath();g.arc(X(hero.x),Z(hero.z),5,0,7);g.fill();g.stroke();}
   if(gl3){const pts=[[-1,1],[1,1],[1,-1],[-1,-1]].map(([x,y])=>groundAt(x,y));if(pts.every(Boolean)){g.strokeStyle='#fff';g.lineWidth=1.5;g.beginPath();pts.forEach((p,i)=>i?g.lineTo(X(p.x),Z(p.z)):g.moveTo(X(p.x),Z(p.z)));g.closePath();g.stroke();}}}
@@ -717,7 +764,7 @@ function sync(){const now=performance.now(),ms=mates(),L=lead(),settled=!room||n
     // na vijf minuten, zodra iemand anders al gestart is, of eerder als iedereen klaar is met bouwen
     if(G.timer<=0||(settled&&ms.some(p=>p.presence.ps===1))||(built&&settled&&ms.every(p=>p.presence.bd===true)))endPrep();}
   else if(G.phase==='wait'){const r=G.cleared;if(!ms.every(p=>(+p.presence.cl||0)>=r))return;
-    {const md=MINI[r];if(md&&arenaFor<r){arenaFor=r;enterArena(md,r);return;}}
+    {const md=miniFor(r);if(md&&arenaFor<r){arenaFor=r;enterArena(md,r);return;}}
     if(arena)return;if(G.final){finalWatch();return;}nx=G.round;if(ms.every(p=>(+p.presence.nx||0)>=G.round))E.next(G);}
   else if(G.phase==='build'&&L&&+L.presence.sw===G.round)E.startWave(G);}
 function waveAct(){if(!G||ended||arena)return;
@@ -733,7 +780,7 @@ function paintTo(c,on){const pc=paintLast;paintLast=c;if(pc<0||pc===c){roadSet(c
   while(x!==tx||y!==ty){if(Math.abs(tx-x)>=Math.abs(ty-y))x+=Math.sign(tx-x);else y+=Math.sign(ty-y);roadSet(y*N+x,on);}}
 function roadTool(){roadMode=!roadMode;buildSel=null;sel=null;if(roadMode){camMode='free';cam.yaw=0;cam.d=stage.clientWidth<760?44:23;camTo(mySlot);}}
 /* --- held: lopen, botsen, aanvallen --- */
-function walkable(x,z){if(arena&&arena.block&&arena.block(x,z))return false;if(Math.hypot(x-ACX,z-ACZ)<=AR)return true;if(runFree(x-RUN.x,z-RUN.z))return true;
+function walkable(x,z){if(arena&&arena.block&&arena.block(x,z))return false;for(const k in ISLES)if(SHAPE[k](x-ISLES[k].x,z-ISLES[k].z))return true;if(runFree(x-RUN.x,z-RUN.z))return true;
   const c=Math.floor((x+3.5)/FW),r=Math.floor((z+3.5)/FW);if(c<0||r<0||c>=COLS||r>=ROWS)return false;const lx=x-c*FW,lz=z-r*FW;
   if(lx>=-.15&&lx<=13.15&&lz>=-.15&&lz<=13.15)return true;
   if(lz>=5.85&&lz<=7.15&&((lx>13&&c<COLS-1)||(lx<0&&c>0)))return true;
@@ -790,13 +837,21 @@ function heroAttack(dt){const h=hero,H=HEROES[save.hero],HR=H.range*HM.hRange,ra
   }}
 /* --- arena: na elke tiende ronde --- */
 function applyArmour(n,g){g=g||G;if(n===1)g.m.dmg*=1.1;else if(n===2){g.lives+=5;g.maxLives+=5;}else if(n===3)g.m.rate*=1.08;else if(n===4)g.m.gold*=1.1;E.recalc(g);}
-// Na elke tiende ronde volgt een minigame. Level 10 is de baas, level 20 het doolhof, level 30 en 50 de stoelendans, level 100 het eindmonster.
+// Na elke tiende ronde volgt een minigame. Drie levels liggen vast: 10 de Kolos, 50 De Geers draait door en 100 de Titaan.
+// Op de andere tientallen komt een willekeurige minigame uit alle overige, en binnen een potje nooit twee keer dezelfde.
+// De keuze volgt uit het potje (matchId), zodat alle spelers dezelfde krijgen.
 // Helden kunnen elkaar nergens raken: je wint op score, of door als laatste over te blijven.
-const MINI={10:'boss',20:'run',30:'chairs',40:'hill',50:'chairs',60:'hunt',70:'cores',80:'storm',90:'duel',100:'titan'};
+const FIXED={10:'boss',50:'geers',100:'titan'};
+let miniPlan={id:null,list:[]};
+function miniFor(r){if(!(r>=10)||r%10||r>ROUNDS)return null;if(FIXED[r])return FIXED[r];
+  if(miniPlan.id!==matchId){const fx=Object.values(FIXED),list=Object.keys(KIND).filter(k=>!fx.includes(k)).sort(),rnd=lcg(1+Math.abs(Math.floor(matchId))%2147483000);
+    for(let i=0;i<6;i++)rnd(); // opeenvolgende potjes beginnen met bijna hetzelfde getal: eerst even doordraaien
+    for(let i=list.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[list[i],list[j]]=[list[j],list[i]];}miniPlan={id:matchId,list};}
+  return miniPlan.list[r/10]||null;}
 // m: spelvorm, T: duur in seconden, goal: score die je alleen spelend moet halen
 const KIND={
  boss:{m:'boss',T:120,n:'Missie: de Kolos',go:'Missie: versla samen de Kolos en win een stuk harnas'},
- run:{m:'run',T:90,n:'Doolhof',go:'Doolhof: haal de overkant. F zet je schild op'},
+ run:{m:'run',isle:'maze',T:90,n:'Doolhof',go:'Doolhof: haal de overkant. F zet je schild op'},
  chairs:{m:'chairs',T:1,n:'Stoelendans',go:'Stoelendans: er is één groen veld minder dan er spelers zijn. Sta op een veld als de tijd stopt'},
  hill:{m:'mini',T:80,n:'Heuvelkoning',goal:35,go:'Heuvelkoning: sta alleen op de gouden plek om te scoren. Mechs bewaken hem'},
  hunt:{m:'mini',T:80,n:'Premiejacht',goal:40,go:'Premiejacht: elk monster is premie waard, het gouden het meest'},
@@ -811,8 +866,10 @@ const BOSS={
  titan:{N:'De Titaan',hp:7000,sc:4.6,by:5.7,bw:5,big:2.3,th:[.9,.8,.7,.6,.5,.4,.3,.2,.1],mv:['safe','rings','beams'],z0:48,z1:38,xk:4,ct:22,cr:2.6,stop:3.3,sp:2.7,cd:2,cd2:6}};
 const TAU=6.2832;
 function enterArena(kind,r){if(arena||!G||ended||!KIND[kind])return;const K=KIND[kind],mode=K.m;arSeq++;const an=Math.random()*6.28;hero.tx=null;orders=[];buildSel=null;sel=null;roadMode=false;hero.hp=maxHp();shieldT=0;shieldCd=0;sprintT=0;sprintCd=0;pushCd=0;msLast=null;
+  setIsle(K.isle);
   if(mode==='run'){hero.x=RUN.x+1.5;hero.z=RUN.z+2+Math.random()*(RUN.W-4);hero.a=0;hcam.yaw=-Math.PI/2;}
-  else{const d=kind==='titan'?7.2:6.2;hero.x=ACX+Math.cos(an)*d;hero.z=ACZ+Math.sin(an)*d;hero.a=an+Math.PI;hcam.yaw=Math.PI/2-an;} // camera achter de held, met het midden van de arena in beeld
+  else{const d=ISLE==='cross'||ISLE==='quad'?1.2:kind==='titan'?7.2:6.2; // op het kruis en de eilandjes begin je in het midden
+    hero.x=ACX+Math.cos(an)*d;hero.z=ACZ+Math.sin(an)*d;hero.a=an+Math.PI;hcam.yaw=Math.PI/2-an;} // camera achter de held, met het midden van de arena in beeld
   arena={mode,kind,K,r:r||0,t:K.T,T:K.T,age:0,seq:arSeq,kills:0,g:null,score:0,rivals:false,ms:mode==='mini'||mode==='lab'||mode==='chairs'||kind==='duel'}; // ms: de score telt mee tegen die van de anderen
   if(mode==='boss')bossInit(arena);else if(mode==='run')runInit(arena);else if(mode==='chairs')chairsInit(arena);else if(mode==='lab')labInit(arena);else miniInit(arena);
   camMode='hero';toast(K.go,6000);
@@ -838,7 +895,7 @@ function rivals(a){const o=[];for(const p of mates()){const ms=p.presence.ms;if(
 function rankEnd(a){const sc=Math.floor(a.score);let top=null;for(const o of rivals(a))if(o.st!==2&&(!top||o.sc>top.sc))top=o;
   if(top&&top.sc>sc){a.winner=nameOf(top.p);return'lose';}
   return(a.rivals?sc>0:sc>=(a.K.goal||0))?'win':'lose';}
-/* --- de bazen: de Kolos op level 10 en 90, de Titaan op level 100 --- */
+/* --- de bazen: de Kolos op level 10, de Kolosjacht als willekeurige minigame, de Titaan op level 100 --- */
 // De baas heeft één levensbalk voor iedereen: maximum min de schade die alle spelers melden. Zo telt ook de schade van wie al is uitgeschakeld.
 function makeTitan(){const g=makeHero(3,SLOTS),add=(m,x,y,z)=>{m.position.set(x,y,z);g.add(m);};
   const eye=()=>new T3.Mesh(raw('hglow',()=>new T3.SphereGeometry(.07,8,6)),glow('#ff3a1a'));
@@ -896,7 +953,7 @@ function updBoss(a,dt){const g=a.g,h=hero,B=a.B,L=missionLead(a);let sum=myBh;fo
     const ba=L.presence.ba;if(Array.isArray(ba))bossAttack(a,ba);}
   else{const hs=[{x:h.x,z:h.z}];for(const r of rheroes.values())if(r.ar>0&&r.hp>0)hs.push({x:r.x,z:r.z});
     let tg=hs[0],bd=1e9;for(const o of hs){const d=Math.hypot(o.x-g.x,o.z-g.z);if(d<bd){bd=d;tg=o;}}
-    const dx=tg.x-g.x,dz=tg.z-g.z;g.a=Math.atan2(dz,dx);if(bd>B.stop){const sp2=B.sp*rage*dt;g.x+=dx/bd*sp2;g.z+=dz/bd*sp2;g.walk+=dt*6;}
+    g.a=Math.atan2(tg.z-g.z,tg.x-g.x); // de baas blijft in het midden staan en draait alleen naar de dichtstbijzijnde held
     g.cd-=dt*rage;g.cd2-=dt*rage;
     if(g.cd<=0){g.cd=B.cd;g.last=[a.seen+1,0,0];bossAttack(a,g.last);}
     else if(g.cd2<=0){g.cd2=B.cd2/(1+.12*(a.n-1));g.last=[a.seen+1,1,1+Math.floor(Math.random()*1e9)];bossAttack(a,g.last);}}
@@ -1030,14 +1087,15 @@ function miniInit(a){const rnd=a.rnd=lcg(1+(Math.abs(Math.floor(matchId))+7919*a
   a.pts=0;a.mid=0;a.mobs=[];a.zones=[];a.marks=[];a.orbs=[];a.claim=[];a.gone=new Set();a.sp=2;a.sp2=8;a.mi=0;a.hi=0;a.carry=false;a.slow=1;a.items=[];
   if(k==='hill')for(let i=0;i*16<a.T;i++)a.items.push(arPt(rnd,2,AR-2.6));
   else if(k==='cores'){a.home=[ACX,ACZ];for(let i=0;i<40;i++){const an=rnd()*TAU;a.items.push({i,x:ACX+Math.cos(an)*(AR-1),z:ACZ+Math.sin(an)*(AR-1),t0:i<3?0:(i-2)*4.5});}}}
-function addMob(a,type,o){const an=Math.random()*TAU;a.mobs.push(Object.assign({id:++a.mid,type,x:ACX+Math.cos(an)*(AR-.4),z:ACZ+Math.sin(an)*(AR-.4),a:an+Math.PI,cd:.6,every:1,reach:1.25,max:o.hp},o));}
+function addMob(a,type,o){const[x,z,an]=isleEdge();a.mobs.push(Object.assign({id:++a.mid,type,x,z,a:an,cd:.6,every:1,reach:1.25,max:o.hp},o));}
 function mobHit(m,d){if(m.hp<=0)return;m.hp-=d;if(m.hp>0)return;const a=arena;if(m.die)m.die(m);
   if(a&&m.val){a.pts+=m.val;hero.hp=Math.min(maxHp(),hero.hp+3*m.val);}
   if(gl3)fxBall(V(m.x,.6,m.z),m.gold?'#ffd24a':'#ff8a2c',.15,m.big?1.8:.9,.4,.85);}
 // Een monster jaagt op de held. Met `aggro` blijft het bij zijn post (a.home) tot de held dichtbij komt.
 function stepMobs(a,dt){const h=hero;for(const m of a.mobs){if(m.hp<=0)continue;if(m.ai){m.ai(m,dt);continue;}const dh=Math.hypot(h.x-m.x,h.z-m.z),post=m.aggro&&dh>m.aggro&&a.home;
     const gx=post?a.home[0]+Math.cos(m.id*2.4)*1.1:h.x,gz=post?a.home[1]+Math.sin(m.id*2.4)*1.1:h.z,dx=gx-m.x,dz=gz-m.z,d=Math.hypot(dx,dz);
-    if(d>(post?.3:m.reach*.8)){const mv=Math.min(d,m.sp*dt);m.x+=dx/d*mv;m.z+=dz/d*mv;m.a=Math.atan2(dz,dx);}
+    if(d>(post?.3:m.reach*.8)){const mv=Math.min(d,m.sp*dt);m.x+=dx/d*mv;m.z+=dz/d*mv;m.a=Math.atan2(dz,dx);
+      if(ISLE!=='round'&&!isleOn(m.x,m.z)){m.x-=dx/d*mv;m.z-=dz/d*mv;const cx=ACX-m.x,cz=ACZ-m.z,c=Math.hypot(cx,cz)||1;m.x+=cx/c*mv;m.z+=cz/c*mv;m.a=Math.atan2(cz,cx);}} // niet over het water: dan eerst naar het midden
     for(const o of a.mobs){if(o===m||o.hp<=0)continue;const ex=m.x-o.x,ez=m.z-o.z,e=Math.hypot(ex,ez);if(e<.8&&e>.001){m.x+=ex/e*(.8-e)*.5;m.z+=ez/e*(.8-e)*.5;}}
     m.cd-=dt;if(dh<=m.reach&&m.cd<=0){m.cd=m.every;hurt(m.dmg);if(gl3)fxRing(V(h.x,0,h.z),'#ff6a4e',1,.25);}}
   for(let i=a.mobs.length-1;i>=0;i--)if(a.mobs[i].hp<=0)a.mobs.splice(i,1);}
@@ -1077,9 +1135,9 @@ function updArena(dt){const a=arena;a.age+=dt;if(a.mode!=='chairs')a.t-=dt; // d
   if(a.mode==='boss')updBoss(a,dt);else if(a.mode==='run')updRun(a,dt);else if(a.mode==='chairs')updChairs(a,dt);else if(a.mode==='lab')updLab(a,dt);else updMini(a,dt);
   if(arena!==a)return;if(hero.hp<=0&&!revive())leaveArena('dead');else if(a.t<=0)leaveArena(a.mode==='mini'?rankEnd(a):a.mode==='lab'?labRank(a):'draw');}
 /* --- minigames uitproberen (lab) --- */
-// De minigames in minigames.js zitten nog niet in het potje: ze staan niet in MINI en zijn alleen via de knop Minigames in de lobby te spelen.
+// De minigames uit minigames.js. In een potje kiest miniFor er op de tientallen een uit; via de knop Minigames in de lobby speel je ze los.
 // Elke minigame is een beschrijving met init(a) en upd(a,dt). Hij vult a.pts (de score) en tekent via a.marks, a.orbs, a.rects, a.glows en a.mobs.
-// Zo werkt hij later ook in een potje: de score gaat dan via `ms` naar de anderen en rankEnd kiest de winnaar.
+// In een potje speelt iedereen zijn eigen ronde op hetzelfde eiland: de score gaat via `ms` naar de anderen en rankEnd kiest de winnaar.
 function labClear(a){if(a.g&&a.g.obj)scene.remove(a.g.obj);if(a.tw&&Array.isArray(a.tw))for(const t of a.tw)if(t&&t.obj)scene.remove(t.obj);if(a.objs)for(const o of a.objs)scene.remove(o);}
 function labInit(a){const K=a.K;a.D=Math.max(1,Math.min(2,1+(a.r-30)/60));a.rnd=lcg(1+(Math.abs(Math.floor(matchId))+7919*(a.r+1)+104729*K.nr)%2147483000);
   Object.assign(a,{pts:0,mid:0,mobs:[],zones:[],marks:[],orbs:[],rects:[],glows:[],slow:1,fin:false,fail:false,hit:false});hero.vx=hero.vz=0;K.init(a);a.hp0=hero.hp;}
@@ -1089,7 +1147,7 @@ function updLab(a,dt){const h=hero;a.marks.length=a.orbs.length=a.rects.length=a
   if(a.K.regen&&h.hp>0)h.hp=Math.min(maxHp(),h.hp+maxHp()*a.K.regen*dt);
   a.hp0=h.hp;a.score=a.pts;rivals(a);if(a.fin&&h.hp>0)leaveArena(labRank(a));}
 const labRank=a=>a.fail?'lose':rankEnd(a);
-const LABAPI={ACX,ACZ,AR,TAU,lcg,get hero(){return hero;},get HM(){return HM;},maxHp,hurt,walkable,addMob,mobHit,
+const LABAPI={get ACX(){return ACX;},get ACZ(){return ACZ;},AR,ARM,QD,QR,TAU,lcg,on:isleOn,pt:islePt,edge:isleEdge,get isle(){return ISLE;},get hero(){return hero;},get HM(){return HM;},maxHp,hurt,walkable,addMob,mobHit,
   toast:(m,ms)=>toast(m,ms),speed:()=>HEROES[save.hero].spd*HM.hSpd*(armour>=4?1.2:1),
   ring:(x,z,col,r,life)=>{if(gl3)fxRing(V(x,0,z),col,r,life||.4);},
   ball:(x,y,z,col,r0,r1,life,op)=>{if(gl3)fxBall(V(x,y,z),col,r0,r1,life||.3,op==null?.8:op);},
@@ -1113,11 +1171,11 @@ function labEnd(a,res){const K=a.K,sc=Math.floor(a.score||0),won=res==='win';lab
   setText($('#lText'),K.m==='lab'?(won?'Je hebt het doel gehaald. ':res==='dead'?'Je held is gesneuveld. ':'Het doel is niet gehaald. ')+K.win:won?'Gewonnen.':res==='dead'?'Je held is gesneuveld.':'Niet gewonnen.');
   setText($('#lScore'),String(sc));setText($('#lTime'),Math.round(a.age)+' s');$('#labEnd').hidden=false;try{$('#lAgain').focus({preventScroll:true});}catch{}}
 function buildLabList(){const ul=$('#miniList');if(ul.children.length)return;
-  const head=t=>{const li=document.createElement('li');li.className='mh';li.textContent=t;ul.append(li);};
+  const head=t=>{const li=document.createElement('li');li.className='mh';li.textContent=t;ul.append(li);},where=K=>K.isle==='maze'?'Eigen baan.':(ISLES[K.isle]||ISLES.round).n+'.';
   const item=(K,id,nr,chip)=>{const li=document.createElement('li'),n=document.createElement('span'),tx=document.createElement('span'),b=document.createElement('b'),d=document.createElement('span'),go=document.createElement('button');
     n.className='rk num';n.textContent=nr;tx.className='tx';b.textContent=K.n;d.className='sub';d.textContent=chip;tx.append(b,d);go.type='button';go.textContent='Speel';go.dataset.k=id;go.setAttribute('aria-label',K.n+' spelen');li.append(n,tx,go);ul.append(li);};
-  for(let t=1;t<TIERS.length;t++){const ds=LAB.filter(d=>d.tier===t);if(!ds.length)continue;head(TIERS[t]);for(const d of ds)item(d,d.id,String(d.nr),d.d+' '+d.win);}
-  head('Zit al in het spel');for(const[lv,id]of Object.entries(MINI)){if(id==='chairs'&&+lv!==30)continue;const K=KIND[id];item(K,id,'L'+(id==='chairs'?'30/50':lv),K.go);}
+  for(let t=1;t<TIERS.length;t++){const ds=LAB.filter(d=>d.tier===t);if(!ds.length)continue;head(TIERS[t]);for(const d of ds)item(d,d.id,String(d.nr),d.d+' '+d.win+' '+where(d));}
+  head('Bazen en eerdere minigames');for(const id of['boss','duel','titan','run','chairs','hill','hunt','cores','storm']){const K=KIND[id];item(K,id,Object.keys(FIXED).find(l=>FIXED[l]===id)||'·',K.go+'. '+where(K));}
   ul.addEventListener('click',ev=>{const b=ev.target.closest('button[data-k]');if(b)startLab(b.dataset.k);});}
 
 // De regel onder de titel in het opdrachtvenster.
@@ -1305,7 +1363,7 @@ function botSync(b){const g=b.G,ok=f=>bots.every(o=>o===b||!botLive(o)||f(o));
   if(g.phase==='prep'){g.timer=G.timer;if(!b.built&&performance.now()-t0>b.readyAt*1000)b.built=true;if(G.phase!=='prep'){E.lock(g);b.built=true;}}
   else if(g.phase==='build'){if(G.round===g.round&&(G.phase==='wave'||sentWave===g.round))E.startWave(g);}
   else if(g.phase==='wait'){const r=g.cleared;if(G.cleared<r||!ok(o=>o.G.cleared>=r))return;
-    if(MINI[r]&&b.arenaFor<r)return; // de minigame begint voor iedereen tegelijk, zodra jij erin stapt
+    if(miniFor(r)&&b.arenaFor<r)return; // de minigame begint voor iedereen tegelijk, zodra jij erin stapt
     if(b.ar||g.final)return;b.nx=g.round;if(nx>=g.round&&ok(o=>o.nx>=g.round))E.next(g);}}
 /* --- bots in de minigames --- */
 // Bots stappen tegelijk met jou een minigame in en spelen hem echt mee: ze lopen, ontwijken, scoren en kunnen sneuvelen.
@@ -1313,10 +1371,10 @@ function botsEnter(kind,r){const K=KIND[kind],inn=bots.filter(botLive);BF=null;i
   // ga: de kant van de baas waar de bots bij elkaar staan. Na elke klap schuift de groep een stuk op, zodat ze samen uit de rode cirkels lopen.
   if(K.m==='boss')BF={r,kind,max:arena&&arena.max||Math.round((BOSS[kind]||BOSS.boss).hp*Math.pow(1+inn.length,1.1)),t:K.T,ga:Math.random()*TAU,dir:Math.random()<.5?1:-1,seen:0};
   inn.forEach((b,i)=>{const h=b.h,an=TAU*i/inn.length+Math.random()*.5;b.arenaFor=r;b.order=null;h.hp=botMax(b);h.cd=.5+Math.random();
-    b.ar={r,kind,mode:K.m,seq:++b.as,age:0,t:K.T,score:0,ms:K.m==='mini'||K.m==='chairs'||kind==='duel',an,rr:3.2+Math.random()*2.2,sw:2+Math.random()*16,inn:false,
+    b.ar={r,kind,mode:K.m,seq:++b.as,age:0,t:K.T,score:0,ms:K.m==='mini'||K.m==='lab'||K.m==='chairs'||kind==='duel',an,rr:3.2+Math.random()*2.2,sw:2+Math.random()*16,inn:false,
       wait:1+Math.random()*8,wp:0,pa:BF?BF.ga+Math.atan2(Math.sin(an-BF.ga),Math.cos(an-BF.ga)):an,hit:1,im:0,rp:[],u:null,ud:0,rd:0,jd:0,spot:-1,go:0,sc:null,carry:false,pt:null,skip:new Map(),miss:new Map(),hitK:null};
     if(K.m==='run'){h.x=RUN.x+1.5;h.z=RUN.z+1.5+Math.random()*(RUN.W-3);h.a=0;}
-    else{const d=5+Math.random()*2.5;h.x=ACX+Math.cos(an)*d;h.z=ACZ+Math.sin(an)*d;h.a=an+Math.PI;}
+    else{const d=ISLE==='cross'||ISLE==='quad'?.4+Math.random()*1.2:5+Math.random()*2.5;h.x=ACX+Math.cos(an)*d;h.z=ACZ+Math.sin(an)*d;h.a=an+Math.PI;}
     if(K.m==='boss'){b.bm=r;b.bh=0;}});}
 // Staat er nog een andere held op deze plek?
 function heroOn(a,x,z,R,b){if(hero.hp>0&&Math.hypot(hero.x-x,hero.z-z)<=R)return true;
@@ -1342,6 +1400,7 @@ function botArena(b,dt){const a=b.ar,h=b.h,H=HEROES[b.idx],m=b.G.m,mx=botMax(b),
       b.bh+=dmg*rate*m.hBoss*.8*dt*4;a.score=b.bh;h.hp-=.5*(1-m.hArm)*dt*4;if(h.hp<=0)botDown(b);return;}}
   if(!pa)return; // wie de andere minigames zonder jou afmaakt, staat in botsDone
   if(h.hp<=0){botDown(b);if(!b.ar)return;}
+  if(a.mode==='lab'){botLab(b,pa,dt,step);return;}
   // Inslagen ontwijken: eruit lopen, en er niet in lopen. Per aanval (z.k: alle inslagen die tegelijk verschenen) heeft een bot hem door of niet;
   // alleen een aanval die hij mist kan hem raken (zie botsZone). Zo hangt zijn lot niet af van het gedrang tussen negen overlappende cirkels.
   let flee=null;const zs=pa.zones||[],odds=a.kind==='titan'?.02:a.mode==='boss'?.04:a.kind==='storm'?.33:.2;
@@ -1404,6 +1463,14 @@ function botArena(b,dt){const a=b.ar,h=b.h,H=HEROES[b.idx],m=b.G.m,mx=botMax(b),
   if(flee){tx=flee[0];tz=flee[1];}
   if(k!=='storm'&&h.hp>0)h.hp=Math.min(mx,h.hp+mx*.015*dt);
   move(tx,tz,step);}
+// De minigames uit minigames.js speelt ieder voor zich. Een bot loopt over het eiland en bouwt een score op die bij zijn niveau past:
+// f is het deel van het doel dat hij haalt. Bij overleven betekent f onder de 1 dat hij op dat deel van de tijd sneuvelt.
+function botLab(b,pa,dt,step){const a=b.ar,h=b.h,K=pa.K,goal=K.goal||1;
+  if(a.f===undefined){a.f=.35+b.skill*.9+Math.random()*.2;a.q=[];a.wp=0;}
+  a.wp-=dt;if(!a.q.length&&a.wp<=0){a.wp=1+Math.random()*3;const p=islePt(0,AR-1);a.q=ISLE==='cross'||ISLE==='quad'?[[ACX,ACZ],p]:[p];} // op het kruis en de eilandjes via het midden
+  if(a.q.length){const p=a.q[0];botGo(b,p[0],p[1],step*.8);if(Math.hypot(p[0]-h.x,p[1]-h.z)<.3)a.q.shift();}
+  if(goal>=K.T-1){a.score=Math.min(K.T-1,pa.age);if(a.f<1&&pa.age>=a.f*K.T){h.hp=0;botLeave(b,'dead');}}
+  else a.score=goal*a.f*Math.min(1,pa.age/(K.T*.85));}
 // Een inslag in de arena raakt ook een bot die erin staat, als hij de aanval niet zag aankomen. Eén aanval raakt hem hooguit één keer.
 function botsZone(a,z){for(const b of bots){const o=b.ar;if(o&&o.r===a.r&&o.mode!=='run'&&o.miss.get(z.k)&&o.hitK!==z.k&&Math.hypot(b.h.x-z.x,b.h.z-z.z)<=z.r){o.hitK=z.k;botHurt(b,z.dmg);}}}
 // De minigame is afgelopen voor de bots die er nog in staan. over: de baas is geveld. ps: jouw score als je tot het eind meedeed, anders -1.
@@ -1689,7 +1756,7 @@ $('#miniBtn').onclick=openMini;$('#lAgain').onclick=()=>{if(lab)startLab(lab.kin
 loadLocal();loadAcct();bindAccount();buildHud();
 try{if(init3D()){bindCanvas();renderIcons();}}catch(err){gl3=false;console.error(err);}
 renderHome();renderLobby();renderChat();if(!acct)showGate('new');requestAnimationFrame(frame);
-if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>enterArena(m,r),bots:()=>bots,MINI,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
+if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>enterArena(m,r),bots:()=>bots,FIXED,miniFor,ISLES,isle:()=>ISLE,isleOn,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
 // Sessie controleren: klopt het token nog, dan komt de voortgang van de server binnen.
 if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
 // Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.

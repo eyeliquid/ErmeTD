@@ -1,8 +1,9 @@
-// Dertig losse minigames. Ze zitten nog NIET in het potje: ze staan niet in de tabel MINI van game.js
-// en zijn alleen te spelen via de knop Minigames in de lobby.
+// Dertig minigames. In een potje kiest game.js er op de tientallen een willekeurige uit (level 50 is altijd De Geers draait door);
+// via de knop Minigames in de lobby speel je ze los.
 //
 // Elke minigame is een beschrijving:
 //   id, n      sleutel en naam
+//   isle       het eiland waarop hij gespeeld wordt: round (rond), square (vierkant), cross (kruis) of quad (vier eilandjes)
 //   tier       1 redelijk makkelijk, 2 gemiddeld, 3 uitdagend, 4 heel uitdagend
 //   T, goal    duur in seconden, en de score die je alleen spelend moet halen
 //   d, win     uitleg en doel voor de keuzelijst; go is de melding bij de start
@@ -13,11 +14,19 @@
 // a.slow remt of versnelt de held, a.ice geeft gladde grond, a.flip keert de besturing om, a.dark dooft het licht, a.haste versnelt de aanval.
 // Niet gebruiken, want game.js leest ze voor de bazen en het doolhof: a.g, a.tw, a.shots, a.ult, a.B, a.sc, a.claim.
 window.RATD_LAB = api => {
-const { ACX: CX, ACZ: CZ, AR, TAU } = api, rand = Math.random, hyp = Math.hypot;
+const { AR, ARM, QD, QR, TAU } = api, rand = Math.random, hyp = Math.hypot;
+// CX, CZ: het midden van het eiland waar nu gespeeld wordt. game.js zet ze via center() zodra een minigame begint.
+let CX = api.ACX, CZ = api.ACZ, ISLE = 'round';
 const H = () => api.hero;
 const dH = (x, z) => hyp(H().x - x, H().z - z);                       // afstand van de held tot een punt
 const pol = (an, d) => ({ x: CX + Math.cos(an) * d, z: CZ + Math.sin(an) * d });
-const pt = (r0, r1) => pol(rand() * TAU, r0 + (r1 - r0) * Math.sqrt(rand()));
+const pt = (r0, r1) => { const p = api.pt(r0, r1); return { x: p[0], z: p[1] }; };  // een willekeurige plek op het eiland, tussen r0 en r1 van het midden
+// het kruis: loop je naar een andere arm, dan eerst naar het midden
+const via = (m, x, z) => ISLE !== 'cross' || (Math.abs(m.z - CZ) <= ARM && Math.abs(z - CZ) <= ARM) || (Math.abs(m.x - CX) <= ARM && Math.abs(x - CX) <= ARM) ? { x, z } : { x: CX, z: CZ };
+const walk = (m, x, z, sp, dt) => { const p = via(m, x, z); go(m, p.x, p.z, sp, dt); };
+// de hele vloer van het eiland in één kleur: een schijf op het ronde eiland, een vlak op het vierkante
+const floor = (a, col, op) => { if (ISLE === 'square') a.rects.push({ x: CX, z: CZ, w: 18.4, d: 18.4, col, op, y: .05 }); else mark(a, CX, CZ, 9.1, col, op, .05); };
+const QP = () => [[1, 1], [-1, 1], [-1, -1], [1, -1]].map(([p, q]) => ({ x: CX + p * QD, z: CZ + q * QD }));  // de middens van de vier eilandjes
 const clampIn = (o, R) => { const dx = o.x - CX, dz = o.z - CZ, d = hyp(dx, dz); if (d > R) { o.x = CX + dx / d * R; o.z = CZ + dz / d * R; } };
 // o een stap richting (x,z) zetten; geeft de afstand die daarna nog over is
 const go = (o, x, z, sp, dt) => { const dx = x - o.x, dz = z - o.z, d = hyp(dx, dz); if (d < 1e-4) return 0; const mv = Math.min(d, sp * dt); o.x += dx / d * mv; o.z += dz / d * mv; o.a = Math.atan2(dz, dx); return d - mv; };
@@ -50,11 +59,13 @@ const bullets = (a, dt, col, rad, hit) => { for (let i = a.bs.length - 1; i >= 0
     orb(a, b.x, b.z, .6, .17, col); } };
 const shoot = (a, an, v, r0) => a.bs.push({ x: CX + Math.cos(an) * (r0 || 1.3), z: CZ + Math.sin(an) * (r0 || 1.3), vx: Math.cos(an) * v, vz: Math.sin(an) * v });
 // zagen: bollen die tussen twee punten heen en weer schuiven
-const saw = (a, v) => { const p = pol(rand() * TAU, AR - 1), q = pol(rand() * TAU, AR - 1); if (hyp(p.x - q.x, p.z - q.z) < 7) return saw(a, v); a.saws.push({ p, q, w: v / hyp(p.x - q.x, p.z - q.z), ph: rand() * TAU }); };
+const saw = (a, v) => { let p = pol(rand() * TAU, AR - 1), q = pol(rand() * TAU, AR - 1);
+  if (ISLE === 'cross') { const an = Math.floor(rand() * 2) * Math.PI / 2, e = u => ({ x: CX + Math.cos(an) * 7.8 * u - Math.sin(an) * (rand() * 4 - 2), z: CZ + Math.sin(an) * 7.8 * u + Math.cos(an) * (rand() * 4 - 2) }); p = e(1); q = e(-1); }
+  else if (hyp(p.x - q.x, p.z - q.z) < 7) return saw(a, v); a.saws.push({ p, q, w: v / hyp(p.x - q.x, p.z - q.z), ph: rand() * TAU }); };
 const sawPos = (a, s) => { const f = .5 + .5 * Math.sin(a.age * s.w * 2 + s.ph); return { x: s.p.x + (s.q.x - s.p.x) * f, z: s.p.z + (s.q.z - s.p.z) * f }; };
 
 const COL4 = [['ROOD', '#e8372a'], ['BLAUW', '#3d8bff'], ['GEEL', '#f6cf4d'], ['GROEN', '#35cf4a']];
-const crate = (a, gold) => { const p = pt(1.5, AR - 1.2); add(a, 'crate', { ...still, x: p.x, z: p.z, a: rand() * TAU, hp: gold ? 170 : 60, val: gold ? 4 : 1, gold: !!gold, es: gold ? 1.9 : 1.5 }); };
+const crate = (a, gold) => { const p = pt(4, AR - .6); add(a, 'crate', { ...still, x: p.x, z: p.z, a: rand() * TAU, hp: gold ? 170 : 60, val: gold ? 4 : 1, gold: !!gold, es: gold ? 1.9 : 1.5 }); };
 const sheep = a => { const p = pt(4.5, AR - 1); add(a, 'sheep', { ...prop, x: p.x, z: p.z, wa: rand() * TAU, wt: 0, es: 1.5,
   ai(m, dt) { const h = H(), dx = m.x - h.x, dz = m.z - h.z, d = hyp(dx, dz) || 1;
     if (d < 3.2) { const v = api.speed() * .78; m.x += dx / d * v * dt; m.z += dz / d * v * dt; m.a = Math.atan2(dz, dx); }
@@ -84,29 +95,29 @@ const twin = (a, i, hp) => add(a, i ? 'haz' : 'mech', Object.assign({ hp: hp || 
         if (m.st) { if (m.ct <= 0) { m.st = 0; m.ct = .6; } }
         else { m.a = Math.atan2(h.z - m.z, h.x - m.x); if (d > 2) go(m, h.x, h.z, m.sp, dt); else if (m.ct <= 0) { m.st = 1; m.ct = 2.3; zone(a, m.x, m.z, 2.6, 1, 30); } } } }));
 
-return [
+const list = [
 /* ============ redelijk makkelijk ============ */
-{ id: 'coins', n: 'Goudregen', tier: 1, T: 45, goal: 35,
-  d: 'Munten vallen uit de lucht en blijven even liggen. Een gewone munt is 1 punt, een grote 3.', win: 'Doel: 35 punten in 45 seconden.',
+{ id: 'coins', isle: 'quad', n: 'Goudregen', tier: 1, T: 45, goal: 22,
+  d: 'Munten vallen op de vier eilandjes en blijven even liggen. Ren over de bruggen heen en weer. Een gewone munt is 1 punt, een grote 3.', win: 'Doel: 22 punten in 45 seconden.',
   go: 'Goudregen: pak de munten voordat ze verdwijnen',
   init(a) { a.coins = []; a.sp = 0; },
-  upd(a, dt) { a.sp -= dt; if (a.sp <= 0) { a.sp = .5; const p = pt(0, AR - 1); a.coins.push({ x: p.x, z: p.z, t: 0, big: rand() < .15 }); }
-    for (let i = a.coins.length - 1; i >= 0; i--) { const c = a.coins[i]; c.t += dt; const fall = Math.max(0, 1 - c.t / 1.1), rest = 5.1 - c.t;
+  upd(a, dt) { a.sp -= dt; if (a.sp <= 0) { a.sp = .5; const p = pt(0, AR); a.coins.push({ x: p.x, z: p.z, t: 0, big: rand() < .15 }); }
+    for (let i = a.coins.length - 1; i >= 0; i--) { const c = a.coins[i]; c.t += dt; const fall = Math.max(0, 1 - c.t / 1.1), rest = 7.1 - c.t;
       if (rest <= 0) { a.coins.splice(i, 1); continue; }
       if (fall <= 0 && dH(c.x, c.z) < (c.big ? 1.1 : .9)) { a.pts += c.big ? 3 : 1; api.ring(c.x, c.z, '#ffd24a', 1, .3); a.coins.splice(i, 1); continue; }
       if (fall > 0) mark(a, c.x, c.z, .2 + .4 * (1 - fall), '#000000', .45);
       if (rest > 1.2 || Math.floor(rest * 8) % 2) orb(a, c.x, c.z, .45 + fall * 7, c.big ? .34 : .22, c.big ? '#ffe98a' : '#ffc21a'); } },
   sub: (a, sec) => `${left(sec)} · ${a.pts} van ${a.K.goal} punten` },
 
-{ id: 'crates', n: 'Kratten slopen', tier: 1, T: 60, goal: 20,
-  d: 'Je held slaat vanzelf de kratten kapot waar hij bij kan. Een krat is 1 punt, de gouden krat 4.', win: 'Doel: 20 punten in 60 seconden.',
+{ id: 'crates', isle: 'quad', n: 'Kratten slopen', tier: 1, T: 60, goal: 16,
+  d: 'Op de vier eilandjes staan kratten. Je held slaat vanzelf kapot waar hij bij kan. Een krat is 1 punt, de gouden krat 4.', win: 'Doel: 16 punten in 60 seconden.',
   go: 'Kratten slopen: sla zo veel mogelijk kratten kapot',
   init(a) { a.gt = 12; for (let i = 0; i < 8; i++) crate(a); },
   upd(a, dt) { a.gt -= dt; if (a.gt <= 0) { a.gt = 14; crate(a, true); api.toast('Een gouden krat: 4 punten', 1800); }
     for (let n = alive(a, m => !m.gold); n < 8; n++) crate(a); },
   sub: (a, sec) => `${left(sec)} · ${a.pts} van ${a.K.goal} punten` },
 
-{ id: 'range', n: 'Schietbaan', tier: 1, T: 50, goal: 30,
+{ id: 'range', isle: 'round', n: 'Schietbaan', tier: 1, T: 50, goal: 30,
   d: 'Doelwitten schuiven door de arena en je held schiet op wat binnen bereik komt. Een groot doelwit is 1 punt, een klein en snel doelwit 3.', win: 'Doel: 30 punten in 50 seconden.',
   go: 'Schietbaan: kom binnen bereik van de doelwitten. Kleine tellen voor 3',
   init(a) { a.sp = 0; },
@@ -115,7 +126,7 @@ return [
       ai(m, dt) { if (go(m, m.gx, m.gz, m.sp, dt) < .05) m.hp = 0; } }); },
   sub: (a, sec) => `${left(sec)} · ${a.pts} van ${a.K.goal} punten` },
 
-{ id: 'sprint', n: 'Sprintrace', tier: 1, T: 26, goal: 24,
+{ id: 'sprint', isle: 'round', n: 'Sprintrace', tier: 1, T: 26, goal: 24,
   d: 'Drie rondjes door de arena, langs acht poorten per rondje. Groene stroken geven een versnelling, modder remt je af.', win: 'Doel: alle 24 poorten binnen 26 seconden. Hoe sneller, hoe hoger je score.',
   go: 'Sprintrace: drie rondjes langs de gouden poorten. Groen versnelt, modder remt',
   init(a) { a.cp = 0; a.bo = 0; a.pads = []; for (let i = 0; i < 8; i++) { const an = (i + .5) * TAU / 8; a.pads.push(i % 2 ? { ...pol(an, 6.4), mud: true, r: 1.35 } : { ...pol(an, 4.9), r: 1 }); }
@@ -129,31 +140,29 @@ return [
     if (a.cp === N) { a.pts = N + Math.ceil(a.t); a.fin = true; } else if (a.cp % 8 === 0) api.toast(`Ronde ${a.cp / 8 + 1} van 3`, 1500); },
   sub: (a, sec) => `${left(sec)} · ronde ${Math.min(3, Math.floor(a.cp / 8) + 1)} van 3 · poort ${a.cp % 8 + 1} van 8` },
 
-{ id: 'colors', n: 'Kleurvloer', tier: 1, T: 60, goal: 8,
-  d: 'De vloer bestaat uit gekleurde tegels. Er wordt een kleur omgeroepen: sta op die kleur als de tijd om is, want de rest van de vloer valt weg. Elke ronde heb je minder tijd.', win: 'Doel: 8 van de 10 rondes overleven.',
-  go: 'Kleurvloer: ren naar de kleur die wordt omgeroepen',
-  init(a) { a.gr = grid(6, 2); a.block = a.gr.out; a.rd = 0; a.ph = 'gap'; a.pt = 2; a.tiles = []; a.col = 0; api.place(CX, CZ); },
-  upd(a, dt) { const g = a.gr, h = H(), c = g.cell(h.x, h.z); a.pt -= dt;
-    if (a.ph === 'gap' && a.pt <= 0) { a.rd++; a.col = Math.floor(rand() * 4); a.tiles = []; for (let i = 0; i < 36; i++) a.tiles.push(i < 16 ? i % 4 : Math.floor(rand() * 4)); shuffle(a.tiles);
-      a.ph = 'run'; a.pt = Math.max(2.2, 4.4 - .25 * a.rd); api.toast('Ren naar ' + COL4[a.col][0], 1800); }
+{ id: 'colors', isle: 'quad', n: 'Kleurvloer', tier: 1, T: 90, goal: 8,
+  d: 'Elk van de vier eilandjes krijgt een kleur. Er wordt een kleur omgeroepen: sta op dat eilandje als de tijd om is, want de rest zakt weg, ook de bruggen. Hoe verder je moet lopen, hoe meer tijd je krijgt, maar elke ronde wordt het krapper.', win: 'Doel: 8 van de 10 rondes overleven.',
+  go: 'Kleurvloer: ren naar het eilandje met de kleur die wordt omgeroepen',
+  init(a) { a.rd = 0; a.ph = 'gap'; a.pt = 2.5; a.cols = [0, 1, 2, 3]; a.col = 0; api.place(CX, CZ); },
+  upd(a, dt) { const h = H(), P = QP(), tg = a.cols.indexOf(a.col); a.pt -= dt;
+    if (a.ph === 'gap' && a.pt <= 0) { a.rd++; shuffle(a.cols); a.col = Math.floor(rand() * 4); const t = P[a.cols.indexOf(a.col)];
+      a.ph = 'run'; a.pt = (1.4 + Math.max(0, dH(t.x, t.z) - QR + .6) / api.speed() * 1.3) * Math.max(1.15, 1.7 - .055 * a.rd); api.toast('Ren naar ' + COL4[a.col][0], 1800); }
     else if (a.ph === 'run' && a.pt <= 0) { a.ph = 'drop'; a.pt = 1.4; }
-    else if (a.ph === 'drop' && a.pt <= 0) { a.pts = a.rd; a.ph = 'gap'; a.pt = 1; if (a.rd >= 10) { a.fin = true; return; } }
-    if (a.ph === 'drop' && (c < 0 || a.tiles[c] !== a.col)) { api.ball(h.x, .6, h.z, '#ff5a20', .2, 1.4, .4); h.hp = 0; return; }
-    for (let i = 0; i < 36; i++) { const p = g.pos(i), t = a.tiles[i];
-      if (a.ph === 'gap') rect(a, p.x, p.z, 1.9, 1.9, '#6c727c', .7);
-      else if (a.ph === 'run' || t === a.col) rect(a, p.x, p.z, 1.9, 1.9, COL4[t][1], .85);
-      else rect(a, p.x, p.z, 1.9, 1.9, '#000000', .92); }
-    if (a.ph !== 'gap') orb(a, CX, CZ, 3.4, .75, COL4[a.col][1]); },
+    else if (a.ph === 'drop' && a.pt <= 0) { a.pts = a.rd; a.ph = 'gap'; a.pt = 1.6; if (a.rd >= 10) { a.fin = true; return; } }
+    if (a.ph === 'drop' && dH(P[tg].x, P[tg].z) > QR) { api.ball(h.x, .6, h.z, '#ff5a20', .2, 1.4, .4); h.hp = 0; return; }
+    P.forEach((p, i) => { if (a.ph === 'gap') mark(a, p.x, p.z, QR + .1, '#6c727c', .5); else if (a.ph === 'run' || i === tg) mark(a, p.x, p.z, QR + .1, COL4[a.cols[i]][1], .8); else mark(a, p.x, p.z, QR + .4, '#000000', .92); });
+    if (a.ph === 'drop') mark(a, CX, CZ, 2, '#000000', .9);
+    if (a.ph !== 'gap') orb(a, CX, CZ, 3.2, .6, COL4[a.col][1]); },
   sub: a => a.ph === 'gap' ? `Ronde ${a.rd} van 10 gehaald` : a.ph === 'run' ? `Ronde ${a.rd} van 10 · ren naar ${COL4[a.col][0]} · ${Math.max(0, a.pt).toFixed(1).replace('.', ',')} s` : `Ronde ${a.rd} van 10 · blijf staan` },
 
-{ id: 'sheep', n: 'Schapen drijven', tier: 1, T: 60, goal: 12,
+{ id: 'sheep', isle: 'round', n: 'Schapen drijven', tier: 1, T: 60, goal: 12,
   d: 'Schapen lopen voor je weg. Ga achter een schaap staan en drijf het zo het groene hok in het midden in.', win: 'Doel: 12 schapen in het hok binnen 60 seconden.',
   go: 'Schapen drijven: jaag de schapen het groene hok in het midden in',
   init(a) { for (let i = 0; i < 6; i++) sheep(a); },
   upd(a) { mark(a, CX, CZ, 2.1, '#35ff5a', .35); if (alive(a) < 6) sheep(a); },
   sub: (a, sec) => `${left(sec)} · ${a.pts} van ${a.K.goal} schapen in het hok` },
 
-{ id: 'bomb', n: 'Bommetje doorgeven', tier: 1, T: 90, goal: 2,
+{ id: 'bomb', isle: 'round', n: 'Bommetje doorgeven', tier: 1, T: 90, goal: 2,
   d: 'Jij en drie tegenspelers geven een bom door: wie de bom heeft tikt een ander aan. Met de bom ren je iets sneller. Teruggeven aan wie hem net gaf kan niet meteen. De bom ontploft op een onbekend moment bij wie hem dan vasthoudt.', win: 'Doel: 2 van de 3 rondes overleven.',
   go: 'Bommetje doorgeven: heb jij de bom, tik dan een tegenspeler aan',
   init(a) { a.rd = 0; a.ph = 'gap'; a.pt = 2.5; a.hold = undefined; a.im = 0; a.from = undefined; a.ft = 0; a.fuse = 0;
@@ -183,8 +192,8 @@ return [
     if (!a.hold) { if (a.pts >= a.K.goal) a.fin = true; else h.hp = 0; return; } a.hold.hp = 0; a.hold = undefined; a.pts = a.rd; a.ph = 'gap'; a.pt = 2.5; api.toast(`Ronde ${a.rd} overleefd`, 2000); },
   sub: a => a.ph === 'gap' ? `${a.pts} van 3 rondes overleefd · doel 2` : a.hold ? `Ronde ${a.rd} · een tegenspeler heeft de bom` : `Ronde ${a.rd} · JIJ hebt de bom` },
 
-{ id: 'flags', n: 'Vlaggenroof', tier: 1, T: 60, goal: 24, regen: .02,
-  d: 'Pak vlaggen en breng ze naar het midden. Elke vlag die je draagt maakt je trager, maar 3 of meer tegelijk inleveren geeft bonuspunten. Bijt een waakhond je, dan laat je een vlag vallen.', win: 'Doel: 24 punten in 60 seconden.',
+{ id: 'flags', isle: 'cross', n: 'Vlaggenroof', tier: 1, T: 60, goal: 24, regen: .02,
+  d: 'Pak vlaggen in de armen van het kruis en breng ze naar het midden. Elke vlag die je draagt maakt je trager, maar 3 of meer tegelijk inleveren geeft bonuspunten. Bijt een waakhond je, dan laat je een vlag vallen.', win: 'Doel: 24 punten in 60 seconden.',
   go: 'Vlaggenroof: breng vlaggen naar het midden. Meer tegelijk is meer punten, maar je loopt trager',
   init(a) { a.car = 0; a.sp = 6; for (let i = 0; i < 5; i++) { const p = pt(5.8, AR - 1); add(a, 'flag', { ...prop, x: p.x, z: p.z, flag: true, es: 1.5, ai() {} }); } },
   upd(a, dt) { const h = H(); a.sp -= dt; mark(a, CX, CZ, 1.8, a.car ? '#35ff5a' : '#f6cf4d', .4);
@@ -196,7 +205,7 @@ return [
   sub: (a, sec) => `${left(sec)} · ${a.pts} van ${a.K.goal} punten · je draagt ${a.car}` },
 
 /* ============ gemiddeld ============ */
-{ id: 'lava', n: 'De vloer is lava', tier: 2, T: 60, goal: 59,
+{ id: 'lava', isle: 'square', n: 'De vloer is lava', tier: 2, T: 60, goal: 59,
   d: 'Tegels knipperen oranje en zakken dan weg in de lava. Na een tijdje komen ze terug. Het gaat steeds sneller, en de tegel onder je voeten is geregeld aan de beurt.', win: 'Doel: 60 seconden overleven.',
   go: 'De vloer is lava: ga van een tegel af zodra hij oranje knippert',
   init(a) { a.gr = grid(6, 2); a.block = a.gr.out; a.st = new Float32Array(36); a.sp = 1.5; a.me = 5; api.place(CX - 1, CZ - 1); },
@@ -209,7 +218,7 @@ return [
     if (c >= 0 && a.st[c] < 0) { h.hp -= api.maxHp() * .55 * dt; if (rand() < dt * 8) api.ball(h.x, .4, h.z, '#ff5a20', .1, .7, .25); } },
   sub: (a, sec) => `${left(sec)} · blijf van de lava af` },
 
-{ id: 'lasers', n: 'Lasergrid', tier: 2, T: 50, goal: 49,
+{ id: 'lasers', isle: 'round', n: 'Lasergrid', tier: 2, T: 50, goal: 49,
   d: 'Laserlijnen schuiven door de arena. In elke lijn zit een opening, gemarkeerd met groen. Later draait er ook een straal vanuit het midden rond. Met F zet je even een schild op dat alles tegenhoudt.', win: 'Doel: 50 seconden overleven.',
   go: 'Lasergrid: loop door de groene openingen. F zet je schild op',
   init(a) { a.shield = true; a.ls = []; a.sp = 2; a.im = 0; a.rot = rand() * TAU; },
@@ -226,7 +235,7 @@ return [
   card: () => [api.shield.slot()],
   sub: (a, sec) => `${left(sec)} · door de groene openingen · F is je schild` },
 
-{ id: 'meteors', n: 'Meteorenregen', tier: 2, T: 60, goal: 59, regen: .01,
+{ id: 'meteors', isle: 'round', n: 'Meteorenregen', tier: 2, T: 60, goal: 59, regen: .01,
   d: 'Meteoren slaan in waar een rode cirkel verschijnt: hoe voller de cirkel, hoe dichterbij de inslag. Het tempo loopt op en om de paar seconden komt er een grote recht op je af.', win: 'Doel: 60 seconden overleven.',
   go: 'Meteorenregen: blijf uit de rode cirkels',
   init(a) { a.sp = 1; a.big = 9; a.mt = []; },
@@ -236,7 +245,7 @@ return [
     for (let i = a.mt.length - 1; i >= 0; i--) { const m = a.mt[i]; m.t -= dt; if (m.t <= 0) a.mt.splice(i, 1); else orb(a, m.x + m.t * 2.5, m.z, .5 + m.t * 7, m.r * .22, '#ff8a2c'); } },
   sub: (a, sec) => `${left(sec)} · blijf uit de rode cirkels` },
 
-{ id: 'king', n: 'Koning van de heuvel', tier: 2, T: 60, goal: 35, regen: .02,
+{ id: 'king', isle: 'round', n: 'Koning van de heuvel', tier: 2, T: 60, goal: 35, regen: .02,
   d: 'Sta in de cirkel in het midden om punten te verdienen. Tanks nemen een aanloop, tonen een rode baan en rammen je dan de cirkel uit. De cirkel wordt steeds kleiner.', win: 'Doel: 35 seconden op de heuvel binnen 60 seconden.',
   go: 'Koning van de heuvel: blijf in de cirkel en ontwijk de rammende tanks',
   init(a) { a.sp = 3; },
@@ -250,8 +259,8 @@ return [
           if (d < 1.2) { api.push(m.ux * 3.6, m.uz * 3.6); api.hurt(8); api.ring(h.x, h.z, '#ff8a2c', 1.4, .3); m.st = 0; m.ct = 2; } else if (m.ct <= 0) { m.st = 0; m.ct = 1.5; } } } }); },
   sub: (a, sec) => `${left(sec)} · ${Math.floor(a.pts)} van ${a.K.goal} seconden op de heuvel` },
 
-{ id: 'convoy', n: 'Konvooi escorteren', tier: 2, T: 75, goal: 1, regen: .015,
-  d: 'Een wagen rijdt langzaam dwars door de arena. Honden en soldaten vallen de wagen aan, een enkeling komt op jou af. Schakel ze uit voordat de wagen kapot is.', win: 'Doel: de wagen haalt de overkant. Hoe heler de wagen, hoe hoger je score.',
+{ id: 'convoy', isle: 'cross', n: 'Konvooi escorteren', tier: 2, T: 75, goal: 1, regen: .015,
+  d: 'Een wagen rijdt langzaam over de lange arm van het kruis. Honden en soldaten komen uit alle vier de armen en vallen de wagen aan, een enkeling komt op jou af. Schakel ze uit voordat de wagen kapot is.', win: 'Doel: de wagen haalt de overkant. Hoe heler de wagen, hoe hoger je score.',
   go: 'Konvooi: bescherm de wagen tot hij aan de overkant is',
   init(a) { a.sp = 3; a.cart = add(a, 'cart', { x: CX - 7.4, z: CZ, a: 0, hp: 480, pass: true, sp: 0, dmg: 0, es: 1.9,
       ai(m, dt) { m.x += 14.8 / 62 * dt; m.a = 0; if (m.x >= CX + 7.4) { a.pts = Math.max(1, Math.round(m.hp / m.max * 100)); a.fin = true; } } }); api.place(CX - 5.5, CZ + 1.5, 0); },
@@ -259,35 +268,35 @@ return [
     a.sp -= dt; if (a.sp > 0 || alive(a) >= 10) return; a.sp = Math.max(1.5, 2.6 - .02 * a.age); const dog = rand() < .6;
     if (rand() < .22) api.addMob(a, dog ? 'dog' : 'inf', { hp: dog ? 35 : 60, sp: dog ? 3.9 : 2.9, dmg: dog ? 6 : 8 });
     else add(a, dog ? 'dog' : 'inf', { hp: dog ? 35 : 60, sp: dog ? 3.9 : 2.9, dmg: 0, bite: dog ? 6 : 9, cd: 0,
-      ai(m, dt) { if (hyp(c.x - m.x, c.z - m.z) > 1.2) go(m, c.x, c.z, m.sp, dt); else { m.cd -= dt; if (m.cd <= 0) { m.cd = 1; c.hp -= m.bite; api.ring(c.x, c.z, '#ff6a4e', .9, .2); } } } }); },
+      ai(m, dt) { if (hyp(c.x - m.x, c.z - m.z) > 1.2) walk(m, c.x, c.z, m.sp, dt); else { m.cd -= dt; if (m.cd <= 0) { m.cd = 1; c.hp -= m.bite; api.ring(c.x, c.z, '#ff6a4e', .9, .2); } } } }); },
   sub: (a, sec) => `${left(sec)} · wagen ${Math.max(0, Math.ceil(a.cart.hp / a.cart.max * 100))}% heel` },
 
-{ id: 'simon', n: 'Simon zegt', tier: 2, T: 150, goal: 5,
-  d: 'Negen tegels lichten in een volgorde op. Loop daarna dezelfde volgorde na door in de cirkel van elke tegel te gaan staan, en loop om de andere cirkels heen. Elke ronde komt er een tegel bij. Je mag twee fouten maken.', win: 'Doel: 5 van de 7 rondes halen.',
-  go: 'Simon zegt: onthoud de volgorde en loop hem na',
-  init(a) { a.gr = grid(3, 3.4); a.seq = []; a.rd = 0; a.ph = 'gap'; a.pt = 2; a.i = 0; a.lives = 3; a.fl = -1; a.ft = 0; a.fc = '#35ff5a'; a.last = -1; api.place(CX, CZ + 1.7); },
-  upd(a, dt) { const g = a.gr, h = H(); let at = -1; a.pt -= dt; a.ft -= dt; for (let i = 0; i < 9; i++) { const p = g.pos(i); if (dH(p.x, p.z) < 1) at = i; }
-    if (a.ph === 'gap' && a.pt <= 0) { if (a.rd >= 7) { a.fin = true; return; } a.rd++; while (a.seq.length < a.rd + 2) { let k; do k = Math.floor(rand() * 9); while (k === a.seq[a.seq.length - 1]); a.seq.push(k); }
-      a.ph = 'show'; a.i = 0; a.pt = .75; api.toast(`Ronde ${a.rd}: kijk goed`, 1500); }
-    else if (a.ph === 'show' && a.pt <= 0) { a.i++; a.pt = .75; if (a.i >= a.seq.length) { a.ph = 'play'; a.i = 0; a.last = at; api.toast('Jouw beurt', 1200); } }
+{ id: 'simon', isle: 'quad', n: 'Simon zegt', tier: 2, T: 170, goal: 4,
+  d: 'De vier eilandjes lichten in een volgorde op, elk in zijn eigen kleur. Loop daarna dezelfde volgorde na door op elk eilandje in de cirkel te gaan staan. Via het midden kom je overal zonder een ander eilandje te raken. Elke ronde komt er een stap bij. Je mag twee fouten maken.', win: 'Doel: 4 van de 6 rondes halen.',
+  go: 'Simon zegt: onthoud de volgorde van de eilandjes en loop hem na',
+  init(a) { a.seq = []; a.rd = 0; a.ph = 'gap'; a.pt = 2.5; a.i = 0; a.lives = 3; a.fl = -1; a.ft = 0; a.fc = '#35ff5a'; a.last = -1; api.place(CX, CZ); },
+  upd(a, dt) { const h = H(), P = QP(); let at = -1; a.pt -= dt; a.ft -= dt; P.forEach((p, i) => { if (dH(p.x, p.z) < 1.5) at = i; });
+    if (a.ph === 'gap' && a.pt <= 0) { if (a.rd >= 6) { a.fin = true; return; } a.rd++; while (a.seq.length < a.rd + 2) { let k; do k = Math.floor(rand() * 4); while (k === a.seq[a.seq.length - 1]); a.seq.push(k); }
+      a.ph = 'show'; a.i = 0; a.pt = .8; api.toast(`Ronde ${a.rd}: kijk goed`, 1500); }
+    else if (a.ph === 'show' && a.pt <= 0) { a.i++; a.pt = .8; if (a.i >= a.seq.length) { a.ph = 'play'; a.i = 0; a.last = at; api.toast('Jouw beurt', 1200); } }
     else if (a.ph === 'play' && at !== a.last) { a.last = at;
-      if (at >= 0 && at === a.seq[a.i]) { a.i++; a.fl = at; a.ft = .4; a.fc = '#35ff5a'; if (a.i >= a.seq.length) { a.pts = a.rd; a.ph = 'gap'; a.pt = 1.6; api.toast('Goed!', 1200); } }
-      else if (at >= 0) { a.fl = at; a.ft = .7; a.fc = '#e8372a'; a.lives--; h.hp = api.maxHp() * a.lives / 3; if (a.lives <= 0) return; a.ph = 'show'; a.i = 0; a.pt = 1.4; api.toast('Fout! Kijk opnieuw', 1500); } }
-    for (let i = 0; i < 9; i++) { const p = g.pos(i), lit = a.ph === 'show' && a.seq[a.i] === i && a.pt > .15 && a.pt <= .75, fl = a.ft > 0 && a.fl === i;
-      rect(a, p.x, p.z, 3.2, 3.2, lit ? '#f6cf4d' : fl ? a.fc : '#3a4252', lit || fl ? .9 : .75); mark(a, p.x, p.z, 1, lit ? '#ffffff' : '#9aa3b3', lit ? .7 : .28); } },
-  sub: a => (a.ph === 'show' ? `Ronde ${a.rd} van 7 · kijk goed` : a.ph === 'play' ? `Ronde ${a.rd} van 7 · tegel ${a.i + 1} van ${a.seq.length}` : `${a.pts} van 7 rondes gehaald`) + ` · ${a.lives} ${a.lives === 1 ? 'leven' : 'levens'}` },
+      if (at >= 0 && at === a.seq[a.i]) { a.i++; a.fl = at; a.ft = .4; a.fc = '#ffffff'; api.ring(P[at].x, P[at].z, COL4[at][1], 2.4, .4); if (a.i >= a.seq.length) { a.pts = a.rd; a.ph = 'gap'; a.pt = 1.8; api.toast('Goed!', 1200); } }
+      else if (at >= 0) { a.fl = at; a.ft = .7; a.fc = '#000000'; a.lives--; h.hp = api.maxHp() * a.lives / 3; if (a.lives <= 0) return; a.ph = 'show'; a.i = 0; a.pt = 1.6; api.toast('Fout! Kijk opnieuw', 1500); } }
+    P.forEach((p, i) => { const lit = a.ph === 'show' && a.seq[a.i] === i && a.pt > .15 && a.pt <= .8, fl = a.ft > 0 && a.fl === i;
+      mark(a, p.x, p.z, QR + .1, fl ? a.fc : COL4[i][1], lit ? .95 : fl ? .8 : .22); mark(a, p.x, p.z, 1.5, lit ? '#ffffff' : COL4[i][1], lit ? .8 : .45); if (lit) orb(a, p.x, p.z, 2.2, .5, COL4[i][1]); }); },
+  sub: a => (a.ph === 'show' ? `Ronde ${a.rd} van 6 · kijk goed` : a.ph === 'play' ? `Ronde ${a.rd} van 6 · stap ${a.i + 1} van ${a.seq.length}` : `${a.pts} van 6 rondes gehaald`) + ` · ${a.lives} ${a.lives === 1 ? 'leven' : 'levens'}` },
 
-{ id: 'ice', n: 'IJsbaan', tier: 2, T: 60, goal: 2,
+{ id: 'ice', isle: 'square', n: 'IJsbaan', tier: 2, T: 60, goal: 2,
   d: 'De vloer is spekglad: je held komt traag op gang en glijdt door. Steek over naar het groene vlak zonder in een wak te glijden. Na elke oversteek keert de richting om en komen er wakken bij.', win: 'Doel: 2 keer oversteken in 60 seconden.',
   go: 'IJsbaan: glij naar het groene vlak en blijf uit de wakken',
   init(a) { a.ice = 2.2; a.dir = 1; a.n = 0; holes(a); api.place(CX - 7.2, CZ, 0); },
-  upd(a) { const h = H(), gx = CX + a.dir * 7.2; mark(a, CX, CZ, 9.1, '#bfe9ff', .16, .05); mark(a, gx, CZ, 1.3, '#35ff5a', .5); mark(a, CX - a.dir * 7.2, CZ, 1.3, '#f6cf4d', .2);
+  upd(a) { const h = H(), gx = CX + a.dir * 7.2; floor(a, '#bfe9ff', .16); mark(a, gx, CZ, 1.3, '#35ff5a', .5); mark(a, CX - a.dir * 7.2, CZ, 1.3, '#f6cf4d', .2);
     for (const o of a.holes) { mark(a, o.x, o.z, o.r, '#000308', .94); if (dH(o.x, o.z) < o.r - .15) { api.hurt(12); api.ball(h.x, .4, h.z, '#9fe8ff', .2, 1.2, .4); api.place(CX - a.dir * 7.2, CZ); api.toast('Je zakt door het ijs', 1500); } }
     if (dH(gx, CZ) < 1.3) { a.n++; a.pts = a.n; a.dir = -a.dir; holes(a); api.ring(gx, CZ, '#35ff5a', 1.6, .4); api.toast(`Oversteek ${a.n} gehaald. Nu terug!`, 1500); } },
   sub: (a, sec) => `${left(sec)} · ${a.pts} van ${a.K.goal} keer overgestoken` },
 
-{ id: 'waves', n: 'Golfsprint', tier: 2, T: 80, goal: 1, regen: .015,
-  d: 'Vijf snelle golven stormen van alle kanten op je vlag in het midden af. Er staan geen torens: alleen je held houdt ze tegen. Is een golf op, dan komt de volgende meteen.', win: 'Doel: de vlag staat nog na de vijfde golf. Hoe heler de vlag, hoe hoger je score.',
+{ id: 'waves', isle: 'cross', n: 'Golfsprint', tier: 2, T: 80, goal: 1, regen: .015,
+  d: 'Vijf snelle golven stormen door de vier armen van het kruis op je vlag in het midden af. Er staan geen torens: alleen je held houdt ze tegen. Is een golf op, dan komt de volgende meteen.', win: 'Doel: de vlag staat nog na de vijfde golf. Hoe heler de vlag, hoe hoger je score.',
   go: 'Golfsprint: verdedig de vlag in het midden tegen vijf golven',
   init(a) { a.flag = add(a, 'flag', { ...still, x: CX, z: CZ, hp: 360, pass: true, es: 2.2 }); a.w = 0; a.pt = 3; a.q = 0; a.qt = 0; api.place(CX + 1.5, CZ + 1.5); },
   upd(a, dt) { const f = a.flag, n = alive(a, m => m !== f); mark(a, CX, CZ, 1.4, '#59c8f2', .3); if (f.hp <= 0) { a.fail = true; a.fin = true; return; } a.pt -= dt;
@@ -298,31 +307,31 @@ return [
     else if (a.pt <= 0 || (!n && a.w > 0 && a.pt < 10)) { a.w++; a.q = 3 + a.w; a.pt = 12; api.toast(`Golf ${a.w} van 5`, 1500); } },
   sub: (a, sec) => `${left(sec)} · golf ${Math.max(1, a.w)} van 5 · vlag ${Math.max(0, Math.ceil(a.flag.hp / a.flag.max * 100))}%` },
 
-{ id: 'jump', n: 'Springparcours', tier: 2, T: 60, goal: 4,
+{ id: 'jump', isle: 'square', n: 'Springparcours', tier: 2, T: 60, goal: 4,
   d: 'Tussen jou en de overkant ligt een afgrond met vijf rijen platforms die heen en weer schuiven. Stap over als twee platforms naast elkaar liggen; een platform neemt je mee. Val je, dan begin je weer aan de rand.', win: 'Doel: 4 keer oversteken in 60 seconden.',
   go: 'Springparcours: stap van platform naar platform naar de overkant',
   init(a) { a.dir = 1; a.n = 0; a.off = 0; a.pl = []; for (let i = 0; i < 5; i++) a.pl.push({ x: CX - 4.8 + i * 2.4, amp: 2.2 + rand() * 1.2, w: .55 + rand() * .5, ph: rand() * TAU }); api.place(CX - 7.3, CZ, 0); },
   upd(a, dt) { const h = H(), sx = CX - a.dir * 7.3, gx = CX + a.dir * 7.3, onPad = x => Math.abs(h.x - x) <= 1.3 && Math.abs(h.z - CZ) <= 1.9; let vz = null;
-    mark(a, CX, CZ, 9.1, '#000000', .88, .05); rect(a, sx, CZ, 2.6, 3.8, '#8f7a58', .95); rect(a, gx, CZ, 2.6, 3.8, '#35cf4a', .9);
+    floor(a, '#000000', .88); rect(a, sx, CZ, 2.6, 3.8, '#8f7a58', .95); rect(a, gx, CZ, 2.6, 3.8, '#35cf4a', .9);
     for (const p of a.pl) { const z = CZ + Math.sin(a.age * p.w + p.ph) * p.amp; rect(a, p.x, z, 2.4, 2.8, '#59616e', .97); if (Math.abs(h.x - p.x) <= 1.2 && Math.abs(h.z - z) <= 1.4) vz = Math.cos(a.age * p.w + p.ph) * p.amp * p.w; }
     if (onPad(gx)) { a.n++; a.pts = a.n; a.dir = -a.dir; a.off = 0; api.ring(gx, CZ, '#35ff5a', 1.6, .4); api.toast(`Oversteek ${a.n} gehaald. Nu terug!`, 1500); return; }
     if (vz != null) { h.z += vz * dt; a.off = 0; } else if (onPad(sx)) a.off = 0; else a.off += dt;
     if (a.off > .14) { a.off = 0; api.hurt(25); api.ball(h.x, .3, h.z, '#8fb6ff', .2, 1.2, .4); api.place(sx, CZ); api.toast('Je valt in de afgrond', 1500); } },
   sub: (a, sec) => `${left(sec)} · ${a.pts} van ${a.K.goal} keer overgestoken` },
 
-{ id: 'gens', n: 'Generatoren', tier: 2, T: 60, goal: 59,
-  d: 'Vier generatoren lopen langzaam leeg. Ga ernaast staan om er een op te laden. Drones hechten zich aan een generator en zuigen hem sneller leeg: schiet ze eraf. Valt er een uit, dan is het voorbij.', win: 'Doel: alle vier 60 seconden aan de praat houden.',
+{ id: 'gens', isle: 'cross', n: 'Generatoren', tier: 2, T: 60, goal: 59,
+  d: 'Aan het eind van elke arm van het kruis staat een generator die langzaam leegloopt. Ga ernaast staan om er een op te laden. Drones hechten zich aan een generator en zuigen hem sneller leeg: schiet ze eraf. Valt er een uit, dan is het voorbij.', win: 'Doel: alle vier 60 seconden aan de praat houden.',
   go: 'Generatoren: laad ze op door ernaast te staan en schiet de drones eraf',
-  init(a) { a.gs = []; for (let i = 0; i < 4; i++) { const p = pol(i * TAU / 4, 6); a.gs.push(add(a, 'gen', { ...still, x: p.x, z: p.z, hp: 70, max: 100, pass: true, es: 1.6 })); } a.sp = 6; api.place(CX, CZ); },
+  init(a) { a.gs = []; for (let i = 0; i < 4; i++) { const p = pol(i * TAU / 4, 6.4); a.gs.push(add(a, 'gen', { ...still, x: p.x, z: p.z, hp: 70, max: 100, pass: true, es: 1.6 })); } a.sp = 6; api.place(CX, CZ); },
   upd(a, dt) { const dr = 2.6 + .02 * a.age; survive(a);
     for (const g of a.gs) { const near = dH(g.x, g.z) < 2.2; g.hp = Math.min(100, g.hp + ((near ? 44 : 0) - dr) * dt); mark(a, g.x, g.z, 2.2, near ? '#35ff5a' : g.hp < 30 ? '#e8372a' : '#59c8f2', near ? .4 : .25);
-      if (g.hp <= 0) { api.toast('Een generator is uitgevallen', 2500); a.fin = true; return; } }
+      if (g.hp <= 0) { api.toast('Een generator is uitgevallen', 2500); a.fail = true; a.fin = true; return; } }
     a.sp -= dt; if (a.sp > 0) return; a.sp = Math.max(3.5, 7 - .05 * a.age);
     add(a, 'drone', { hp: 45, sp: 3.2, dmg: 0, gen: a.gs[Math.floor(rand() * 4)],
       ai(m, dt) { const g = m.gen; if (hyp(g.x - m.x, g.z - m.z) > 1.1) go(m, g.x, g.z, m.sp, dt); else { g.hp -= 7 * dt; if (rand() < dt * 5) api.beam(m.x, 1, m.z, g.x, 1.6, g.z, '#ff5a3c', .05, .12); } } }); },
   sub: (a, sec) => `${left(sec)} · zwakste generator ${Math.max(0, Math.ceil(Math.min(...a.gs.map(g => g.hp))))}%` },
 
-{ id: 'mines', n: 'Mijnenveld', tier: 2, T: 75, goal: 3,
+{ id: 'mines', isle: 'square', n: 'Mijnenveld', tier: 2, T: 75, goal: 3,
   d: 'Vijf seconden lang zie je het veilige pad door een veld van 25 tegels. Daarna loop je het uit je hoofd. Stap je op een verkeerde tegel, dan ontploft een mijn en begin je opnieuw; drie mijnen is te veel.', win: 'Doel: 3 keer oversteken in 75 seconden.',
   go: 'Mijnenveld: onthoud het groene pad. Na vijf seconden verdwijnt het',
   init(a) { a.gr = grid(5, 2.2); a.block = (x, z) => Math.abs(x - CX) < 5.5 && Math.abs(z - CZ) > 5.5; a.n = 0; a.dir = 1; minePath(a); api.place(CX - 7, CZ, 0); },
@@ -334,7 +343,7 @@ return [
     if ((h.x - CX) * a.dir > 5.6) { a.n++; a.pts = a.n; a.dir = -a.dir; minePath(a); api.toast(`Oversteek ${a.n} gehaald. Onthoud het nieuwe pad!`, 2000); } },
   sub: (a, sec) => `${left(sec)} · ${a.pts} van ${a.K.goal} keer overgestoken` + (a.show > 0 ? ` · pad nog ${Math.ceil(a.show)} s zichtbaar` : '') },
 
-{ id: 'build', n: 'Bouwrace', tier: 2, T: 125, goal: 28,
+{ id: 'build', isle: 'square', n: 'Bouwrace', tier: 2, T: 125, goal: 28,
   d: 'Je krijgt 700 credits en 60 seconden. Ga op een gele bouwplek staan en kies met 1 tot 4 een toren. Daarna loopt één megagolf van 36 vijanden over het pad. Je held vecht mee.', win: 'Doel: 28 van de 36 vijanden uitschakelen.',
   go: 'Bouwrace: 60 seconden bouwen met 700 credits. Ga op een gele plek staan en druk op 1 tot 4',
   init(a) { a.gold = 700; a.ph = 'build'; a.pt = 60; a.q = 0; a.qt = 0; a.dead = 0; a.leaks = 0;
@@ -359,14 +368,14 @@ return [
   sub: a => a.ph === 'build' ? `Bouwen: nog ${Math.ceil(a.pt)} s · ${a.gold} credits · G stuurt de golf` : `${a.dead} uitgeschakeld · ${a.leaks} ontsnapt · doel ${a.K.goal}` },
 
 /* ============ uitdagend ============ */
-{ id: 'dark', n: 'Stroomuitval', tier: 3, T: 60, goal: 59, regen: .012,
+{ id: 'dark', isle: 'round', n: 'Stroomuitval', tier: 3, T: 60, goal: 59, regen: .012,
   d: 'Het licht valt uit. Je ziet alleen een kleine lichtkring rond je held, en monsters duiken pas op als ze vlakbij zijn. Elk monster dat je uitschakelt geeft wat levenspunten terug.', win: 'Doel: 60 seconden overleven.',
   go: 'Stroomuitval: je ziet alleen wat vlak bij je is. Blijf in beweging',
   init(a) { a.dark = 3.4; a.sp = 2; },
   upd(a, dt) { const h = H(); survive(a); mark(a, h.x, h.z, a.dark, '#ffe2b0', .07); a.sp -= dt; if (a.sp <= 0 && alive(a) < 9) { a.sp = Math.max(1.1, 2.3 - .02 * a.age); hunters(a); } },
   sub: (a, sec) => `${left(sec)} · overleef het donker` },
 
-{ id: 'mirror', n: 'Spiegelwereld', tier: 3, T: 45, goal: 10,
+{ id: 'mirror', isle: 'round', n: 'Spiegelwereld', tier: 3, T: 45, goal: 10,
   d: 'De besturing staat omgekeerd: vooruit is achteruit en links is rechts. Loop zo langs tien bakens, om de rode stekelvelden heen en tussen de schuivende zagen door.', win: 'Doel: 10 bakens in 45 seconden. Hoe sneller, hoe hoger je score.',
   go: 'Spiegelwereld: je besturing staat omgekeerd. Haal de groene bakens',
   init(a) { a.flip = true; a.n = 0; a.im = 0; a.tr = []; a.saws = []; for (let k = 0; k < 300 && a.tr.length < 7; k++) { const p = pt(2.8, AR - 1.2); if (!a.tr.some(o => hyp(o.x - p.x, o.z - p.z) < 3.2)) a.tr.push(p); }
@@ -381,7 +390,7 @@ return [
     if (a.n >= 10) { a.pts = 10 + Math.ceil(a.t); a.fin = true; } else this.next(a); },
   sub: (a, sec) => `${left(sec)} · baken ${Math.min(10, a.n + 1)} van 10 · besturing omgekeerd` },
 
-{ id: 'shrink', n: 'Krimpende arena', tier: 3, T: 70, goal: 69, regen: .02,
+{ id: 'shrink', isle: 'round', n: 'Krimpende arena', tier: 3, T: 70, goal: 69, regen: .02,
   d: 'Een giftige ring sluit de arena in tot er een klein rondje overblijft. Buiten de groene kring verlies je snel levenspunten, en ondertussen blijven er monsters op je af komen.', win: 'Doel: 70 seconden overleven.',
   go: 'Krimpende arena: blijf binnen de groene kring en houd de monsters van je af',
   init(a) { a.sp = 2; },
@@ -390,7 +399,7 @@ return [
     a.sp -= dt; if (a.sp <= 0 && alive(a) < 5) { a.sp = Math.max(1.3, 2.2 - .02 * a.age); hunters(a, { val: 2, dmg: .75 }); } },
   sub: (a, sec) => `${left(sec)} · blijf in de groene kring` },
 
-{ id: 'notower', n: 'Torenloos', tier: 3, T: 75, goal: 1, regen: .01,
+{ id: 'notower', isle: 'square', n: 'Torenloos', tier: 3, T: 75, goal: 1, regen: .01,
   d: 'Je torens staan uit. Hun stroom gaat naar je held, die daardoor twee keer zo snel aanvalt. Veertig vijanden lopen over drie banen van links naar rechts en letten niet op jou.', win: 'Doel: laat er minder dan 5 door. Elke uitgeschakelde vijand is een punt.',
   go: 'Torenloos: je held valt dubbel zo snel aan. Laat er minder dan vijf door',
   init(a) { a.haste = 2; a.q = 40; a.qt = 2.5; a.dead = 0; a.leaks = 0; },
@@ -401,7 +410,7 @@ return [
     a.pts = a.dead; if (a.leaks >= 5) { a.fail = true; a.fin = true; } else if (a.q <= 0 && !alive(a)) a.fin = true; },
   sub: a => `${a.dead} uitgeschakeld · ${a.leaks} van 5 door · nog ${a.q + alive(a)} te gaan` },
 
-{ id: 'twins', n: 'Tweelingbazen', tier: 3, T: 120, goal: 100, regen: .015,
+{ id: 'twins', isle: 'round', n: 'Tweelingbazen', tier: 3, T: 120, goal: 100, regen: .015,
   d: 'Twee bazen: de paarse loopt op je af en haalt uit met een klap rondom (stap uit de rode cirkel), de oranje blijft op afstand en legt inslagen onder je voeten. Valt de ene, dan moet de andere binnen 6 seconden volgen, anders staat de eerste weer op met halve levens. Je held valt aan wat het dichtst bij staat.', win: 'Doel: beide bazen vellen binnen 2 minuten.',
   go: 'Tweelingbazen: vel ze vlak na elkaar, anders staat de eerste weer op',
   init(a) { a.pair = [twin(a, 0), twin(a, 1)]; a.down = -1; a.rv = 0; api.place(CX, CZ + 5, -Math.PI / 2); },
@@ -411,7 +420,7 @@ return [
     a.rv -= dt; if (a.rv > 0) return; a.pair[a.down] = twin(a, a.down, 350); a.down = -1; api.toast('Te laat: de tweeling staat weer op met halve levens.', 3000); },
   sub: (a, sec) => { const f = m => Math.max(0, Math.ceil(m.hp / m.max * 100)) + '%'; return `${left(sec)} · paars ${f(a.pair[0])} · oranje ${f(a.pair[1])}` + (a.down >= 0 ? ` · nog ${Math.ceil(a.rv)} s!` : ''); } },
 
-{ id: 'hunter', n: 'Jager', tier: 3, T: 60, goal: 18, regen: .01,
+{ id: 'hunter', isle: 'round', n: 'Jager', tier: 3, T: 60, goal: 18, regen: .01,
   d: 'Een onverslaanbaar monster jaagt op je en wordt steeds sneller. Het neemt wijde bochten, dus een scherpe haak schudt het af. Raakt het je, dan vlieg je weg en verlies je veel levenspunten. Pak ondertussen de gouden bollen.', win: 'Doel: 18 bollen in 60 seconden.',
   go: 'Jager: pak de gouden bollen en blijf uit de klauwen van de jager',
   init(a) { a.or = []; for (let i = 0; i < 4; i++) a.or.push(pt(1, AR - 1));
@@ -425,7 +434,7 @@ return [
   sub: (a, sec) => `${left(sec)} · ${a.pts} van ${a.K.goal} bollen` },
 
 /* ============ heel uitdagend ============ */
-{ id: 'bullets', n: 'Bullet hell', tier: 4, T: 45, goal: 44,
+{ id: 'bullets', isle: 'round', n: 'Bullet hell', tier: 4, T: 45, goal: 44,
   d: 'De toren in het midden vuurt patronen af: eerst een draaiende spiraal, na 10 seconden ringen met één opening en na 30 seconden ook gerichte waaiers. Eén treffer en je ligt eruit.', win: 'Doel: 45 seconden overleven zonder één treffer.',
   go: 'Bullet hell: één treffer is dodelijk. Zoek de gaten tussen de kogels',
   init(a) { a.bs = []; a.block = (x, z) => hyp(x - CX, z - CZ) < 1.5; api.tower('geers', CX, CZ, 1.5); a.c1 = 0; a.c2 = 2; a.c3 = 1; a.sa = rand() * TAU; },
@@ -437,10 +446,10 @@ return [
     bullets(a, dt, '#ff7a3c', .36, () => { api.ball(h.x, .8, h.z, '#ff3a1a', .2, 1.4, .3); api.hurt(1e6); }); },
   sub: (a, sec) => `${left(sec)} · één treffer is dodelijk` },
 
-{ id: 'relay', n: 'Estafette', tier: 4, T: 36, goal: 12,
-  d: 'Breng het stokje twaalf keer van post naar post. Na elke overdracht komt er een zaag bij en er vallen inslagen op je hielen. Het team deelt één balk van vijf levens die niet herstelt: elke fout telt voor iedereen.', win: 'Doel: 12 overdrachten in 36 seconden met hooguit 4 fouten.',
+{ id: 'relay', isle: 'cross', n: 'Estafette', tier: 4, T: 36, goal: 12,
+  d: 'Breng het stokje twaalf keer van post naar post over het kruis. De zagen schuiven langs de armen. Na elke overdracht komt er een zaag bij en er vallen inslagen op je hielen. Het team deelt één balk van vijf levens die niet herstelt: elke fout telt voor iedereen.', win: 'Doel: 12 overdrachten in 36 seconden met hooguit 4 fouten.',
   go: 'Estafette: breng het stokje naar de groene post. Vijf levens voor het hele parcours',
-  init(a) { a.n = 0; a.im = 0; a.bar = 5; a.saws = []; a.zt = 3; a.st = [0, 1, 2, 3].map(i => pol(i * TAU / 4 + .4, 6.8)); a.to = 2; saw(a, 3.2); saw(a, 3.6); saw(a, 4); api.place(a.st[0].x, a.st[0].z); },
+  init(a) { a.n = 0; a.im = 0; a.bar = 5; a.saws = []; a.zt = 3; a.st = [0, 1, 2, 3].map(i => pol(i * TAU / 4, 6.9)); a.to = 2; saw(a, 3.2); saw(a, 3.6); saw(a, 4); api.place(a.st[0].x, a.st[0].z); },
   upd(a, dt) { const h = H(), t = a.st[a.to]; a.im -= dt; a.zt -= dt;
     if (a.hit && a.im <= 0) { a.bar--; a.im = 1; api.toast(a.bar > 0 ? `Fout! Nog ${a.bar} ${a.bar === 1 ? 'leven' : 'levens'}` : 'De balk is leeg', 1500); }
     h.hp = api.maxHp() * a.bar / 5; if (a.bar <= 0) return;
@@ -451,7 +460,7 @@ return [
     if (a.n >= 12) { a.pts = 12 + Math.ceil(a.t); a.fin = true; return; } let k; do k = Math.floor(rand() * 4); while (k === a.to); a.to = k; if (a.saws.length < 11) saw(a, 3.6 + a.n * .25); },
   sub: (a, sec) => `${left(sec)} · overdracht ${Math.min(12, a.n + 1)} van 12 · ${a.bar} van 5 levens` },
 
-{ id: 'geers', n: 'De Geers draait door', tier: 4, T: 100, goal: 3, regen: .02,
+{ id: 'geers', isle: 'round', n: 'De Geers draait door', tier: 4, T: 100, goal: 3, regen: .02,
   d: 'Een op hol geslagen superturret vuurt op je vanuit het midden. Zet hem uit met de drie schakelaars aan de rand: blijf even op een schakelaar staan om hem aan te zetten. Hij blijft maar kort aan, dus alle drie moeten in één ren branden. Dat moet drie keer, en elke keer wordt The Geers kwader.', win: 'Doel: 3 keer alle schakelaars tegelijk aan binnen 100 seconden.',
   go: 'De Geers draait door: zet alle drie de schakelaars aan voordat de eerste weer uitvalt',
   init(a) { a.block = (x, z) => hyp(x - CX, z - CZ) < 1.7; api.tower('geers', CX, CZ, 1.9); a.phs = 0; a.bs = []; a.c1 = 3; a.c2 = 5; a.rot = rand() * TAU; a.im = 0; this.place(a); },
@@ -469,7 +478,7 @@ return [
     bullets(a, dt, '#ffc83a', .45, () => { api.hurt(10); api.ball(h.x, .8, h.z, '#ffc83a', .1, .6, .2); }); },
   sub: (a, sec) => `${left(sec)} · schakeling ${Math.min(3, a.phs + 1)} van 3 · ${a.sw.filter(s => s.t > 0).length} van 3 schakelaars aan` },
 
-{ id: 'horde', n: 'Overleef de 100', tier: 4, T: 100, goal: 99,
+{ id: 'horde', isle: 'round', n: 'Overleef de 100', tier: 4, T: 100, goal: 99,
   d: 'Een eindeloze horde die elke 10 seconden sterker en sneller wordt en met meer tegelijk binnenkomt. Elk monster dat je uitschakelt geeft wat levenspunten terug. Blijf lopen en laat je niet insluiten.', win: 'Doel: 100 seconden overleven.',
   go: 'Overleef de 100: de horde wordt elke 10 seconden sterker',
   init(a) { a.sp = 1.5; a.lv = 0; },
@@ -477,4 +486,6 @@ return [
     if (a.sp <= 0 && alive(a) < 15) { a.sp = Math.max(.5, 2.1 * Math.pow(.86, L)); hunters(a, { hp: Math.pow(1.19, L), dmg: Math.pow(1.11, L), sp: 1 + .022 * L, big: L > 4 }); } },
   sub: (a, sec) => `${left(sec)} · golf ${Math.min(10, a.lv + 1)} van 10` }
 ];
+list.center = (x, z, k) => { CX = x; CZ = z; ISLE = k; };
+return list;
 };
