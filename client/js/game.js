@@ -1072,7 +1072,9 @@ function frame(ts){requestAnimationFrame(frame);const dt=Math.min(.1,(ts-last)/1
   if(G){const fs=render3D(ts/1000,dt)||fieldsNow();hud();slow+=dt;if(slow>.25){slow=0;refresh();pushPresence();updWorldUi(fs);}}}
 function logic(dt){if(window.__ratdPause)return;
   if(G&&!ended){sync();if(arena)updArena(dt);else if(G.phase!=='prep'){acc+=dt*speed;let n=0;while(acc>=STEP&&n<14){E.step(G,STEP);acc-=STEP;n++;}if(n>=14)acc=0;}
-    events();updHero(dt);pushHero();if(G.phase==='over'||G.phase==='won')endGame();}}
+    events();updHero(dt);pushHero();if(G.phase==='over'||G.phase==='won')endGame();}
+  // muziek: rustig tijdens het potje, sneller en voller in een minigame; stil in de lobby en na afloop
+  Music.sync(G&&!ended?{level:arena?arena.r:G.round,mini:!!arena}:null);}
 // Een tabblad op de achtergrond krijgt geen frames meer. Het spel loopt dan hier door, anders wacht iedereen op jou.
 setInterval(()=>{const now=performance.now();if(now-last<600)return;let dt=Math.min(3,(now-last)/1000);last=now;
   while(dt>.001){const d=Math.min(.1,dt);logic(d);dt-=d;}if(G)pushPresence();},500);
@@ -1130,6 +1132,7 @@ $('#waveBtn').onclick=waveAct;
 $('#speed').onclick=ev=>{const b=ev.target.closest('button');if(!b||!G||ended)return;if(lead()){toast('Alleen speler 1 kiest de snelheid');return;}speed=+b.dataset.s;paintSpeed();pushPresence(true);};
 let quitArm=0;$('#quitBtn').onclick=()=>{const b=$('#quitBtn');if(!G||ended)return;if(Date.now()-quitArm<3000){quitArm=0;b.textContent='Opgeven';G.phase='over';}
   else{quitArm=Date.now();b.textContent='Zeker weten?';setTimeout(()=>{if(quitArm){quitArm=0;b.textContent='Opgeven';}},3000);}};
+{const mb=$('#musicBtn'),show=()=>{const o=Music.isOn();mb.textContent=o?'Muziek aan':'Muziek uit';mb.setAttribute('aria-pressed',o);};mb.onclick=()=>{Music.setOn(!Music.isOn());show();mb.blur();};show();}
 $('#rBack').onclick=toLobby;
 function buildHud(){const card=$('#card');for(let i=0;i<12;i++){const b=document.createElement('button');b.id='card-'+i;b.className='empty';
     const cv=document.createElement('canvas');cv.width=116;cv.height=108;const k=document.createElement('span');k.className='k';const c=document.createElement('span');c.className='c num';b.append(cv,k,c);
