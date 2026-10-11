@@ -294,9 +294,25 @@ dialog.pop::backdrop{background:rgba(3,5,8,.8);backdrop-filter:blur(3px)}
 #tip{position:absolute;right:8px;width:300px;padding:10px 12px;pointer-events:none}
 #tip h4{font-size:17px;color:#fff} #tip .cost{color:var(--gold);font-size:15px;display:flex;align-items:center;gap:6px} #tip .cost .coin{margin:0}
 #tip p{margin:4px 0 0;font:400 14px/1.35 var(--body);color:var(--text)}
-#result{position:fixed;inset:0;background:rgba(3,5,8,.82);display:flex;align-items:center;justify-content:center;padding:16px;z-index:5}
-#result .card{padding:26px;max-width:440px;width:100%;display:flex;flex-direction:column;gap:14px;text-align:center}
-#result h2{font-size:32px;color:var(--gold)}
+#result,#labEnd{position:fixed;inset:0;background:rgba(3,5,8,.82);display:flex;align-items:center;justify-content:center;padding:16px;z-index:5}
+#result .card,#labEnd .card{padding:26px;max-width:440px;width:100%;display:flex;flex-direction:column;gap:14px;text-align:center}
+#result h2,#labEnd h2{font-size:32px;color:var(--gold)}
+#labEnd{background:rgba(3,5,8,.6)}
+#labEnd p{margin:0}
+#labEnd dl{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0}
+#labEnd dd{margin:0;font-family:var(--display);font-size:24px;color:#fff}
+/* een losse minigame: alles wat bij een potje hoort blijft uit beeld */
+#game.lab #speed,#game.lab #topbar .res,#game.lab #clock b,#game.lab #qNext,#game.lab #qPlayers,#game.lab #waveBtn,#game.lab #inv{display:none}
+.minilist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.minilist li{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 6px;border-top:1px solid #2a2f3a}
+.minilist .mh{display:block;border-top:0;padding:16px 6px 4px;font-family:var(--display);font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.minilist .mh:first-child{padding-top:0}
+.minilist .mh+li{border-top:0}
+.minilist .rk{font-family:var(--display);font-size:18px;color:var(--muted);text-align:center}
+.minilist .tx{min-width:0;display:flex;flex-direction:column;gap:2px}
+.minilist .tx b{font-weight:700}
+.minilist .sub{font-size:13px;line-height:1.35;color:var(--muted)}
+.minilist button{font-family:var(--display);font-weight:400;letter-spacing:.08em;text-transform:uppercase;font-size:14px;color:var(--gold);padding:7px 14px}
 #result dl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:0}
 #result dd{margin:0;font-family:var(--display);font-size:24px;color:#fff}
 @media(max-width:1020px){

@@ -30,6 +30,7 @@ client/                 frontend: gewone bestanden, geen bouwstap
   js/config.js          adres van de backend (leeg = dezelfde server)
   js/engine.js          spelregels: torens, vijanden, golven, skills
   js/net.js             alle communicatie met de backend
+  js/minigames.js       30 losse minigames, nog niet gekoppeld aan levels
   js/game.js            3D-wereld, bediening, lobby, minigames
   vendor/three.min.js   three.js r128
 server/                 backend: Node.js, Express, WebSocket, SQLite
@@ -44,6 +45,14 @@ docs/game-design.md     het oorspronkelijke game design document
 ```
 
 De server serveert ook de frontend, dus één adres is genoeg. `engine.js` wordt door beide kanten gebruikt: de browser speelt ermee, de server controleert er opgeslagen voortgang mee.
+
+## Minigames uitproberen
+
+In de lobby staat de knop **Minigames**. Daar kies je een minigame en speel je hem los, alleen, met je gekozen held en je skills. Het telt nergens voor mee: geen skillpunten, geen score, geen potje erbij. Andere spelers zien je in de lobby als "Test minigames".
+
+De dertig genummerde minigames staan in `client/js/minigames.js` en zitten **nog niet in het spel**. Een minigame komt pas in een potje als je hem in de tabel `MINI` in `client/js/game.js` bij een level zet, bijvoorbeeld `40:'coins'`. De score loopt dan vanzelf mee tussen de spelers: iedereen speelt zijn eigen ronde in de arena en de hoogste score wint.
+
+Een minigame toevoegen of aanpassen: bovenin `minigames.js` staat welke velden een minigame heeft. De getallen die de moeilijkheid bepalen (duur `T`, doel `goal`, levenspunten, schade, tempo) staan per minigame bij elkaar.
 
 ## Hoe het online werkt
 

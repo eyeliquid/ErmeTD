@@ -22,6 +22,8 @@ function runFree(lx,lz){if(lx<0||lz<0||lx>RUN.L||lz>RUN.W)return false;for(const
 // vrij zicht tussen twee punten op het parcours: elke muur ertussen moet bij zijn opening gekruist worden
 function runLos(ax,az,cx,cz){for(const[wx,sd]of RUN.walls){if((ax-wx)*(cx-wx)>=0)continue;const z=az+(cz-az)*(wx-ax)/(cx-ax),g=runGap(sd);if(z<g[0]||z>g[1])return false;}return true;}
 let hero={x:0,z:0,a:0,hp:100,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false},orders=[];
+// lab: een losse minigame uitproberen vanuit de lobby, buiten een potje om
+let lab=null;
 let camMode='hero',arena=null,arSeq=0,armour=0,myPeer=null,akCount=0,heroObj=null,heroSig='';
 const hcam={yaw:0,pitch:.5,d:9},joy={x:0,y:0},rheroes=new Map();
 const HEROES=[
@@ -49,7 +51,7 @@ function clean(d){if(!d||typeof d!=='object')return null;const sk={},v2=d.v===2;
     pts=Math.floor(xp/500);earned=Math.floor(earned/500);}
   if(d.skills&&typeof d.skills==='object'&&!Array.isArray(d.skills))for(const s of SKILLS){const r=Math.min(s.max,Math.max(0,d.skills[s.id]|0));if(r)sk[s.id]=r;}
   return{v:2,pts:Math.min(E.SKILL_MAX,Math.floor(pts)),earned:Math.floor(earned),games:Math.max(0,+d.games||0),best:Math.max(0,+d.best||0),skills:sk,hero:Math.max(0,Math.min(5,d.hero|0)),at:Math.max(0,+d.at||0)};}
-function award(n){if(!(n>0))return;save.pts+=n;save.earned+=n;gamePts+=n;persist();toastAdd=` · +${n} skillpunt${n>1?'en':''}`;}
+function award(n){if(!(n>0)||lab)return;save.pts+=n;save.earned+=n;gamePts+=n;persist();toastAdd=` · +${n} skillpunt${n>1?'en':''}`;}
 const blank=()=>({v:2,pts:0,earned:0,skills:{},games:0,best:0,hero:0,at:0});
 const putLocal=()=>{try{localStorage.setItem('ratd-save',JSON.stringify(save));}catch{}};
 function loadLocal(){try{const d=clean(JSON.parse(localStorage.getItem('ratd-save')));if(d)save=d;}catch{}}
@@ -231,7 +233,15 @@ function animHero(g,walk,atk){const u=g.userData,s=Math.sin(walk)*.7;u.legL.rota
 function nameSprite(text,col){const cv=document.createElement('canvas');cv.width=256;cv.height=48;const g=cv.getContext('2d');g.font='400 30px Marcellus,Georgia,serif';g.textAlign='center';g.textBaseline='middle';
   g.lineWidth=5;g.strokeStyle='#000';g.strokeText(text.slice(0,16),128,24);g.fillStyle=col;g.fillText(text.slice(0,16),128,24);
   const s=new T3.Sprite(new T3.SpriteMaterial({map:new T3.CanvasTexture(cv),transparent:true,depthWrite:false,toneMapped:false}));s.scale.set(2.2,.42,1);return s;}
-const EI={},ETOP={inf:.75,dog:.5,tank:.65,drone:.95,mech:.75,haz:.78,boss:2.4};
+// modellen die alleen in minigames voorkomen
+Object.assign(ENGEO,{
+  crate:()=>[bx(.5,.5,.5,'#8a6a3a',0,.25,0),bx(.56,.07,.56,'#5a4526',0,.5,0),bx(.56,.07,.56,'#5a4526',0,.035,0),bx(.07,.44,.56,'#5a4526',.25,.25,0),bx(.07,.44,.56,'#5a4526',-.25,.25,0)],
+  target:()=>[cy(.03,.03,.5,'#2a2d31',0,.25,0,6),cy(.16,.2,.06,'#3a3f47',0,.03,0,10),P(new T3.CylinderGeometry(.3,.3,.05,20),'#e8e8e8',0,.72,0,0,0,Math.PI/2),P(new T3.CylinderGeometry(.2,.2,.07,20),'#c8281e',0,.72,0,0,0,Math.PI/2),P(new T3.CylinderGeometry(.08,.08,.09,12),'#e8e8e8',0,.72,0,0,0,Math.PI/2)],
+  gen:()=>[cy(.4,.46,.5,'#3b5670',0,.25,0,10),cy(.12,.12,.7,'#aab4be',0,.8,0,8),tor(.3,.045,'#b06a30',.62),tor(.22,.04,'#b06a30',.86),sp(.15,'#9fe0ff',0,1.22,0)],
+  sheep:()=>[sp(.24,'#e8e4d8',0,.32,0,[1.3,.9,.95]),sp(.11,'#2a2a2a',.32,.38,0),...[[.16,.09],[.16,-.09],[-.16,.09],[-.16,-.09]].map(([x,z])=>bx(.05,.18,.05,'#2a2a2a',x,.09,z))],
+  cart:()=>[bx(.9,.28,.5,'#6a4a30',0,.3,0),bx(.7,.26,.44,'#8a6c16',-.04,.56,0),bx(.12,.5,.5,'#4d3422',.42,.5,0),...[[.3,.28],[.3,-.28],[-.3,.28],[-.3,-.28]].map(([x,z])=>P(new T3.CylinderGeometry(.15,.15,.08,12),'#1d1f22',x,.15,z,Math.PI/2))],
+  flag:()=>[cy(.03,.03,1.1,'#2a2d31',0,.55,0,6),cy(.2,.24,.08,'#5a616c',0,.04,0,10),bx(.42,.26,.03,'#c8281e',.22,.95,0)]});
+const EI={},ETOP={inf:.75,dog:.5,tank:.65,drone:.95,mech:.75,haz:.78,boss:2.4,crate:.72,target:1.1,gen:1.45,sheep:.62,cart:.9,flag:1.25};
 let hpMesh,hpBack,dummy,WHITE,ICE,TOXC,cR=null;
 const tobj=new Map(),bobj=new Map(),labels=[],live=[],pool={beam:[],ball:[],ring:[]},missiles=[],fires=[];
 let hoverM,rangeM,selM,ghosts=[],links=[],roadM,trailM,kerbM,gateIn,gateOut,roadSig='';
@@ -491,17 +501,24 @@ function drawHeroes(time,dt,hp){
   if(arena)hp=drawMission(time,hp);else hideMission();
   return hp;}
 // gevarenzones van de baas, kogels en torens van het parcours, en het schild
-const zoneM=[],shotM=[],safeM=[],markM=[],orbM=[],ringM=[],wedgeM=[],beamM=[];let shieldM=null,ultM=null,GOLDC=null;
+const zoneM=[],shotM=[],safeM=[],markM=[],orbM=[],ringM=[],wedgeM=[],beamM=[],rectM=[],glowM=[];let shieldM=null,ultM=null,GOLDC=null,darkOn=false,darkL=null;
 const flatMat=(col,op)=>new T3.MeshBasicMaterial({color:col,transparent:true,opacity:op==null?1:op,depthWrite:false,toneMapped:false,side:T3.DoubleSide});
 const mkDisc=col=>new T3.Mesh(raw('disc64',()=>new T3.CircleGeometry(1,64).rotateX(-Math.PI/2)),flatMat(col));
 // ring met een opening, en de taartpunt die de opening aanwijst; beide met de opening rond hoek 0
 const ringGeo=w=>raw('ring'+w.toFixed(2),()=>new T3.RingGeometry(.93,1,72,1,w/2,TAU-w).rotateX(-Math.PI/2));
 const wedgeGeo=w=>raw('wedge'+w.toFixed(2),()=>new T3.CircleGeometry(1,20,-w/2,w).rotateX(-Math.PI/2));
 const hidePool=(arr,i)=>{for(;i<arr.length;i++)arr[i].visible=false;};
-function hideMission(){if(ultM)ultM.visible=false;for(const p of[safeM,zoneM,shotM,markM,orbM,ringM,wedgeM,beamM])hidePool(p,0);if(shieldM)shieldM.visible=false;}
+function hideMission(){if(ultM)ultM.visible=false;for(const p of[safeM,zoneM,shotM,markM,orbM,ringM,wedgeM,beamM,rectM,glowM])hidePool(p,0);if(shieldM)shieldM.visible=false;}
 function drawMission(time,hp){const a=arena,u=a.ult;let zi=0,si=0,mi=0,oi=0,ri=0,wi=0,bi=0,gi2=0;
-  if(a.marks)for(const k of a.marks){const m=poolMesh(markM,mi,()=>mkDisc('#ffffff'));m.material.color.set(k.col);m.material.opacity=k.op;m.position.set(k.x,.066+mi*.003,k.z);m.scale.setScalar(k.r);mi++;}
+  if(a.marks)for(const k of a.marks){const m=poolMesh(markM,mi,()=>mkDisc('#ffffff'));m.material.color.set(k.col);m.material.opacity=k.op;m.position.set(k.x,k.y||.066+mi*.003,k.z);m.scale.setScalar(k.r);mi++;}
   hidePool(markM,mi);
+  // rechthoeken op de grond (tegels, banen, platforms) en gloeiende balken (lasers)
+  {let xi=0,qi=0;
+    if(a.rects)for(const k of a.rects){const m=poolMesh(rectM,xi,()=>new T3.Mesh(raw('decal',()=>new T3.PlaneGeometry(1,1).rotateX(-Math.PI/2)),flatMat('#ffffff')));m.material.color.set(k.col);m.material.opacity=k.op==null?1:k.op;m.position.set(k.x,k.y||.054+xi*.0002,k.z);m.rotation.y=-(k.rot||0);m.scale.set(k.w,1,k.d);xi++;}
+    hidePool(rectM,xi);
+    if(a.glows)for(const k of a.glows){const m=poolMesh(glowM,qi++,()=>new T3.Mesh(raw('glowbox',()=>new T3.BoxGeometry(1,1,1)),new T3.MeshBasicMaterial({transparent:true,depthWrite:false,blending:T3.AdditiveBlending,toneMapped:false})));m.material.color.set(k.col);m.material.opacity=(k.op==null?.85:k.op)*(.9+.1*Math.sin(time*30));m.position.set(k.x,k.y||.5,k.z);m.rotation.y=-(k.rot||0);m.scale.set(k.w,k.h||.16,k.d||.16);}
+    hidePool(glowM,qi);
+    if(a.objs)for(const o of a.objs)for(const f of o.userData.anims||[])f(time);}
   if(a.zones)for(const z of a.zones){const m=poolMesh(zoneM,zi++,()=>new T3.Mesh(new T3.CircleGeometry(1,48).rotateX(-Math.PI/2),new T3.MeshBasicMaterial({color:'#ff3a24',transparent:true,depthWrite:false,toneMapped:false})));
     m.position.set(z.x,.075,z.z);m.scale.setScalar(z.r);m.material.opacity=.2+.4*(1-Math.max(0,z.t)/z.T)+.05*Math.sin(time*18);}
   hidePool(zoneM,zi);
@@ -529,11 +546,16 @@ function drawMission(time,hp){const a=arena,u=a.ult;let zi=0,si=0,mi=0,oi=0,ri=0
   return hp;}
 // monsters van een minigame: dezelfde modellen als de vijanden in de vesting
 function drawMobs(time,hp){if(!GOLDC)GOLDC=new T3.Color('#ffd24a');
-  for(const m of arena.mobs){if(m.hp<=0)continue;const I=EI[m.type];if(!I||I.n>=I.cap)continue;const i=I.n++,es=m.big?2.1:1.45;
+  for(const m of arena.mobs){if(m.hp<=0||(arena.dark&&Math.hypot(m.x-hero.x,m.z-hero.z)>arena.dark))continue;const I=EI[m.type];if(!I||I.n>=I.cap)continue;const i=I.n++,es=m.es||(m.big?2.1:1.45);
     dummy.position.set(m.x,m.type==='drone'?Math.sin(time*5+m.id)*.08:Math.abs(Math.sin(time*9+m.id))*.03,m.z);dummy.quaternion.identity();dummy.rotation.set(0,-m.a,0);dummy.scale.setScalar(es);dummy.updateMatrix();
-    I.m.setMatrixAt(i,dummy.matrix);I.m.setColorAt(i,m.gold?GOLDC:WHITE);
-    if(hp<900)bar(hp++,m.x,ETOP[m.type]*es+.2,m.z,m.big?1.2:.7,.09,Math.max(0,Math.min(1,m.hp/m.max)));}
+    I.m.setMatrixAt(i,dummy.matrix);I.m.setColorAt(i,m.tint?_c.set(m.tint):m.gold?GOLDC:WHITE);
+    if(!m.nobar&&hp<900)bar(hp++,m.x,ETOP[m.type]*es+.2,m.z,m.big?1.2:.7,.09,Math.max(0,Math.min(1,m.hp/m.max)));}
   return hp;}
+// Stroomuitval: het licht gaat uit en alleen rond de held blijft een lichtkring over.
+function setDark(on){if(!gl3||on===darkOn)return;darkOn=on;
+  for(const o of scene.children)if(o.isLight&&o!==darkL){if(o.userData.i0==null)o.userData.i0=o.intensity;o.intensity=o.userData.i0*(on?.07:1);}
+  scene.fog.near=on?5:55;scene.fog.far=on?26:150;scene.fog.color.set(on?'#010203':'#0a121c');scene.background.set(on?'#010203':'#070c14');
+  if(on&&!darkL){darkL=new T3.PointLight('#ffe2b0',2.4,7.5,1.4);scene.add(darkL);}if(darkL)darkL.visible=on;}
 function poolMesh(arr,i,mk){if(!arr[i]){arr[i]=mk();scene.add(arr[i]);}arr[i].visible=true;return arr[i];}
 function render3D(time,dt){if(!gl3)return;
   if(camMode==='hero'){if(keys.q||keys.arrowleft)hcam.yaw+=1.9*dt;if(keys.e||keys.arrowright)hcam.yaw-=1.9*dt;}
@@ -541,7 +563,7 @@ function render3D(time,dt){if(!gl3)return;
     if(keys.arrowup){cam.tx+=f[0]*kp;cam.tz+=f[1]*kp;}if(keys.arrowdown){cam.tx-=f[0]*kp;cam.tz-=f[1]*kp;}
     if(keys.arrowright){cam.tx+=r[0]*kp;cam.tz+=r[1]*kp;}if(keys.arrowleft){cam.tx-=r[0]*kp;cam.tz-=r[1]*kp;}
     if(keys.q)cam.yaw+=1.6*dt;if(keys.e)cam.yaw-=1.6*dt;}
-  camUpdate();sea.material.map.offset.set(time*.004,time*.003);
+  camUpdate();sea.material.map.offset.set(time*.004,time*.003);setDark(!!(arena&&arena.dark));if(darkOn)darkL.position.set(hero.x,2.4,hero.z);
   const fs=fieldsNow(),seenT=new Set(),seenB=new Set();for(const k in EI)EI[k].n=0;let hp=0;updRoads(fs);
   cR.set(1,0,0).applyQuaternion(camera.quaternion);
   for(const fl of fs){const[ox,oz]=slotO(fl.slot);
@@ -652,7 +674,7 @@ function endGame(){ended=true;const won=G.phase==='won';
   setText($('#rTitle'),won?'Overwinning':G.final?'De Titaan wint':'Basis gevallen');
   setText($('#rText'),won?`Alle ${ROUNDS} golven afgeslagen en de Titaan is geveld. Het hoofdkwartier staat nog.`:G.final?`Alle ${ROUNDS} golven afgeslagen, maar de Titaan bleef overeind.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`:`Je hield stand tot en met ronde ${G.cleared}.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`);
   setText($('#rRound'),G.cleared+'/'+ROUNDS);setText($('#rScore'),fmt(G.score));setText($('#rXp'),'+'+gamePts);$('#result').hidden=false;}
-function toLobby(){if(arena&&arena.g&&arena.g.obj)scene.remove(arena.g.obj);arena=null;G=null;myState='lobby';ready=false;$('#result').hidden=true;$('#game').hidden=true;$('#home').hidden=false;
+function toLobby(){if(arena)labClear(arena);arena=null;if(lab){lab=null;$('#labEnd').hidden=true;$('#game').classList.remove('lab');setText($('#quitBtn'),'Opgeven');}G=null;myState='lobby';ready=false;$('#result').hidden=true;$('#game').hidden=true;$('#home').hidden=false;
   if(room)room.presence({st:'lobby',rd:false,tw:null,en:null,b:null,go:null,sl:null,p:null,ar:null,dm:null,mt:null,bd:null,ps:null,cl:null,nx:null,sw:null,pa:null,am:null,bm:null,bh:null,bp:null,ba:null,ms:null,mg:null,sd:null,sc:null,dn:null,kb:null,wn:null}).catch(()=>{});renderHome();renderLobby();}
 function events(){const[ox,oz]=slotO(mySlot);for(const e of G.ev){
     if(e.k==='clear'){award(E.pointsFor(e.r));toast(`Ronde ${e.r} afgeslagen · +${fmt(e.bonus)} credits`);}
@@ -691,7 +713,7 @@ function paintTo(c,on){const pc=paintLast;paintLast=c;if(pc<0||pc===c){roadSet(c
   while(x!==tx||y!==ty){if(Math.abs(tx-x)>=Math.abs(ty-y))x+=Math.sign(tx-x);else y+=Math.sign(ty-y);roadSet(y*N+x,on);}}
 function roadTool(){roadMode=!roadMode;buildSel=null;sel=null;if(roadMode){camMode='free';cam.yaw=0;cam.d=stage.clientWidth<760?44:23;camTo(mySlot);}}
 /* --- held: lopen, botsen, aanvallen --- */
-function walkable(x,z){if(Math.hypot(x-ACX,z-ACZ)<=AR)return true;if(runFree(x-RUN.x,z-RUN.z))return true;
+function walkable(x,z){if(arena&&arena.block&&arena.block(x,z))return false;if(Math.hypot(x-ACX,z-ACZ)<=AR)return true;if(runFree(x-RUN.x,z-RUN.z))return true;
   const c=Math.floor((x+3.5)/FW),r=Math.floor((z+3.5)/FW);if(c<0||r<0||c>=COLS||r>=ROWS)return false;const lx=x-c*FW,lz=z-r*FW;
   if(lx>=-.15&&lx<=13.15&&lz>=-.15&&lz<=13.15)return true;
   if(lz>=5.85&&lz<=7.15&&((lx>13&&c<COLS-1)||(lx<0&&c>0)))return true;
@@ -700,15 +722,22 @@ function towerAt(x,z){if(!G||G.omega)return false;const[ox,oz]=slotO(mySlot),lx=
   const t=G.map[cz*N+cx];return!!t&&Math.hypot(lx-t.x,lz-t.y)<.5;}
 function stepHero(dx,dz,manual){const h=hero,ok=(x,z)=>walkable(x,z)&&!(manual&&towerAt(x,z)&&!towerAt(h.x,h.z));
   if(ok(h.x+dx,h.z+dz)){h.x+=dx;h.z+=dz;return true;}if(ok(h.x+dx,h.z)){h.x+=dx;return true;}if(ok(h.x,h.z+dz)){h.z+=dz;return true;}return false;}
-function updHero(dt){const h=hero,H=HEROES[save.hero],sp=H.spd*HM.hSpd*(armour>=4?1.2:1)*(arena&&arena.slow||1)*dt,yaw=camMode==='hero'?hcam.yaw:cam.yaw,f=[-Math.sin(yaw),-Math.cos(yaw)],r=[Math.cos(yaw),-Math.sin(yaw)];
+function updHero(dt){const h=hero,H=HEROES[save.hero],v1=H.spd*HM.hSpd*(armour>=4?1.2:1)*(arena&&arena.slow||1),sp=v1*dt,yaw=camMode==='hero'?hcam.yaw:cam.yaw,f=[-Math.sin(yaw),-Math.cos(yaw)],r=[Math.cos(yaw),-Math.sin(yaw)];
   let fw=joy.y,rt=joy.x;if(keys.w||(camMode==='hero'&&keys.arrowup))fw+=1;if(keys.s||(camMode==='hero'&&keys.arrowdown))fw-=1;if(keys.d)rt+=1;if(keys.a)rt-=1;
+  if(arena&&arena.flip){fw=-fw;rt=-rt;} // spiegelwereld: de besturing staat omgekeerd
   const kx=f[0]*fw+r[0]*rt,kz=f[1]*fw+r[1]*rt,kl=Math.hypot(kx,kz);h.moving=false;
-  if(kl>.05){camMode='hero';const m=Math.min(1,kl);stepHero(kx/kl*sp*m,kz/kl*sp*m,true);h.a=Math.atan2(kz,kx);h.tx=null;h.moving=true;}
+  if(arena&&arena.ice){ // ijs: de held komt traag op gang en glijdt door
+    let wx=0,wz=0;if(kl>.05){camMode='hero';const m=Math.min(1,kl);wx=kx/kl*m;wz=kz/kl*m;h.tx=null;}
+    else if(h.tx!=null){const dx=h.tx-h.x,dz=h.tz-h.z,d=Math.hypot(dx,dz);if(d<.5)h.tx=null;else{wx=dx/d;wz=dz/d;}}
+    const k=Math.min(1,arena.ice*dt);h.vx=(h.vx||0)+(wx*v1-(h.vx||0))*k;h.vz=(h.vz||0)+(wz*v1-(h.vz||0))*k;
+    if(!stepHero(h.vx*dt,h.vz*dt,true)){h.vx*=-.3;h.vz*=-.3;}
+    if(wx||wz){h.a=Math.atan2(wz,wx);h.moving=true;}}
+  else if(kl>.05){camMode='hero';const m=Math.min(1,kl);stepHero(kx/kl*sp*m,kz/kl*sp*m,true);h.a=Math.atan2(kz,kx);h.tx=null;h.moving=true;}
   else{let tg=null;const o=arena?null:orders[0];
     if(o){const[ox,oz]=slotO(mySlot),x=o.c%N;tg=[ox+x+.5,oz+(o.c-x)/N+.5];}else if(h.tx!=null)tg=[h.tx,h.tz];
     if(tg){const dx=tg[0]-h.x,dz=tg[1]-h.z,d=Math.hypot(dx,dz);
       if(o&&d<1.6){orders.shift();const t=E.build(G,o.c,o.type);if(t){G.fx.push({k:'build',a:[t.x,t.y],b:[t.x,t.y]});h.atk=1;}else toast(E.canBuild(G,o.c)?'Te weinig credits voor '+T[o.type].n:'Hier kun je niet meer bouwen');}
-      else if(d<=sp){h.x=tg[0];h.z=tg[1];h.tx=null;}
+      else if(d<=sp){if(walkable(tg[0],tg[1])){h.x=tg[0];h.z=tg[1];}h.tx=null;}
       else{h.a=Math.atan2(dz,dx);h.moving=true;if(!stepHero(dx/d*sp,dz/d*sp,false)){h.tx=null;if(o){orders.shift();toast('Je held kan daar niet komen');}}}}}
   if(h.moving)h.walk+=dt*H.spd*2.1;else h.walk*=.8;h.atk=Math.max(0,h.atk-dt*4);
   if(!arena&&h.hp<maxHp())h.hp=Math.min(maxHp(),h.hp+maxHp()*.06*dt);
@@ -718,13 +747,13 @@ const heroScale=()=>Math.pow(E.hpMul(G.round)/E.hpMul(1),.75);
 function heroAttack(dt){const h=hero,H=HEROES[save.hero],HR=H.range*HM.hRange,rate=H.rate*HM.hRate;h.cd-=dt*(arena?1:speed);if(h.cd>0)return;const ts=[];
   if(arena){const a=arena; // helden kunnen elkaar niet raken: alleen de baas, monsters en torens zijn een doelwit
     if(a.g&&a.g.hp>0)ts.push({x:a.g.x,z:a.g.z,g:a.g,big:a.B?a.B.big:0});
-    if(a.mobs)for(const m of a.mobs)if(m.hp>0)ts.push({x:m.x,z:m.z,mob:m,big:m.big?.5:0});
+    if(a.mobs)for(const m of a.mobs)if(m.hp>0&&!m.pass)ts.push({x:m.x,z:m.z,mob:m,big:m.big?.5:0});
     if(a.tw)for(const t of a.tw)if(t.hp>0&&runLos(h.x-RUN.x,h.z-RUN.z,t.x,t.z))ts.push({x:RUN.x+t.x,z:RUN.z+t.z,tw:t});}
   else if(G&&!ended){const[ox,oz]=slotO(mySlot);for(const e of G.en)if(!e.dead)ts.push({x:ox+e.x,z:oz+e.y,e});}
   let best=null,bv=1e18;const inr=[];
   for(const t of ts){t.d=Math.hypot(t.x-h.x,t.z-h.z);if(t.d<=HR+(t.e&&t.e.boss?.7:t.big||0)){inr.push(t);const v=H.k==='snipe'&&t.e?-t.e.hp:t.d;if(v<bv){bv=v;best=t;}}}
   if(!best){h.cd=0;return;}
-  h.cd=1/rate;if(HM.leech&&h.hp>0)h.hp=Math.min(maxHp(),h.hp+maxHp()*HM.leech/rate);h.atk=1;akCount++;const ta=Math.atan2(best.z-h.z,best.x-h.x);if(!h.moving)h.a=ta;
+  h.cd=1/(rate*(arena&&arena.haste||1));if(HM.leech&&h.hp>0)h.hp=Math.min(maxHp(),h.hp+maxHp()*HM.leech/rate);h.atk=1;akCount++;const ta=Math.atan2(best.z-h.z,best.x-h.x);if(!h.moving)h.a=ta;
   const base=H.dmg*HM.hDmg*(armour>=3?1.3:1)*(Math.random()<HM.hCrit?2+HM.hCritDmg:1),cs=arena?1:heroScale();
   const hit=(t,d,pierce)=>{if(t.e){const was=t.e.dead;E.hit(G,t.e,d*cs*(t.e.boss?HM.hBoss:1),1-(1-(pierce||0))*(1-HM.hAp));if(t.e.dead&&!was&&HM.hGold)G.gold+=Math.round(t.e.b*HM.hGold);}else if(t.g){if(arena&&arena.mode==='boss')d*=HM.hBoss;t.g.hp-=d;if(arena&&arena.mode==='boss')myBh+=d;}else if(t.tw)runHit(t.tw,d*HM.hMini);else if(t.mob)mobHit(t.mob,d*HM.hMini);};
   const A=V(h.x,.8,h.z),B=t=>V(t.x,t.e&&t.e.boss?1.8:.5,t.z);
@@ -763,14 +792,15 @@ const TAU=6.2832;
 function enterArena(kind,r){if(arena||!G||ended||!KIND[kind])return;const K=KIND[kind],mode=K.m;arSeq++;const an=Math.random()*6.28;hero.tx=null;orders=[];buildSel=null;sel=null;roadMode=false;hero.hp=maxHp();shieldT=0;shieldCd=0;msLast=null;
   if(mode==='run'){hero.x=RUN.x+1.5;hero.z=RUN.z+2+Math.random()*(RUN.W-4);hero.a=0;hcam.yaw=-Math.PI/2;}
   else{const d=kind==='titan'?7.2:6.2;hero.x=ACX+Math.cos(an)*d;hero.z=ACZ+Math.sin(an)*d;hero.a=an+Math.PI;hcam.yaw=Math.PI/2-an;} // camera achter de held, met het midden van de arena in beeld
-  arena={mode,kind,K,r:r||0,t:K.T,T:K.T,age:0,seq:arSeq,kills:0,g:null,score:0,rivals:false,ms:mode==='mini'||mode==='chairs'||kind==='duel'}; // ms: de score telt mee tegen die van de anderen
-  if(mode==='boss')bossInit(arena);else if(mode==='run')runInit(arena);else if(mode==='chairs')chairsInit(arena);else miniInit(arena);
+  arena={mode,kind,K,r:r||0,t:K.T,T:K.T,age:0,seq:arSeq,kills:0,g:null,score:0,rivals:false,ms:mode==='mini'||mode==='lab'||mode==='chairs'||kind==='duel'}; // ms: de score telt mee tegen die van de anderen
+  if(mode==='boss')bossInit(arena);else if(mode==='run')runInit(arena);else if(mode==='chairs')chairsInit(arena);else if(mode==='lab')labInit(arena);else miniInit(arena);
   camMode='hero';toast(K.go,6000);
   if(gl3){fxRing(V(hero.x,0,hero.z),'#8fb6ff',2,.8);fxBall(V(hero.x,1,hero.z),'#bfd4ff',.3,2.2,.6,.8);}pushHero(true);refresh();}
 // Beloning: een stuk harnas, of credits als het harnas al compleet is.
 function reward(a,txt){if(armour<4){armour++;applyArmour(armour);hero.hp=maxHp();toast(txt+`${ARMOUR[armour-1].n}. ${ARMOUR[armour-1].d}`,5000);}
   else{const c=300+10*a.r;G.gold+=c;toast(txt+`+${c} credits`,4000);}}
-function leaveArena(res){const a=arena,K=a.K;arena=null;if(a.g&&a.g.obj)scene.remove(a.g.obj);if(a.tw)for(const t of a.tw)if(t.obj)scene.remove(t.obj);shieldT=0;
+function leaveArena(res){const a=arena,K=a.K;arena=null;if(a.g&&a.g.obj)scene.remove(a.g.obj);if(a.tw)for(const t of a.tw)if(t.obj)scene.remove(t.obj);if(a.objs)for(const o of a.objs)scene.remove(o);shieldT=0;
+  if(lab){labEnd(a,res);return;}
   if(a.ms)msLast=[a.r,Math.floor(a.score||0),res==='dead'||res==='out'?2:1];
   const[ox,oz]=slotO(mySlot);hero.x=ox+6.5;hero.z=oz+5.5;hero.tx=null;hero.hp=maxHp();hcam.yaw=0;if(res==='win'&&HM.mission)G.gold+=HM.mission;if(res==='win'&&a.mode==='boss')award(1);
   if(a.kind==='titan'){if(res==='win')E.win(G);else if(res==='dead')toast('Je bent uitgeschakeld. Wie nog staat vecht door tegen de Titaan.',5000);else E.lose(G);}
@@ -866,7 +896,7 @@ function runInit(a){const hp=110;a.shots=[];a.shotDmg=15;a.shotCd=.9;
   a.tw=[[7,1.6],[11,8.4],[15,1.6],[15,8.6],[19,8.4],[19,1.4],[23,1.6],[27,8.4],[27,1.4],[31,1.6],[31,8.6],[35,8.4]].map(([x,z],i)=>{const t={x,z,hp,max:hp,cd:.6+i*.17,ang:Math.PI,obj:null};
     if(gl3){t.obj=makeTower('sentry',SLOTS,0,null);t.obj.scale.setScalar(1.35);t.obj.position.set(RUN.x+x,0,RUN.z+z);scene.add(t.obj);}return t;});}
 function runHit(t,d){if(t.hp<=0)return;t.hp-=d;if(t.hp<=0){arena.kills++;if(t.obj)scene.remove(t.obj);if(gl3)fxBall(V(RUN.x+t.x,.6,RUN.z+t.z),'#ff8a2c',.2,1.4,.5,.85);}}
-function useShield(){if(!arena||arena.mode!=='run'||shieldCd>0)return;shieldT=2.5+HM.shDur;shieldCd=9-HM.shCd;if(gl3)fxRing(V(hero.x,0,hero.z),'#59c8f2',1.6,.3);}
+function useShield(){if(!arena||(arena.mode!=='run'&&!arena.shield)||shieldCd>0)return;shieldT=2.5+HM.shDur;shieldCd=9-HM.shCd;if(gl3)fxRing(V(hero.x,0,hero.z),'#59c8f2',1.6,.3);}
 function updRun(a,dt){const h=hero,lx=h.x-RUN.x,lz=h.z-RUN.z;shieldT=Math.max(0,shieldT-dt);shieldCd=Math.max(0,shieldCd-dt);
   if(lx>=RUN.L-2){leaveArena('win');return;}
   for(const t of a.tw){if(t.hp<=0)continue;const dx=lx-t.x,dz=lz-t.z,d=Math.hypot(dx,dz);if(d>9||d<.01||!runLos(t.x,t.z,lx,lz)){t.cd=Math.max(t.cd,.35);continue;}
@@ -960,11 +990,11 @@ function miniInit(a){const rnd=a.rnd=lcg(1+(Math.abs(Math.floor(matchId))+7919*a
   if(k==='hill')for(let i=0;i*16<a.T;i++)a.items.push(arPt(rnd,2,AR-2.6));
   else if(k==='cores'){a.home=[ACX,ACZ];for(let i=0;i<40;i++){const an=rnd()*TAU;a.items.push({i,x:ACX+Math.cos(an)*(AR-1),z:ACZ+Math.sin(an)*(AR-1),t0:i<3?0:(i-2)*4.5});}}}
 function addMob(a,type,o){const an=Math.random()*TAU;a.mobs.push(Object.assign({id:++a.mid,type,x:ACX+Math.cos(an)*(AR-.4),z:ACZ+Math.sin(an)*(AR-.4),a:an+Math.PI,cd:.6,every:1,reach:1.25,max:o.hp},o));}
-function mobHit(m,d){if(m.hp<=0)return;m.hp-=d;if(m.hp>0)return;const a=arena;
+function mobHit(m,d){if(m.hp<=0)return;m.hp-=d;if(m.hp>0)return;const a=arena;if(m.die)m.die(m);
   if(a&&m.val){a.pts+=m.val;hero.hp=Math.min(maxHp(),hero.hp+3*m.val);}
   if(gl3)fxBall(V(m.x,.6,m.z),m.gold?'#ffd24a':'#ff8a2c',.15,m.big?1.8:.9,.4,.85);}
 // Een monster jaagt op de held. Met `aggro` blijft het bij zijn post (a.home) tot de held dichtbij komt.
-function stepMobs(a,dt){const h=hero;for(const m of a.mobs){if(m.hp<=0)continue;const dh=Math.hypot(h.x-m.x,h.z-m.z),post=m.aggro&&dh>m.aggro&&a.home;
+function stepMobs(a,dt){const h=hero;for(const m of a.mobs){if(m.hp<=0)continue;if(m.ai){m.ai(m,dt);continue;}const dh=Math.hypot(h.x-m.x,h.z-m.z),post=m.aggro&&dh>m.aggro&&a.home;
     const gx=post?a.home[0]+Math.cos(m.id*2.4)*1.1:h.x,gz=post?a.home[1]+Math.sin(m.id*2.4)*1.1:h.z,dx=gx-m.x,dz=gz-m.z,d=Math.hypot(dx,dz);
     if(d>(post?.3:m.reach*.8)){const mv=Math.min(d,m.sp*dt);m.x+=dx/d*mv;m.z+=dz/d*mv;m.a=Math.atan2(dz,dx);}
     for(const o of a.mobs){if(o===m||o.hp<=0)continue;const ex=m.x-o.x,ez=m.z-o.z,e=Math.hypot(ex,ez);if(e<.8&&e>.001){m.x+=ex/e*(.8-e)*.5;m.z+=ez/e*(.8-e)*.5;}}
@@ -1003,14 +1033,59 @@ function updMini(a,dt){const h=hero,D=a.D,k=a.kind,rv=rivals(a),got=(x,z,col)=>{
   a.score=k==='storm'?Math.min(a.T-1,a.age):a.pts;
   if(a.age>4&&rv.length&&rv.every(o=>o.st===2))leaveArena('win');} // als laatste overeind
 function updArena(dt){const a=arena;a.age+=dt;if(a.mode!=='chairs')a.t-=dt; // de stoelendans heeft geen klok in beeld
-  if(a.mode==='boss')updBoss(a,dt);else if(a.mode==='run')updRun(a,dt);else if(a.mode==='chairs')updChairs(a,dt);else updMini(a,dt);
-  if(arena!==a)return;if(hero.hp<=0&&!revive())leaveArena('dead');else if(a.t<=0)leaveArena(a.mode==='mini'?rankEnd(a):'draw');}
+  if(a.mode==='boss')updBoss(a,dt);else if(a.mode==='run')updRun(a,dt);else if(a.mode==='chairs')updChairs(a,dt);else if(a.mode==='lab')updLab(a,dt);else updMini(a,dt);
+  if(arena!==a)return;if(hero.hp<=0&&!revive())leaveArena('dead');else if(a.t<=0)leaveArena(a.mode==='mini'?rankEnd(a):a.mode==='lab'?labRank(a):'draw');}
+/* --- minigames uitproberen (lab) --- */
+// De minigames in minigames.js zitten nog niet in het potje: ze staan niet in MINI en zijn alleen via de knop Minigames in de lobby te spelen.
+// Elke minigame is een beschrijving met init(a) en upd(a,dt). Hij vult a.pts (de score) en tekent via a.marks, a.orbs, a.rects, a.glows en a.mobs.
+// Zo werkt hij later ook in een potje: de score gaat dan via `ms` naar de anderen en rankEnd kiest de winnaar.
+function labClear(a){if(a.g&&a.g.obj)scene.remove(a.g.obj);if(a.tw&&Array.isArray(a.tw))for(const t of a.tw)if(t&&t.obj)scene.remove(t.obj);if(a.objs)for(const o of a.objs)scene.remove(o);}
+function labInit(a){const K=a.K;a.D=Math.max(1,Math.min(2,1+(a.r-30)/60));a.rnd=lcg(1+(Math.abs(Math.floor(matchId))+7919*(a.r+1)+104729*K.nr)%2147483000);
+  Object.assign(a,{pts:0,mid:0,mobs:[],zones:[],marks:[],orbs:[],rects:[],glows:[],slow:1,fin:false,fail:false,hit:false});hero.vx=hero.vz=0;K.init(a);a.hp0=hero.hp;}
+function updLab(a,dt){const h=hero;a.marks.length=a.orbs.length=a.rects.length=a.glows.length=0;a.slow=1;shieldT=Math.max(0,shieldT-dt);shieldCd=Math.max(0,shieldCd-dt);
+  a.hit=h.hp<a.hp0-.001; // geraakt sinds het vorige beeld
+  a.K.upd(a,dt);if(arena!==a)return;stepMobs(a,dt);stepZones(a,dt);
+  if(a.K.regen&&h.hp>0)h.hp=Math.min(maxHp(),h.hp+maxHp()*a.K.regen*dt);
+  a.hp0=h.hp;a.score=a.pts;rivals(a);if(a.fin&&h.hp>0)leaveArena(labRank(a));}
+const labRank=a=>a.fail?'lose':rankEnd(a);
+const LABAPI={ACX,ACZ,AR,TAU,lcg,get hero(){return hero;},get HM(){return HM;},maxHp,hurt,walkable,addMob,mobHit,
+  toast:(m,ms)=>toast(m,ms),speed:()=>HEROES[save.hero].spd*HM.hSpd*(armour>=4?1.2:1),
+  ring:(x,z,col,r,life)=>{if(gl3)fxRing(V(x,0,z),col,r,life||.4);},
+  ball:(x,y,z,col,r0,r1,life,op)=>{if(gl3)fxBall(V(x,y,z),col,r0,r1,life||.3,op==null?.8:op);},
+  beam:(x1,y1,z1,x2,y2,z2,col,w,life)=>{if(gl3)fxBeam(V(x1,y1,z1),V(x2,y2,z2),col,w,life||.15);},
+  push:(dx,dz)=>{for(let i=0;i<8;i++)stepHero(dx/8,dz/8,false);hero.tx=null;hero.vx=hero.vz=0;},
+  // de held neerzetten; met een kijkrichting erbij komt de camera er recht achter
+  place:(x,z,a)=>{hero.x=x;hero.z=z;hero.tx=null;hero.vx=hero.vz=0;if(a!=null){hero.a=a;hcam.yaw=-Math.PI/2-a;}},
+  tower:(type,x,z,sc)=>{if(!gl3||!arena)return null;const o=makeTower(type,SLOTS,0,null);o.scale.setScalar(sc||1.3);o.position.set(x,0,z);scene.add(o);(arena.objs||(arena.objs=[])).push(o);return o;},
+  drop:o=>{if(o&&gl3)scene.remove(o);},
+  shield:{get on(){return shieldT>0;},slot:()=>shieldSlot()}};
+const LAB=typeof window.RATD_LAB==='function'?window.RATD_LAB(LABAPI):[];
+LAB.forEach((d,i)=>{d.nr=i+1;d.m='lab';KIND[d.id]=d;});
+const TIERS=['','Redelijk makkelijk','Gemiddeld','Uitdagend','Heel uitdagend'];
+function startLab(kind){if(!KIND[kind]||(G&&!lab))return;closePops();$('#labEnd').hidden=true;
+  if(!G){lab={kind,over:false};beginGame(0,Date.now());myState='test';if(room)room.presence({st:'test',rd:false}).catch(()=>{});E.lock(G);G.phase='wait';
+    $('#game').classList.add('lab');setText($('#quitBtn'),'Stoppen');}
+  if(arena){labClear(arena);arena=null;}lab.kind=kind;lab.over=false;armour=0;enterArena(kind,0);}
+function labEnd(a,res){const K=a.K,sc=Math.floor(a.score||0),won=res==='win';lab.over=true;lab.res=res;lab.score=sc;hero.tx=null;
+  setText($('#lTitle'),won?'Gehaald':res==='dead'?'Uitgeschakeld':'Niet gehaald');
+  setText($('#lName'),(K.nr?K.nr+'. ':'')+K.n);
+  setText($('#lText'),K.m==='lab'?(won?'Je hebt het doel gehaald. ':res==='dead'?'Je held is gesneuveld. ':'Het doel is niet gehaald. ')+K.win:won?'Gewonnen.':res==='dead'?'Je held is gesneuveld.':'Niet gewonnen.');
+  setText($('#lScore'),String(sc));setText($('#lTime'),Math.round(a.age)+' s');$('#labEnd').hidden=false;try{$('#lAgain').focus({preventScroll:true});}catch{}}
+function buildLabList(){const ul=$('#miniList');if(ul.children.length)return;
+  const head=t=>{const li=document.createElement('li');li.className='mh';li.textContent=t;ul.append(li);};
+  const item=(K,id,nr,chip)=>{const li=document.createElement('li'),n=document.createElement('span'),tx=document.createElement('span'),b=document.createElement('b'),d=document.createElement('span'),go=document.createElement('button');
+    n.className='rk num';n.textContent=nr;tx.className='tx';b.textContent=K.n;d.className='sub';d.textContent=chip;tx.append(b,d);go.type='button';go.textContent='Speel';go.dataset.k=id;go.setAttribute('aria-label',K.n+' spelen');li.append(n,tx,go);ul.append(li);};
+  for(let t=1;t<TIERS.length;t++){const ds=LAB.filter(d=>d.tier===t);if(!ds.length)continue;head(TIERS[t]);for(const d of ds)item(d,d.id,String(d.nr),d.d+' '+d.win);}
+  head('Zit al in het spel');for(const[lv,id]of Object.entries(MINI)){if(id==='chairs'&&+lv!==30)continue;const K=KIND[id];item(K,id,'L'+(id==='chairs'?'30/50':lv),K.go);}
+  ul.addEventListener('click',ev=>{const b=ev.target.closest('button[data-k]');if(b)startLab(b.dataset.k);});}
+
 // De regel onder de titel in het opdrachtvenster.
 function arenaSub(a,sec){const best=()=>{let b=-1;for(const o of rivals(a))if(o.st!==2&&o.sc>b)b=o.sc;return b;};
   if(a.mode==='boss'){const u=a.ult;if(u)return u.kind==='safe'?`Ultra-aanval over ${Math.max(1,Math.ceil(u.t))} s · ren naar groen`:u.kind==='rings'?'Schokgolven · ga in de groene opening staan':'Doodsstralen · loop mee tussen de stralen';
     let s=`Nog ${sec} seconden · ${a.B.N.slice(3)} ${Math.ceil(a.g.hp/a.max*100)}%`;if(a.kind==='duel'){const b=best();s+=` · jouw schade ${fmt(myBh)}`+(b>=0?` · beste ander ${fmt(b)}`:'');}return s;}
   if(a.mode==='run')return`Nog ${sec} seconden · ${a.tw.filter(t=>t.hp>0).length} torens over`;
   if(a.mode==='chairs')return chairsSub(a);
+  if(a.mode==='lab'){const b=best();return a.K.sub(a,sec)+(b>=0?` · beste ander ${b}`:'');}
   if(a.mode==='mini'){const b=best();return`Nog ${sec} s · jij ${Math.floor(a.score)}`+(b>=0?` · beste ander ${b}`:a.rivals?'':` · doel ${a.K.goal}`)+(a.carry?' · breng de kern naar het midden':'');}
   return`Nog ${sec} seconden · ${a.kills} verslagen`;}
 function hud(){if(!G)return;setText($('#hGold'),fmt(G.gold));setText($('#hLives'),String(G.lives));setText($('#hRound'),G.round+'/'+ROUNDS);setText($('#hScore'),fmt(G.score));setText($('#hRoundBig'),String(G.round));
@@ -1031,8 +1106,9 @@ function hud(){if(!G)return;setText($('#hGold'),fmt(G.gold));setText($('#hLives'
   $('#heroHp').style.width=Math.max(0,Math.min(100,hero.hp/maxHp()*100))+'%';}
 /* commandokaart: 12 vakken, inhoud hangt af van wat geselecteerd is */
 let cur=[],tipIdx=-1;
+const shieldSlot=()=>({ic:'shield',key:'F',n:'Schild',d:`Houdt ${String(2.5+HM.shDur).replace('.',',')} seconden alle kogels tegen. Daarna laadt het ${9-HM.shCd} seconden op.`,on:shieldT>0,wait:Math.ceil(shieldCd),act:useShield});
 function cardSlots(){const a=[];if(!G)return a;
-  if(arena){if(arena.mode==='run')a[0]={ic:'shield',key:'F',n:'Schild',d:`Houdt ${String(2.5+HM.shDur).replace('.',',')} seconden alle kogels tegen. Daarna laadt het ${9-HM.shCd} seconden op.`,on:shieldT>0,wait:Math.ceil(shieldCd),act:useShield};return a;}
+  if(arena){if(arena.mode==='run')a[0]=shieldSlot();else if(arena.K.card)return arena.K.card(arena)||a;return a;}
   if(sel){const t=sel,g=t.type==='geers'||t.type==='omega',n=G.tw.filter(o=>o.spec==='turbo').length;
     if(!g&&t.lvl<5)a[0]={ic:'up',key:'U',n:'Upgrade naar niveau '+(t.lvl+1),cost:E.upCost(G,t),d:'40% meer schade, en iets meer bereik en vuursnelheid.',act:()=>{if(!E.upgrade(G,t))toast('Te weinig credits');}};
     if(!g&&t.lvl>=5&&!t.spec){a[0]={ic:'link',key:'L',n:'Link',cost:E.specCost(G,t,'link'),d:`+25% schade per naburige volledig geüpgradede turret. Nu ${Math.min(4,t.nb)} in de buurt.`,act:()=>{if(!E.spec(G,t,'link'))toast('Te weinig credits');}};
@@ -1047,7 +1123,7 @@ function refresh(){if(!G)return;if(sel&&!G.tw.includes(sel))sel=null;cur=cardSlo
   for(let i=0;i<12;i++){const b=card.children[i],s=cur[i];b.classList.toggle('empty',!s);if(!s){b.tabIndex=-1;continue;}b.tabIndex=0;
     if(b.dataset.ic!==s.ic){b.dataset.ic=s.ic;iconDraw(b.firstChild,s.ic);}
     setText(b.children[1],s.key);setText(b.children[2],s.wait?s.wait+' s':s.free?'gratis':s.cost!=null?String(s.cost):s.gain!=null?'+'+s.gain:'');
-    b.classList.toggle('on',!!s.on);b.classList.toggle('poor',(s.cost!=null&&G.gold<s.cost)||(!!s.wait&&!s.on));b.setAttribute('aria-label',s.n+(s.cost!=null?', '+s.cost+' credits':''));}
+    b.classList.toggle('on',!!s.on);b.classList.toggle('poor',(s.poor!=null?s.poor:s.cost!=null&&G.gold<s.cost)||(!!s.wait&&!s.on));b.setAttribute('aria-label',s.n+(s.cost!=null?', '+s.cost+' credits':''));}
   const tip=$('#tip'),ts=cur[tipIdx];tip.hidden=!ts;
   if(ts){setText($('#tipN'),ts.n+' ('+ts.key+')');const c=$('#tipC'),txt=ts.free?'gratis':ts.cost!=null?String(ts.cost):ts.gain!=null?'+'+ts.gain:'';c.hidden=!txt;if(c.dataset.v!==txt){c.dataset.v=txt;c.textContent='';const i=document.createElement('i');i.className='coin';c.append(i,document.createTextNode(txt));}setText($('#tipD'),ts.d);}
   // portret + infopaneel
@@ -1071,6 +1147,7 @@ let last=0,acc=0,slow=0;
 function frame(ts){requestAnimationFrame(frame);const dt=Math.min(.1,(ts-last)/1000||0);last=ts;logic(dt);
   if(G){const fs=render3D(ts/1000,dt)||fieldsNow();hud();slow+=dt;if(slow>.25){slow=0;refresh();pushPresence();updWorldUi(fs);}}}
 function logic(dt){if(window.__ratdPause)return;
+  if(G&&lab){if(!lab.over){if(arena)updArena(dt);G.ev.length=0;G.fx.length=0;updHero(dt);}return;}
   if(G&&!ended){sync();if(arena)updArena(dt);else if(G.phase!=='prep'){acc+=dt*speed;let n=0;while(acc>=STEP&&n<14){E.step(G,STEP);acc-=STEP;n++;}if(n>=14)acc=0;}
     events();updHero(dt);pushHero();if(G.phase==='over'||G.phase==='won')endGame();}}
 // Een tabblad op de achtergrond krijgt geen frames meer. Het spel loopt dan hier door, anders wacht iedereen op jou.
@@ -1104,7 +1181,7 @@ function bindCanvas(){const el=renderer.domElement,jv=$('#joy');
   el.addEventListener('wheel',ev=>{ev.preventDefault();const k=Math.exp(ev.deltaY*.0012);if(camMode==='hero')hcam.d*=k;else cam.d*=k;},{passive:false});
   el.addEventListener('contextmenu',ev=>ev.preventDefault());}
 // rechtermuisknop zoals in een RTS: bouwmodus annuleren, anders de builder ergens heen sturen
-function moveTo(w){hero.tx=w.x;hero.tz=w.z;camMode='hero';if(gl3)fxRing(V(w.x,0,w.z),'#35cf4a',.5,.4);}
+function moveTo(w){if(arena&&arena.flip)w={x:2*hero.x-w.x,z:2*hero.z-w.z};hero.tx=w.x;hero.tz=w.z;camMode='hero';if(gl3)fxRing(V(w.x,0,w.z),'#35cf4a',.5,.4);}
 function rclick(ev){if(!G||ended)return;if(buildSel||roadMode){buildSel=null;roadMode=false;refresh();return;}const w=pick(ev);if(w)moveTo(w);}
 function click(ev){if(!G||ended)return;const w=pick(ev);if(!w)return;if(arena){moveTo(w);return;}const p=pickOwn(ev);
   if(!p||p.cell<0){if(buildSel||roadMode)toast('Je kunt alleen binnen je eigen vesting bouwen');else moveTo(w);return;}
@@ -1128,7 +1205,7 @@ const cc=()=>camMode==='hero'?hcam:cam;$('#cRotL').onclick=()=>cc().yaw+=Math.PI
 $('#hero').onclick=()=>{sel=null;buildSel=null;camHome();refresh();};
 $('#waveBtn').onclick=waveAct;
 $('#speed').onclick=ev=>{const b=ev.target.closest('button');if(!b||!G||ended)return;if(lead()){toast('Alleen speler 1 kiest de snelheid');return;}speed=+b.dataset.s;paintSpeed();pushPresence(true);};
-let quitArm=0;$('#quitBtn').onclick=()=>{const b=$('#quitBtn');if(!G||ended)return;if(Date.now()-quitArm<3000){quitArm=0;b.textContent='Opgeven';G.phase='over';}
+let quitArm=0;$('#quitBtn').onclick=()=>{const b=$('#quitBtn');if(lab){toLobby();openMini();return;}if(!G||ended)return;if(Date.now()-quitArm<3000){quitArm=0;b.textContent='Opgeven';G.phase='over';}
   else{quitArm=Date.now();b.textContent='Zeker weten?';setTimeout(()=>{if(quitArm){quitArm=0;b.textContent='Opgeven';}},3000);}};
 $('#rBack').onclick=toLobby;
 function buildHud(){const card=$('#card');for(let i=0;i<12;i++){const b=document.createElement('button');b.id='card-'+i;b.className='empty';
@@ -1179,7 +1256,7 @@ function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array
   setText($('#lobbyNote'),room.open?`${all.length} speler${all.length===1?'':'s'} online`:'verbinding verbroken, opnieuw verbinden…');
   [...lp,...all.filter(p=>!lp.includes(p))].forEach(p=>{const pr=p.presence||{};let chip,cl='';
     if(pr.st==='lobby'){if(p===host){chip='Eerste speler';cl='host';}else if(pr.rd){chip='Klaar';cl='ok';}else chip='Wacht';}
-    else if(pr.st==='playing'){chip='Ronde '+(+pr.r||1);cl='play';}else chip=pr.st==='done'?'Uitgespeeld':'Kijkt';
+    else if(pr.st==='playing'){chip='Ronde '+(+pr.r||1);cl='play';}else chip=pr.st==='done'?'Uitgespeeld':pr.st==='test'?'Test minigames':'Kijkt';
     list.push({name:nameOf(p),chip,cl,score:pr.s?fmt(+pr.s):'',h:heroOf(p),me:!!own(p)});});
   if(!all.length)list.push({name:'Jij',chip:'Verbinden',cl:'',score:'',h:save.hero,me:true});
   paintRoster(list);
@@ -1208,7 +1285,7 @@ function onPeers(ch){peers=ch.peers;const now=performance.now();syncPeers();for(
     if(mine&&peers.some(p=>!own(p)&&p.presence&&p.presence.st==='playing'&&p.presence.sl===mySlot&&p.peer<mine.peer)){const[ax,az]=slotO(mySlot);mySlot=freeSlot(0);const[bx2,bz2]=slotO(mySlot);if(!arena){hero.x+=bx2-ax;hero.z+=bz2-az;hero.tx=null;}orders=[];pushPresence(true);}}
   if($('#game').hidden)renderLobby();}
 let lastPush=0;
-function pushPresence(force){if(!room)return;const now=performance.now();if(!force&&now-lastPush<320)return;lastPush=now;
+function pushPresence(force){if(!room||lab)return;const now=performance.now();if(!force&&now-lastPush<320)return;lastPush=now;
   const p={st:myState,rd:ready};if(G){p.sl=mySlot;p.r=G.round;p.l=G.lives;p.s=G.score;p.sp=speed;p.tw=encT();p.mt=matchId;p.bd=built;p.ps=G.phase==='prep'?0:1;p.cl=G.cleared;p.nx=nx;p.sw=sentWave;p.pa=encP();p.wn=G.phase==='won'?1:0;
     if(myState==='playing')p.en=encE();else p.en='';Object.assign(p,heroPatch());}
   room.presence(p).catch(()=>{});}
@@ -1216,7 +1293,7 @@ const rd1=v=>Math.round(v*10)/10;
 function heroPatch(){return{h:save.hero,p:[rd1(hero.x),rd1(hero.z),rd1(hero.a)],hp:Math.max(0,Math.round(hero.hp)),mh:Math.round(maxHp()),ar:arena?arena.seq:0,ak:akCount,am:arena?arena.r:0,bm:myBm,bh:Math.round(myBh),ms:arena&&arena.ms?[arena.r,Math.floor(arena.score||0),0]:msLast,mg:arena&&arena.claim?arena.claim.slice(-16):null,...chairsPatch(),...bossPatch()};}
 function bossPatch(){const a=arena;if(!a||a.mode!=='boss'||missionLead(a))return{bp:null,ba:null};return{bp:[rd1(a.g.x),rd1(a.g.z),rd1(a.g.a)],ba:a.g.last};}
 let lastHero=0;
-function pushHero(force){if(!room||!G)return;const now=performance.now();if(!force&&now-lastHero<100)return;lastHero=now;room.presence(heroPatch()).catch(()=>{});}
+function pushHero(force){if(!room||!G||lab)return;const now=performance.now();if(!force&&now-lastHero<100)return;lastHero=now;room.presence(heroPatch()).catch(()=>{});}
 function syncPeers(){const mine=peers.find(p=>own(p));if(mine)myPeer=mine.peer;const seen=new Set();
   for(const p of peers){if(own(p)||p.kind!=='viewer')continue;const pr=p.presence||{};
     if(!Array.isArray(pr.p)||(pr.st!=='playing'&&pr.st!=='done'))continue;const x=+pr.p[0],z=+pr.p[1];if(!isFinite(x)||!isFinite(z))continue;seen.add(p.peer);
@@ -1293,6 +1370,8 @@ document.querySelectorAll('dialog.pop').forEach(d=>{
   const tabs=[...d.querySelectorAll('.tabs button')];
   tabs.forEach(b=>b.onclick=()=>{tabs.forEach(x=>x.setAttribute('aria-selected',String(x===b)));d.querySelectorAll('.tab').forEach(t=>t.hidden=t.id!==b.dataset.t);d.querySelector('.pop-body').scrollTop=0;});});
 $('#skillsBtn').onclick=()=>openPop('#popSkills','tSkills');$('#infoBtn').onclick=()=>openPop('#popInfo');$('#heroBtn').onclick=()=>openPop('#popSkills','tHero');
+const openMini=()=>{buildLabList();openPop('#popMini');};
+$('#miniBtn').onclick=openMini;$('#lAgain').onclick=()=>{if(lab)startLab(lab.kind);};$('#lOther').onclick=()=>{toLobby();openMini();};$('#lBack').onclick=toLobby;
 
 /* ---------- vonken achter de lobby ---------- */
 (function(){const cv=$('#embers');if(!cv||(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches))return;const g=cv.getContext('2d');let W=0,H=0,last=0;const ps=[];
@@ -1308,7 +1387,7 @@ $('#skillsBtn').onclick=()=>openPop('#popSkills','tSkills');$('#infoBtn').onclic
 loadLocal();loadAcct();bindAccount();buildHud();
 try{if(init3D()){bindCanvas();renderIcons();}}catch(err){gl3=false;console.error(err);}
 renderHome();renderLobby();renderChat();if(!acct)showGate('new');requestAnimationFrame(frame);
-if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>enterArena(m,r),MINI,KIND,setHero:i=>{save.hero=i;},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
+if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>enterArena(m,r),MINI,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
 // Sessie controleren: klopt het token nog, dan komt de voortgang van de server binnen.
 if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
 // Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.
