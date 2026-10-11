@@ -60,6 +60,18 @@ Voor de start kiest elke speler zelf een moeilijkheidsgraad; die geldt alleen vo
 | Alleen voor Geers | 85% meer levens, 12% sneller | +50% | ×1,75 |
 
 De waarden staan in `DIFF` bovenin `client/js/engine.js`.
+## Torens: de keten
+
+Elke toren doorloopt dezelfde keten, en die leidt naar De Slapende Geers.
+
+1. **5 upgrades.** Elke gewone toren kun je 5 keer upgraden.
+2. **Ultra.** Daarna wordt hij een ultra versie van zichzelf: meer schade, 15% sneller, 10% meer bereik.
+3. **Turbo.** Een ultra toren kan turbo worden zodra er nog een andere ultra toren staat (een toren die al turbo is telt ook). Turbo komt boven op ultra: 80% sneller en 30% meer schade.
+4. **Geers Toren.** Staat er van elk van de tien torensoorten een turbo, dan kun je Geers Torens bouwen (toets G, na de bouwfase). Een Geers Toren kun je 13 keer upgraden.
+5. **De Slapende Geers.** Bij 4 Geers Torens komt hij vrij (toets Z): een toren van 3 bij 3 vakken die alles binnen zijn bereik vertraagt en zware schade doet. Er kan er één staan.
+
+De voorwaarden worden gecontroleerd op het moment dat je bouwt of upgradet. Prijzen, schade en de bonussen van ultra en turbo staan in `T`, `stats` en `specCost` in `client/js/engine.js`.
+
 ## Minigames uitproberen
 
 In de lobby staat de knop **Minigames**. Daar kies je een minigame en speel je hem los, alleen, met je gekozen held en je skills. Het telt nergens voor mee: geen skillpunten, geen score, geen potje erbij. Andere spelers zien je in de lobby als "Test minigames".
