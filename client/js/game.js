@@ -14,7 +14,7 @@ let matchId=0,built=false,prepEnd=0,t0=0,nx=0,sentWave=0,arenaFor=0,roadMode=fal
 // own: dit tabblad. isMe geldt ook voor je andere tabbladen, en die tellen als aparte spelers.
 const own=p=>!!p&&(p.sameTab===undefined?!!p.isMe:!!p.sameTab);
 // missies: schild voor het parcours, en mijn schade aan de baas (blijft meetellen nadat ik ben uitgeschakeld)
-let shieldT=0,shieldCd=0,myBm=0,myBh=0,msLast=null,finalMax=0,finalAt=0;
+let sprintT=0,sprintCd=0,pushCd=0,pushOut=null,shieldT=0,shieldCd=0,myBm=0,myBh=0,msLast=null,finalMax=0,finalAt=0;
 // Parcours: een strook naast de arena met dwarsmuren. Elke muur heeft een opening, om en om onder (1) en boven (0).
 const RUN={x:60,z:ROWS*FW+6,L:38,W:10,gap:3,walls:[[5,1],[9,0],[13,1],[17,0],[21,1],[25,0],[29,1],[33,0]]};
 const runGap=sd=>sd?[RUN.W-RUN.gap,RUN.W]:[0,RUN.gap];
@@ -635,6 +635,8 @@ function iconDraw(cv,ic){const g=cv.getContext('2d'),W=cv.width,H=cv.height;g.cl
     else if(ic==='shield'){g.beginPath();g.moveTo(0,-22);g.lineTo(18,-14);g.lineTo(16,6);g.quadraticCurveTo(10,18,0,23);g.quadraticCurveTo(-10,18,-16,6);g.lineTo(-18,-14);g.closePath();g.fillStyle='#1f6f94';g.fill();g.strokeStyle='#9fe8ff';g.lineWidth=3;g.stroke();g.beginPath();g.moveTo(0,-13);g.lineTo(0,14);g.moveTo(-10,-3);g.lineTo(10,-3);g.lineWidth=2;g.stroke();}
     else if(ic==='road'){g.beginPath();g.moveTo(-27,13);g.bezierCurveTo(-4,13,-8,-12,10,-12);g.lineTo(27,-12);g.strokeStyle='#15100c';g.lineWidth=18;g.stroke();g.strokeStyle='#8a5a44';g.lineWidth=13;g.stroke();g.strokeStyle='#f6cf4d';g.lineWidth=2;g.setLineDash([5,5]);g.stroke();g.setLineDash([]);}
     else if(ic==='ultra'){g.fillStyle='#b56bff';g.strokeStyle='#f1e2ff';g.lineWidth=1.5;g.beginPath();for(let i=0;i<10;i++){const an=-Math.PI/2+i*Math.PI/5,r=i%2?9:22;g.lineTo(Math.cos(an)*r,Math.sin(an)*r);}g.closePath();g.fill();g.stroke();}
+    else if(ic==='push'){g.strokeStyle='#ffe9a8';g.lineWidth=5;g.beginPath();g.arc(-14,0,7,0,7);g.stroke();for(const y of[-12,0,12]){g.beginPath();g.moveTo(0,y*.6);g.lineTo(18,y);g.moveTo(11,y-5+y*.1);g.lineTo(19,y);g.lineTo(11,y+5+y*.1);g.stroke();}}
+    else if(ic==='sprint'){g.strokeStyle='#ffd23a';g.lineWidth=6;for(const x of[-14,-1,12]){g.beginPath();g.moveTo(x-6,-14);g.lineTo(x+7,0);g.lineTo(x-6,14);g.stroke();}}
     else if(ic==='link'){g.strokeStyle='#59c8f2';g.lineWidth=6;g.beginPath();g.ellipse(-8,0,12,9,0,0,7);g.stroke();g.beginPath();g.ellipse(8,0,12,9,0,0,7);g.stroke();}
     else if(ic==='turbo'){g.fillStyle='#ff8a2a';g.beginPath();g.moveTo(6,-22);g.lineTo(-14,4);g.lineTo(-2,4);g.lineTo(-7,22);g.lineTo(14,-5);g.lineTo(2,-5);g.closePath();g.fill();g.strokeStyle='#fff0b0';g.lineWidth=1.5;g.stroke();}
     else if(ic==='sell'){for(const y of[10,3,-4]){g.fillStyle='#8a5a08';g.beginPath();g.ellipse(0,y+3,17,7,0,0,7);g.fill();g.fillStyle='#e6a91e';g.beginPath();g.ellipse(0,y,17,7,0,0,7);g.fill();}g.fillStyle='#fff3b0';g.beginPath();g.ellipse(-3,-6,7,2.5,0,0,7);g.fill();}
@@ -695,7 +697,7 @@ function endGame(){ended=true;const won=G.phase==='won';
   setText($('#rDiff'),G.D.n+(G.D.score>1?' · score '+mulText(G.D.score):''));
   setText($('#rRound'),G.cleared+'/'+ROUNDS);setText($('#rScore'),fmt(G.score));setText($('#rXp'),'+'+gamePts);$('#result').hidden=false;}
 function toLobby(){if(arena)labClear(arena);arena=null;if(lab){lab=null;$('#labEnd').hidden=true;$('#game').classList.remove('lab');setText($('#quitBtn'),'Opgeven');}G=null;clearBots();myState='lobby';ready=false;$('#result').hidden=true;$('#game').hidden=true;$('#home').hidden=false;
-  if(room)room.presence({st:'lobby',rd:false,df:save.diff,tw:null,en:null,b:null,go:null,sl:null,p:null,ar:null,dm:null,mt:null,bd:null,ps:null,cl:null,nx:null,sw:null,pa:null,am:null,bm:null,bh:null,bp:null,ba:null,ms:null,mg:null,sd:null,sc:null,dn:null,kb:null,wn:null,bs:null}).catch(()=>{});renderHome();renderLobby();}
+  if(room)room.presence({st:'lobby',rd:false,df:save.diff,tw:null,en:null,b:null,go:null,sl:null,p:null,ar:null,pu:null,dm:null,mt:null,bd:null,ps:null,cl:null,nx:null,sw:null,pa:null,am:null,bm:null,bh:null,bp:null,ba:null,ms:null,mg:null,sd:null,sc:null,dn:null,kb:null,wn:null,bs:null}).catch(()=>{});renderHome();renderLobby();}
 function events(){const[ox,oz]=slotO(mySlot);for(const e of G.ev){
     if(e.k==='clear'){award(E.pointsFor(e.r));toast(`Ronde ${e.r} afgeslagen · +${fmt(e.bonus)} credits`);}
     else if(e.k==='wave'&&e.r%10===0)toast('Een luchtschip nadert de vesting');
@@ -740,7 +742,8 @@ function towerAt(x,z){if(!G)return false;const[ox,oz]=slotO(mySlot),lx=x-ox,lz=z
   const t=G.map[cz*N+cx];return!!t&&Math.hypot(lx-t.x,lz-t.y)<(t.size>1?t.size*.47:.5);}
 function stepHero(dx,dz,manual){const h=hero,ok=(x,z)=>walkable(x,z)&&!(manual&&towerAt(x,z)&&!towerAt(h.x,h.z));
   if(ok(h.x+dx,h.z+dz)){h.x+=dx;h.z+=dz;return true;}if(ok(h.x+dx,h.z)){h.x+=dx;return true;}if(ok(h.x,h.z+dz)){h.z+=dz;return true;}return false;}
-function updHero(dt){const h=hero,H=HEROES[save.hero],v1=H.spd*HM.hSpd*(armour>=4?1.2:1)*(arena&&arena.slow||1),sp=v1*dt,yaw=camMode==='hero'?hcam.yaw:cam.yaw,f=[-Math.sin(yaw),-Math.cos(yaw)],r=[Math.cos(yaw),-Math.sin(yaw)];
+function updHero(dt){sprintT=Math.max(0,sprintT-dt);sprintCd=Math.max(0,sprintCd-dt);pushCd=Math.max(0,pushCd-dt);
+  const h=hero,H=HEROES[save.hero],v1=H.spd*HM.hSpd*(armour>=4?1.2:1)*(arena&&arena.slow||1)*(arena&&sprintT>0?1+E.MOVES.sprSpd+HM.sprSpd:1),sp=v1*dt,yaw=camMode==='hero'?hcam.yaw:cam.yaw,f=[-Math.sin(yaw),-Math.cos(yaw)],r=[Math.cos(yaw),-Math.sin(yaw)];
   let fw=joy.y,rt=joy.x;if(keys.w||(camMode==='hero'&&keys.arrowup))fw+=1;if(keys.s||(camMode==='hero'&&keys.arrowdown))fw-=1;if(keys.d)rt+=1;if(keys.a)rt-=1;
   if(arena&&arena.flip){fw=-fw;rt=-rt;} // spiegelwereld: de besturing staat omgekeerd
   const kx=f[0]*fw+r[0]*rt,kz=f[1]*fw+r[1]*rt,kl=Math.hypot(kx,kz);h.moving=false;
@@ -807,7 +810,7 @@ const BOSS={
  duel:{N:'De Kolos',hp:3400,sc:2.9,by:3.7,bw:3.2,big:1.4,th:[.7,.4],mv:['safe'],z0:44,z1:34,xk:2,ct:18,cr:1.6,stop:2.5,sp:2.9,cd:2.2,cd2:7},
  titan:{N:'De Titaan',hp:7000,sc:4.6,by:5.7,bw:5,big:2.3,th:[.9,.8,.7,.6,.5,.4,.3,.2,.1],mv:['safe','rings','beams'],z0:48,z1:38,xk:4,ct:22,cr:2.6,stop:3.3,sp:2.7,cd:2,cd2:6}};
 const TAU=6.2832;
-function enterArena(kind,r){if(arena||!G||ended||!KIND[kind])return;const K=KIND[kind],mode=K.m;arSeq++;const an=Math.random()*6.28;hero.tx=null;orders=[];buildSel=null;sel=null;roadMode=false;hero.hp=maxHp();shieldT=0;shieldCd=0;msLast=null;
+function enterArena(kind,r){if(arena||!G||ended||!KIND[kind])return;const K=KIND[kind],mode=K.m;arSeq++;const an=Math.random()*6.28;hero.tx=null;orders=[];buildSel=null;sel=null;roadMode=false;hero.hp=maxHp();shieldT=0;shieldCd=0;sprintT=0;sprintCd=0;pushCd=0;msLast=null;
   if(mode==='run'){hero.x=RUN.x+1.5;hero.z=RUN.z+2+Math.random()*(RUN.W-4);hero.a=0;hcam.yaw=-Math.PI/2;}
   else{const d=kind==='titan'?7.2:6.2;hero.x=ACX+Math.cos(an)*d;hero.z=ACZ+Math.sin(an)*d;hero.a=an+Math.PI;hcam.yaw=Math.PI/2-an;} // camera achter de held, met het midden van de arena in beeld
   arena={mode,kind,K,r:r||0,t:K.T,T:K.T,age:0,seq:arSeq,kills:0,g:null,score:0,rivals:false,ms:mode==='mini'||mode==='lab'||mode==='chairs'||kind==='duel'}; // ms: de score telt mee tegen die van de anderen
@@ -817,7 +820,7 @@ function enterArena(kind,r){if(arena||!G||ended||!KIND[kind])return;const K=KIND
 // Beloning: een stuk harnas, of credits als het harnas al compleet is.
 function reward(a,txt){if(armour<4){armour++;applyArmour(armour);hero.hp=maxHp();toast(txt+`${ARMOUR[armour-1].n}. ${ARMOUR[armour-1].d}`,5000);}
   else{const c=300+10*a.r;G.gold+=c;toast(txt+`+${c} credits`,4000);}}
-function leaveArena(res){const a=arena,K=a.K;arena=null;if(!lab)botsDone(a,res);if(a.g&&a.g.obj)scene.remove(a.g.obj);if(a.tw)for(const t of a.tw)if(t.obj)scene.remove(t.obj);if(a.objs)for(const o of a.objs)scene.remove(o);shieldT=0;
+function leaveArena(res){const a=arena,K=a.K;arena=null;if(!lab)botsDone(a,res);if(a.g&&a.g.obj)scene.remove(a.g.obj);if(a.tw)for(const t of a.tw)if(t.obj)scene.remove(t.obj);if(a.objs)for(const o of a.objs)scene.remove(o);shieldT=0;sprintT=0;
   if(lab){labEnd(a,res);return;}
   if(a.ms)msLast=[a.r,Math.floor(a.score||0),res==='dead'||res==='out'?2:1];
   const[ox,oz]=slotO(mySlot);hero.x=ox+6.5;hero.z=oz+5.5;hero.tx=null;hero.hp=maxHp();hcam.yaw=0;if(res==='win'&&HM.mission)G.gold+=HM.mission;if(res==='win'&&a.mode==='boss')award(1);
@@ -914,6 +917,26 @@ function runInit(a){const hp=110;a.shots=[];a.shotDmg=15;a.shotCd=.9;
   a.tw=[[7,1.6],[11,8.4],[15,1.6],[15,8.6],[19,8.4],[19,1.4],[23,1.6],[27,8.4],[27,1.4],[31,1.6],[31,8.6],[35,8.4]].map(([x,z],i)=>{const t={x,z,hp,max:hp,cd:.6+i*.17,ang:Math.PI,obj:null};
     if(gl3){t.obj=makeTower('sentry',SLOTS,0,null);t.obj.scale.setScalar(1.35);t.obj.position.set(RUN.x+x,0,RUN.z+z);scene.add(t.obj);}return t;});}
 function runHit(t,d){if(t.hp<=0)return;t.hp-=d;if(t.hp<=0){arena.kills++;if(t.obj)scene.remove(t.obj);if(gl3)fxBall(V(RUN.x+t.x,.6,RUN.z+t.z),'#ff8a2c',.2,1.4,.5,.85);}}
+/* --- duwen en sprinten: in elke minigame --- */
+const sprintLen=()=>E.MOVES.sprDur+HM.sprDur,sprintWait=()=>E.MOVES.sprCd-HM.sprCd,pushWait=()=>E.MOVES.pushCd-HM.pushCd,pushLen=()=>E.MOVES.pushDist*HM.pushDist;
+function useSprint(){if(!arena||sprintCd>0||hero.hp<=0)return;sprintT=sprintLen();sprintCd=sprintWait();if(gl3){fxRing(V(hero.x,0,hero.z),'#ffd23a',1.3,.35);fxBall(V(hero.x,.6,hero.z),'#fff0b0',.1,.9,.3,.6);}}
+// Verplaatst een punt in kleine stapjes, zodat niemand door een muur of de arenarand heen geduwd wordt.
+function shove(o,dx,dz){for(let i=0;i<8;i++){const x=o.x+dx/8,z=o.z+dz/8;if(walkable(x,z)){o.x=x;o.z=z;}else if(walkable(x,o.z))o.x=x;else if(walkable(o.x,z))o.z=z;else break;}}
+// Duwt iedere andere speler binnen bereik een klein stukje van je af. Bots verplaats je zelf; een mens krijgt de duw via presence (pu).
+function usePush(){const a=arena,h=hero;if(!a||pushCd>0||h.hp<=0)return;const R=E.MOVES.pushRange,D=pushLen(),out=[];let n=0;
+  const dir=(x,z)=>{const dx=x-h.x,dz=z-h.z,d=Math.hypot(dx,dz);return d>R?null:d<.05?[Math.cos(h.a)*D,Math.sin(h.a)*D]:[dx/d*D,dz/d*D];};
+  for(const b of bots){if(!b.ar||b.ar.r!==a.r||b.ar.kind!==a.kind||!(b.h.hp>0))continue;const v=dir(b.h.x,b.h.z);if(!v)continue;shove(b.h,v[0],v[1]);n++;if(gl3)fxBall(V(b.h.x,.8,b.h.z),'#ffe9a8',.1,.6,.25,.7);}
+  for(const r of rheroes.values()){if(!(r.ar>0)||!(r.hp>0))continue;const v=dir(r.x,r.z);if(!v)continue;out.push([r.peer,rd1(v[0]),rd1(v[1])]);n++;if(gl3)fxBall(V(r.x,.8,r.z),'#ffe9a8',.1,.6,.25,.7);}
+  if(!n){toast('Niemand dichtbij genoeg om te duwen',1500);return;}
+  pushCd=pushWait();h.atk=1;if(gl3)fxRing(V(h.x,0,h.z),'#ffe9a8',R,.3);
+  if(out.length){pushOut=[Math.floor(Date.now()/100)%1e8,a.r,out.slice(0,24)];pushHero(true);}}
+// Een duw van een andere speler: alleen als hij in dezelfde minigame staat en jij in zijn lijst staat.
+function gotPush(pu){const a=arena;if(!a||hero.hp<=0||pu[1]!==a.r||!Array.isArray(pu[2]))return;const m=pu[2].find(e=>Array.isArray(e)&&e[0]===myPeer);if(!m)return;
+  let dx=+m[1]||0,dz=+m[2]||0;const d=Math.hypot(dx,dz),mx=E.MOVES.pushDist*1.5;if(!d)return;if(d>mx){dx*=mx/d;dz*=mx/d;}
+  shove(hero,dx,dz);hero.tx=null;hero.vx=hero.vz=0;if(gl3)fxBall(V(hero.x,.8,hero.z),'#ffe9a8',.1,.7,.25,.7);toast('Je wordt opzij geduwd',1200);}
+const pushSlot=()=>({ic:'push',key:'C',n:'Duwen',d:`Duwt andere spelers binnen ${nl1(E.MOVES.pushRange)} meter een klein stukje van je af. Laadt ${nl1(pushWait())} seconden op.`,wait:Math.ceil(pushCd),act:usePush});
+const sprintSlot=()=>({ic:'sprint',key:'Shift',n:'Sprint',d:`${nl1(sprintLen())} seconden lang ${Math.round((E.MOVES.sprSpd+HM.sprSpd)*100)}% sneller. Laadt ${nl1(sprintWait())} seconden op.`,on:sprintT>0,wait:Math.ceil(sprintCd),act:useSprint});
+const nl1=v=>String(Math.round(v*10)/10).replace('.',',');
 function useShield(){if(!arena||(arena.mode!=='run'&&!arena.shield)||shieldCd>0)return;shieldT=2.5+HM.shDur;shieldCd=9-HM.shCd;if(gl3)fxRing(V(hero.x,0,hero.z),'#59c8f2',1.6,.3);}
 function updRun(a,dt){const h=hero,lx=h.x-RUN.x,lz=h.z-RUN.z;shieldT=Math.max(0,shieldT-dt);shieldCd=Math.max(0,shieldCd-dt);
   if(lx>=RUN.L-2){leaveArena('win');return;}
@@ -1126,7 +1149,7 @@ function hud(){if(!G)return;setText($('#hGold'),fmt(G.gold));setText($('#hLives'
 let cur=[],tipIdx=-1;
 const shieldSlot=()=>({ic:'shield',key:'F',n:'Schild',d:`Houdt ${String(2.5+HM.shDur).replace('.',',')} seconden alle kogels tegen. Daarna laadt het ${9-HM.shCd} seconden op.`,on:shieldT>0,wait:Math.ceil(shieldCd),act:useShield});
 function cardSlots(){const a=[];if(!G)return a;
-  if(arena){if(arena.mode==='run')a[0]=shieldSlot();else if(arena.K.card)return arena.K.card(arena)||a;return a;}
+  if(arena){let c=a;if(arena.mode==='run')a[0]=shieldSlot();else if(arena.K.card)c=arena.K.card(arena)||a;c[9]=pushSlot();c[10]=sprintSlot();return c;}
   if(sel){const t=sel;
     const mx=E.maxLvl(t),pay=fn=>()=>{if(!fn())toast('Te weinig credits');};
     if(t.lvl<mx)a[0]={ic:'up',key:'U',n:'Upgrade naar niveau '+(t.lvl+1),cost:E.upCost(G,t),d:t.type==='geers'?'22% meer schade, en iets meer bereik en vuursnelheid.':'40% meer schade, en iets meer bereik en vuursnelheid.',act:pay(()=>E.upgrade(G,t))};
@@ -1562,14 +1585,15 @@ function pushPresence(force){if(!room||lab)return;const now=performance.now();if
     if(myState==='playing')p.en=encE();else p.en='';Object.assign(p,heroPatch());}
   room.presence(p).catch(()=>{});}
 const rd1=v=>Math.round(v*10)/10;
-function heroPatch(){return{h:save.hero,df:G.diff,p:[rd1(hero.x),rd1(hero.z),rd1(hero.a)],hp:Math.max(0,Math.round(hero.hp)),mh:Math.round(maxHp()),ar:arena?arena.seq:0,ak:akCount,am:arena?arena.r:0,bm:myBm,bh:Math.round(myBh),ms:arena&&arena.ms?[arena.r,Math.floor(arena.score||0),0]:msLast,mg:arena&&arena.claim?arena.claim.slice(-16):null,...chairsPatch(),...bossPatch()};}
+function heroPatch(){return{h:save.hero,df:G.diff,p:[rd1(hero.x),rd1(hero.z),rd1(hero.a)],hp:Math.max(0,Math.round(hero.hp)),mh:Math.round(maxHp()),ar:arena?arena.seq:0,ak:akCount,am:arena?arena.r:0,bm:myBm,bh:Math.round(myBh),ms:arena&&arena.ms?[arena.r,Math.floor(arena.score||0),0]:msLast,mg:arena&&arena.claim?arena.claim.slice(-16):null,pu:arena?pushOut:null,...chairsPatch(),...bossPatch()};}
 function bossPatch(){const a=arena;if(!a||a.mode!=='boss'||missionLead(a))return{bp:null,ba:null};return{bp:[rd1(a.g.x),rd1(a.g.z),rd1(a.g.a)],ba:a.g.last};}
 let lastHero=0;
 function pushHero(force){if(!room||!G||lab)return;const now=performance.now();if(!force&&now-lastHero<100)return;lastHero=now;room.presence(heroPatch()).catch(()=>{});}
 function syncPeers(){const mine=peers.find(p=>own(p));if(mine)myPeer=mine.peer;const seen=new Set();
   for(const p of peers){if(own(p)||p.kind!=='viewer')continue;const pr=p.presence||{};
     if(!Array.isArray(pr.p)||(pr.st!=='playing'&&pr.st!=='done'))continue;const x=+pr.p[0],z=+pr.p[1];if(!isFinite(x)||!isFinite(z))continue;seen.add(p.peer);
-    let r=rheroes.get(p.peer);if(!r){r={x,z,a:0,walk:0,atk:0,ak:pr.ak|0,obj:null,lab:null,sig:'',peer:p.peer};rheroes.set(p.peer,r);}
+    let r=rheroes.get(p.peer);if(!r){r={x,z,a:0,walk:0,atk:0,ak:pr.ak|0,pu:Array.isArray(pr.pu)?pr.pu[0]:0,obj:null,lab:null,sig:'',peer:p.peer};rheroes.set(p.peer,r);}
+    if(Array.isArray(pr.pu)&&pr.pu[0]!==r.pu){r.pu=pr.pu[0];if(+pr.ar>0)gotPush(pr.pu);}
     if(Math.hypot(x-r.x,z-r.z)>10){r.x=x;r.z=z;}
     r.tx=x;r.tz=z;r.ta=+pr.p[2]||0;r.idx=Math.max(0,Math.min(5,pr.h|0));r.slot=Number.isInteger(pr.sl)&&pr.sl>=0&&pr.sl<SLOTS?pr.sl:SLOTS;r.hp=+pr.hp||0;r.mh=+pr.mh||100;r.ar=+pr.ar||0;r.name=nameOf(p);
     if((pr.ak|0)!==r.ak){r.ak=pr.ak|0;r.atk=1;r.shoot=true;}}

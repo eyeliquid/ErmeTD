@@ -110,8 +110,10 @@ const SKILLS=[
  {id:'hdmg',tree:'H',t:0,c:0,max:5,ic:'sword',n:'Wapentraining',d:'Je held doet +{v}% schade',v:4},
  {id:'hhp',tree:'H',t:0,c:1,max:5,ic:'heart',n:'Taai',d:'+{v}% levenspunten voor je held',v:5},
  {id:'hspd',tree:'H',t:0,c:2,max:5,ic:'boot',n:'Snelle voeten',d:'Je held loopt {v}% sneller',v:2},
+ {id:'pushr',tree:'H',t:0,c:3,max:3,ic:'dodge',n:'Brede schouders',d:'Duwen duwt andere spelers {v}% verder weg',v:15},
  {id:'hrate',tree:'H',t:1,c:0,max:5,ic:'clock',n:'Vuurdiscipline',d:'Je held valt {v}% sneller aan',v:3},
  {id:'harm',tree:'H',t:1,c:1,max:5,ic:'shield',n:'Dikke huid',d:'Je held krijgt {v}% minder schade',v:3},
+ {id:'sprint',tree:'H',t:1,c:2,max:3,ic:'boot',n:'Lange adem',d:'Sprint duurt {v} seconde langer',v:.5},
  {id:'hrange',tree:'H',t:1,c:3,max:3,ic:'cross',n:'Verrekijker',d:'+{v}% bereik voor je held',v:4},
  {id:'hap',tree:'H',t:2,c:0,max:3,ic:'bolt',n:'Pantserdoorn',d:'Aanvallen van je held negeren {v}% pantser',v:15},
  {id:'hregen',tree:'H',t:2,c:1,max:3,ic:'plus',n:'Tweede adem',d:'In missies en de arena herstelt je held {v}% levenspunten per seconde',v:.5},
@@ -122,12 +124,17 @@ const SKILLS=[
  {id:'shdur',tree:'H',t:3,c:2,max:3,ic:'shield',n:'Schildgenerator',d:'Je schild op het parcours houdt {v} seconde langer stand',v:.5},
  {id:'hpvp',tree:'H',t:3,c:3,max:5,ic:'sword',n:'Arenavechter',d:'+{v}% schade tegen monsters en torens in minigames',v:4},
  {id:'hcritd',tree:'H',t:4,c:0,max:3,ic:'star',n:'Dodelijke precisie',d:'Kritieke treffers doen nog eens {v}% extra schade',v:25,req:'hcrit'},
+ {id:'sprintcd',tree:'H',t:4,c:1,max:3,ic:'clock',n:'Snel op adem',d:'Sprint laadt {v} seconde sneller op',v:1},
  {id:'shcd',tree:'H',t:4,c:2,max:3,ic:'clock',n:'Snelle lader',d:'Je schild laadt {v} seconde sneller op',v:1,req:'shdur'},
  {id:'mission',tree:'H',t:4,c:3,max:3,ic:'up',n:'Missiepremie',d:'+{v} credits als je een missie of de arena wint',v:150},
  {id:'leech',tree:'H',t:5,c:0,max:3,ic:'drop',n:'Bloeddorst',d:'Zolang je held aanvalt herstelt hij {v}% levenspunten per seconde',v:1},
  {id:'second',tree:'H',t:5,c:1,max:1,ic:'heart',n:'Tweede kans',d:'Eén keer per missie staat je held na een dodelijke klap weer op met 30% levenspunten. Werkt niet tegen de ultra-aanval van de Kolos.',v:0},
+ {id:'pushcd',tree:'H',t:5,c:2,max:2,ic:'clock',n:'Elleboogwerk',d:'Duwen laadt {v} seconde sneller op',v:1},
+ {id:'sprintspd',tree:'H',t:5,c:3,max:3,ic:'bolt',n:'Naverbrander',d:'Sprint geeft nog eens {v}% extra snelheid',v:10},
  {id:'legend',tree:'H',t:6,c:1,max:1,ic:'trophy',n:'Legende',d:'Je held: +15% schade, +15% levenspunten en +10% snelheid',v:0,req:'second'}
 ];
+// Duwen en sprinten in minigames. Skills schuiven deze waarden op (zie mods: pushDist, pushCd, sprDur, sprCd, sprSpd).
+const MOVES={pushCd:6,pushRange:2.4,pushDist:1.6,sprDur:3,sprCd:10,sprSpd:.6};
 const SKILL_MAX=SKILLS.reduce((a,s)=>a+s.max,0),TIER=5;
 function mods(sk){sk=sk&&!Array.isArray(sk)?sk:{};const r=id=>sk[id]|0,war=r('war')?1.1:1,lg=r('legend');return{
   gold:1+.04*r('bounty'),up:1-.05*r('engineer'),start:50*r('chest'),build:1-.025*r('bulk'),lives:2*r('fort'),
@@ -136,7 +143,8 @@ function mods(sk){sk=sk&&!Array.isArray(sk)?sk:{};const r=id=>sk[id]|0,war=r('wa
   ap:.1*r('ap'),splash:1+.05*r('splash'),repair:r('repair'),boss:1+.06*r('boss'),
   hDmg:(1+.04*r('hdmg'))*(lg?1.15:1),hHp:(1+.05*r('hhp'))*(lg?1.15:1),hSpd:(1+.02*r('hspd'))*(lg?1.1:1),hRate:1+.03*r('hrate'),hArm:.03*r('harm'),
   hRange:1+.04*r('hrange'),hAp:.15*r('hap'),hRegen:.005*r('hregen'),hGold:.1*r('hgold'),hBoss:1+.05*r('hboss'),hCrit:.04*r('hcrit'),hCritDmg:.25*r('hcritd'),
-  hDodge:.05*r('hdodge'),shDur:.5*r('shdur'),shCd:r('shcd'),hMini:1+.04*r('hpvp'),mission:150*r('mission'),leech:.01*r('leech'),second:r('second')>0};}
+  hDodge:.05*r('hdodge'),shDur:.5*r('shdur'),shCd:r('shcd'),hMini:1+.04*r('hpvp'),mission:150*r('mission'),leech:.01*r('leech'),second:r('second')>0,
+  pushDist:1+.15*r('pushr'),pushCd:r('pushcd'),sprDur:.5*r('sprint'),sprCd:r('sprintcd'),sprSpd:.1*r('sprintspd')};}
 const skillTotal=sk=>SKILLS.reduce((a,s)=>a+(sk[s.id]|0),0);
 const skillSpent=(sk,tree)=>SKILLS.reduce((a,s)=>a+(s.tree===tree?(sk[s.id]|0):0),0);
 // lock: 'tier' = te weinig punten in deze boom, 'req' = het talent erboven is nog niet vol
@@ -290,7 +298,7 @@ function lose(G){if(G.phase==='won'||G.phase==='over')return;G.phase='over';}
 function tune(s){if(!s||typeof s!=='object')return;const n=(v,lo,hi,d)=>{v=+v;return Number.isFinite(v)?Math.max(lo,Math.min(hi,v)):d;};
   B.startGold=Math.round(n(s.startGold,0,100000,B.startGold));B.lives=Math.round(n(s.lives,1,999,B.lives));
   B.hpX=n(s.enemyHp,.25,5,B.hpX);B.goldX=n(s.goldMul,.25,5,B.goldX);PREP=API.PREP=Math.round(n(s.prepSeconds,10,1800,PREP));}
-const API={N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,tune,B,DIFF,diffIdx,T,TYPES,ALL,GEERS_NEED,maxLvl,hasTiers,tierOf,canTurbo,missingTurbo,geersReady,geersCount,sleeperReady,unlocked,cellsOf,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
+const API={MOVES,N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,tune,B,DIFF,diffIdx,T,TYPES,ALL,GEERS_NEED,maxLvl,hasTiers,tierOf,canTurbo,missingTurbo,geersReady,geersCount,sleeperReady,unlocked,cellsOf,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
   buildCost,upCost,specCost,sellValue,stats,mods,skillTotal,skillSpent,skillState,SKILL_MAX,TIER,pointsFor,hpMul,makeWave,hit,recalc,win,lose,VS,vs,strongVs,weakVs,counters,waveMix,waveFit};
 return API;
 })();

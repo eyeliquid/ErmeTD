@@ -351,3 +351,15 @@ test('de keten: 5 upgrades, ultra, turbo, Geers Toren (13 upgrades) en De Slapen
   const { cleanSave } = require('../src/validate');
   assert.equal(cleanSave({ pts: 0, skills: { geers: 3 } }).skills.overdrive, 3);
 });
+
+test('duwen en sprinten: de skills schuiven de waarden op', () => {
+  const Engine = require('../../client/js/engine.js');
+  assert.deepEqual([Engine.MOVES.pushCd, Engine.MOVES.sprDur, Engine.MOVES.sprCd], [6, 3, 10]);
+  const m0 = Engine.mods({}), m = Engine.mods({ pushr: 3, pushcd: 2, sprint: 3, sprintcd: 3, sprintspd: 3 });
+  assert.deepEqual([m0.pushDist, m0.pushCd, m0.sprDur, m0.sprCd, m0.sprSpd], [1, 0, 0, 0, 0]);
+  assert.ok(Math.abs(m.pushDist - 1.45) < 1e-9 && Math.abs(m.sprSpd - .3) < 1e-9);
+  assert.deepEqual([m.pushCd, m.sprDur, m.sprCd], [2, 1.5, 3]);
+  // geen twee talenten op dezelfde plek in de boom
+  const seen = new Set();
+  for (const s of Engine.SKILLS) { const k = s.tree + s.t + '-' + s.c; assert.ok(!seen.has(k), k); seen.add(k); }
+});
