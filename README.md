@@ -129,4 +129,22 @@ npm test        # tests van de API en de lobby
 
 Open de pagina met `#dev` achter het adres om de testhulpmiddelen in `window.__ratd` beschikbaar te maken.
 
-Het startgoud staat nog op een testwaarde (10.000). Zet het in de webadmin onder Instellingen op 260 voor de definitieve versie.
+In de spelregels is het startgoud 260. De server stuurt zijn eigen instelling mee en die staat nog op een testwaarde (10.000). Zet het in de webadmin onder Instellingen op 260 voor de definitieve versie.
+
+## Sterk en zwak
+
+Elke toren doet 150% schade tegen de vijanden waar hij sterk tegen is en 50% tegen de vijanden waar hij zwak tegen is. De tabel staat als `VS` in `client/js/engine.js`; daar pas je een matchup aan. Het getal telt ook voor het gif per seconde van de Toxine Sproeier en voor hoe lang de Cryo Toren een vijand bevriest. Een bevroren Veldmech herstelt niet.
+
+| Toren | Sterk tegen | Zwak tegen |
+|---|---|---|
+| Sentry Gun | Conscript, Aanvalshond | Hammer Tank, Luchtschip |
+| Flak Kanon | Terror Drone, Luchtschip | Hammer Tank, Veldmech |
+| Cryo Toren | Aanvalshond, Veldmech | Hazmat-trooper, Luchtschip |
+| Toxine Sproeier | Conscript, Aanvalshond | Hazmat-trooper, Terror Drone, Hammer Tank |
+| Tesla Spoel | Terror Drone, Veldmech | Hazmat-trooper, Luchtschip |
+| Prisma Toren | Hammer Tank, Veldmech, Luchtschip | Terror Drone, Aanvalshond |
+| Raketbatterij | Hammer Tank, Hazmat-trooper | Aanvalshond, Terror Drone |
+| Railgun | Hammer Tank, Hazmat-trooper, Luchtschip | Conscript, Aanvalshond, Terror Drone |
+| Golfkanon | Conscript, Aanvalshond | Hammer Tank, Luchtschip |
+
+De Commandopost heeft geen matchups.
