@@ -57,6 +57,7 @@
       <h1>Red Alert <em>Towerdefense</em></h1>
       <div class="top-actions">
         <button class="btn-pop" id="skillsBtn" aria-haspopup="dialog">Skills<small class="num" id="skHint">0</small></button>
+        <button class="btn-pop" id="miniBtn" aria-haspopup="dialog">Minigames</button>
         <button class="btn-pop" id="infoBtn" aria-haspopup="dialog">Spelinfo</button>
       </div>
     </header>
@@ -117,6 +118,18 @@
               </div>
             </div>
             <div class="herogrid" id="heroes"></div>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="pop" id="popMini" aria-labelledby="popMiniT">
+      <div class="pop-in plate">
+        <div class="pop-head"><h2 id="popMiniT">Minigames uitproberen</h2><button class="pop-x" type="button" aria-label="Sluiten">×</button></div>
+        <div class="pop-body">
+          <div class="tab">
+            <p class="lead">Kies een minigame en speel hem los, in je eentje, met je gekozen held en je skills. De genummerde minigames zitten nog niet in het spel. Wat je hier doet telt niet mee: geen skillpunten, geen score en geen potje erbij.</p>
+            <ul class="minilist" id="miniList"></ul>
           </div>
         </div>
       </div>
@@ -226,6 +239,18 @@
     </div>
   </section>
 
+  <div id="labEnd" hidden>
+    <div class="card frame">
+      <p class="label" id="lName"></p>
+      <h2 id="lTitle"></h2>
+      <p id="lText"></p>
+      <dl><div><dt class="label">Score</dt><dd class="num" id="lScore"></dd></div><div><dt class="label">Tijd</dt><dd class="num" id="lTime"></dd></div></dl>
+      <button class="btn-main" id="lAgain">Opnieuw spelen</button>
+      <button id="lOther">Andere minigame</button>
+      <button id="lBack">Terug naar de lobby</button>
+    </div>
+  </div>
+
   <div id="result" hidden>
     <div class="card frame">
       <h2 id="rTitle"></h2>
@@ -240,6 +265,7 @@
 <script src="js/config.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/net.js"></script>
+<script src="js/minigames.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>
