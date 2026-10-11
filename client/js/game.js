@@ -2,7 +2,7 @@
 const E=Engine,{N,T,TYPES,EN,SKILLS,ROUNDS}=E,T3=window.THREE;
 const $=s=>document.querySelector(s);
 const fmt=n=>Math.round(n).toLocaleString('nl-NL');
-const STEP=1/30,FW=20,COLS=5,ROWS=4,SLOTS=COLS*ROWS;
+const STEP=1/30,FW=20,COLS=5,ROWS=5,SLOTS=COLS*ROWS;
 let save={v:2,pts:0,earned:0,skills:{},games:0,best:0,hero:0,diff:0,at:0};
 // gamePts: punten verdiend in dit potje. toastAdd wordt achter de eerstvolgende melding geplakt.
 let gamePts=0,toastAdd='';
@@ -16,7 +16,7 @@ const own=p=>!!p&&(p.sameTab===undefined?!!p.isMe:!!p.sameTab);
 // missies: schild voor het parcours, en mijn schade aan de baas (blijft meetellen nadat ik ben uitgeschakeld)
 let shieldT=0,shieldCd=0,myBm=0,myBh=0,msLast=null,finalMax=0,finalAt=0;
 // Parcours: een strook naast de arena met dwarsmuren. Elke muur heeft een opening, om en om onder (1) en boven (0).
-const RUN={x:60,z:86,L:38,W:10,gap:3,walls:[[5,1],[9,0],[13,1],[17,0],[21,1],[25,0],[29,1],[33,0]]};
+const RUN={x:60,z:ROWS*FW+6,L:38,W:10,gap:3,walls:[[5,1],[9,0],[13,1],[17,0],[21,1],[25,0],[29,1],[33,0]]};
 const runGap=sd=>sd?[RUN.W-RUN.gap,RUN.W]:[0,RUN.gap];
 function runFree(lx,lz){if(lx<0||lz<0||lx>RUN.L||lz>RUN.W)return false;for(const[wx,sd]of RUN.walls)if(Math.abs(lx-wx)<.45){const g=runGap(sd);if(lz<g[0]+.25||lz>g[1]-.25)return false;}return true;}
 // vrij zicht tussen twee punten op het parcours: elke muur ertussen moet bij zijn opening gekruist worden
@@ -119,7 +119,7 @@ function bindAccount(){
 /* ================= 3D ================= */
 const stage=$('#stage');
 let renderer=null,scene,camera,sun,sea,ray,gl3=false,haloTex;
-const cam={tx:0,tz:0,d:25,yaw:0},PITCH=.86,ACX=2*20+6.5,ACZ=4*20+12,AR=8.6;
+const cam={tx:0,tz:0,d:25,yaw:0},PITCH=.86,ACX=2*FW+6.5,ACZ=ROWS*FW+12,AR=8.6;
 const slotO=s=>[(s%COLS)*FW,Math.floor(s/COLS)*FW];
 const TEAM=[];
 const _m=T3&&new T3.Matrix4(),_q=T3&&new T3.Quaternion(),_e=T3&&new T3.Euler(),_v=T3&&new T3.Vector3(),_s=T3&&new T3.Vector3(),_c=T3&&new T3.Color();
@@ -366,7 +366,7 @@ function init3D(){if(!T3)return false;
   {const rt=roadTextures(),tile=()=>new T3.PlaneGeometry(1,1).rotateX(-Math.PI/2);
     roadM=new T3.InstancedMesh(tile(),new T3.MeshStandardMaterial({map:rt[0],bumpMap:rt[1],bumpScale:.04,roughness:.9,metalness:0}),SLOTS*N*N);
     trailM=new T3.InstancedMesh(tile(),new T3.MeshStandardMaterial({map:rt[2],transparent:true,depthWrite:false,roughness:1,metalness:0}),SLOTS*N*N);
-    kerbM=new T3.InstancedMesh(new T3.BoxGeometry(1,.09,1),new T3.MeshStandardMaterial({color:grit('#8d929b'),roughness:.9,metalness:0}),7000);
+    kerbM=new T3.InstancedMesh(new T3.BoxGeometry(1,.09,1),new T3.MeshStandardMaterial({color:grit('#8d929b'),roughness:.9,metalness:0}),SLOTS*350);
     for(const m of[roadM,trailM,kerbM]){m.count=0;m.frustumCulled=false;m.receiveShadow=true;scene.add(m);}
     gateIn=decal('#ff4a30',1,.6);gateOut=decal('#59c8f2',1,.6);gateIn.visible=gateOut.visible=false;scene.add(gateIn,gateOut);}
   cR=new T3.Vector3();gl3=true;return true;}
@@ -376,7 +376,7 @@ function updRoads(fs){const sig=fs.map(f=>f.slot+':'+f.psig).join('|');if(sig===
   for(const f of fs){const[ox,oz]=slotO(f.slot);
     for(const c of f.road){const x=c%N,y=(c-x)/N;put(roadM,r++,ox+x+.5,.022,oz+y+.5,1,1);
       for(const[dx,dy]of E.DIRS){const ax=x+dx,ay=y+dy,inb=ax>=0&&ay>=0&&ax<N&&ay<N,nb=ay*N+ax;
-        if(inb?(f.road.has(nb)||f.trail.has(nb)):(dx&&y===E.MID))continue;if(k<7000)put(kerbM,k++,ox+x+.5+dx*.46,.045,oz+y+.5+dy*.46,dx?.08:1,dy?.08:1);}}
+        if(inb?(f.road.has(nb)||f.trail.has(nb)):(dx&&y===E.MID))continue;if(k<SLOTS*350)put(kerbM,k++,ox+x+.5+dx*.46,.045,oz+y+.5+dy*.46,dx?.08:1,dy?.08:1);}}
     for(const c of f.trail){const x=c%N;put(trailM,t++,ox+x+.5,.02,oz+(c-x)/N+.5,1,1);}}
   roadM.count=r;trailM.count=t;kerbM.count=k;for(const m of[roadM,trailM,kerbM])m.instanceMatrix.needsUpdate=true;}
 function resize(){$('#tip').style.bottom=($('#console').offsetHeight+8)+'px';if(!gl3)return;const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
@@ -1413,7 +1413,7 @@ function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array
   for(const p of all){const pr=p.presence||{};if(!own(p)&&(pr.st==='playing'||pr.st==='done')&&Number.isInteger(pr.sl)&&pr.sl>=0&&pr.sl<SLOTS)cells[pr.sl]={name:nameOf(p),st:'play',me:false,sub:pr.st==='done'?'uitgespeeld':'ronde '+(+pr.r||1)};}
   lp.forEach((p,i)=>{if(!free.length)return;const s=free[i%free.length];if(!cells[s]||own(p))cells[s]={name:nameOf(p),st:'lobby',me:!!own(p),sub:own(p)?'jouw vesting':'in de lobby'};});
   paintMap(cells);
-  if(taken.size>=SLOTS||(!me&&lp.length>=SLOTS)){setText(btn,'Wereld vol');btn.disabled=true;setText(help,'Alle 20 vestingen zijn bezet. Wacht tot er een vrijkomt.');return;}
+  if(taken.size>=SLOTS||(!me&&lp.length>=SLOTS)){setText(btn,'Wereld vol');btn.disabled=true;setText(help,`Alle ${SLOTS} vestingen zijn bezet. Wacht tot er een vrijkomt.`);return;}
   btn.disabled=false;
   if(!others.length){setText(btn,'Start spel');setText(help,'Je bent alleen in de lobby. Start direct en acht bots doen mee, of wacht tot er meer spelers zijn. Elk potje begint met '+prepTxt()+' bouwen.');}
   else if(host&&own(host)){setText(btn,'Start spel');const n=others.filter(p=>p.presence.rd).length;setText(help,`${n} van ${others.length} andere spelers klaar. Jij bent de eerste speler en kunt altijd starten.`);}
