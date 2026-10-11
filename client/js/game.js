@@ -1039,19 +1039,29 @@ function cardSlots(){const a=[];if(!G)return a;
       a[1]={ic:'turbo',key:'T',n:'Turbo',cost:E.specCost(G,t,'turbo'),d:`80% sneller en 30% meer schade. Je hebt ${n} turbo turret${n===1?'':'s'}; de derde smelt samen tot The Geers. The Geers gebouwd: ${G.geers} van 10.`,act:()=>{if(!E.spec(G,t,'turbo'))toast('Te weinig credits');else events();}};}
     a[8]={ic:'sell',key:'V',n:'Verkopen',gain:E.sellValue(G,t),d:'Sloop deze turret en krijg een deel van je credits terug.',act:()=>{E.sell(G,t);sel=null;}};
     a[11]={ic:'back',key:'Esc',n:'Terug',d:'Terug naar de bouwkaart.',act:()=>{sel=null;}};return a;}
-  TYPES.forEach((type,i)=>a[i]={ic:type,key:String((i+1)%10),n:T[type].n,cost:E.buildCost(G,type),d:T[type].d,on:buildSel===type,act:()=>{buildSel=buildSel===type?null:type;roadMode=false;}});
+  TYPES.forEach((type,i)=>a[i]={ic:type,key:String((i+1)%10),n:T[type].n,cost:E.buildCost(G,type),d:T[type].d,vs:type,fit:E.VS[type]?E.waveFit(type,G.round):1,on:buildSel===type,act:()=>{buildSel=buildSel===type?null:type;roadMode=false;}});
   if(G.phase==='prep')a[10]={ic:'road',key:'R',n:'Weg',free:true,d:'Sleep over je vesting om weg te leggen van de linkerpoort naar de rechterpoort. Sleep over bestaande weg om die weer weg te halen.',on:roadMode,act:roadTool};
   a[11]={ic:'cancel',key:'Esc',n:'Annuleer',d:'Stop met bouwen en wis alle bouwopdrachten.',act:()=>{buildSel=null;roadMode=false;orders=[];}};return a;}
 const r1=n=>(Math.round(n*10)/10).toLocaleString('nl-NL');
+/* matchups: korte torennamen voor in de golfvoorvertoning, en de regels "sterk tegen / zwak tegen" */
+const SHORT={sentry:'Sentry',flak:'Flak',cryo:'Cryo',toxin:'Toxine',tesla:'Tesla',prism:'Prisma',rocket:'Raket',rail:'Railgun',wave:'Golfkanon'};
+const mk=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;};
+// Wat komt eraan, en welke torens werken daar goed tegen.
+function paintNext(){const q=$('#qNext');q.textContent='';q.append(mk('b','hd','Golf '+G.round+' bestaat uit'));
+  for(const o of E.waveMix(G.round)){const li=mk('span','en');li.append(mk('b',null,o.n+'× '+EN[o.type].n),mk('i','good',E.counters(o.type).map(t=>SHORT[t]).join(', ')));q.append(li);}
+  if(G.geers&&!G.omega)q.append(mk('span','en',`The Geers ${G.geers}/10`));}
+function paintVs(p,type){const k=E.VS[type]?type:'';if(p.dataset.v===k)return;p.dataset.v=k;p.textContent='';p.hidden=!k;if(!k)return;
+  const a=mk('span','good'),b=mk('span','bad');a.append(mk('b',null,'Sterk tegen '),E.strongVs(type).map(e=>EN[e].n).join(', '));b.append(mk('b',null,'Zwak tegen '),E.weakVs(type).map(e=>EN[e].n).join(', '));p.append(a,b);}
 function refresh(){if(!G)return;if(sel&&!G.tw.includes(sel))sel=null;cur=cardSlots();const card=$('#card');
   for(let i=0;i<12;i++){const b=card.children[i],s=cur[i];b.classList.toggle('empty',!s);if(!s){b.tabIndex=-1;continue;}b.tabIndex=0;
     if(b.dataset.ic!==s.ic){b.dataset.ic=s.ic;iconDraw(b.firstChild,s.ic);}
     setText(b.children[1],s.key);setText(b.children[2],s.wait?s.wait+' s':s.free?'gratis':s.cost!=null?String(s.cost):s.gain!=null?'+'+s.gain:'');
-    b.classList.toggle('on',!!s.on);b.classList.toggle('poor',(s.cost!=null&&G.gold<s.cost)||(!!s.wait&&!s.on));b.setAttribute('aria-label',s.n+(s.cost!=null?', '+s.cost+' credits':''));}
+    b.classList.toggle('on',!!s.on);b.classList.toggle('good',s.fit>1.12);b.classList.toggle('bad',s.fit<.88);b.classList.toggle('poor',(s.cost!=null&&G.gold<s.cost)||(!!s.wait&&!s.on));b.setAttribute('aria-label',s.n+(s.cost!=null?', '+s.cost+' credits':'')+(s.fit>1.12?', sterk tegen de komende golf':s.fit<.88?', zwak tegen de komende golf':''));}
   const tip=$('#tip'),ts=cur[tipIdx];tip.hidden=!ts;
-  if(ts){setText($('#tipN'),ts.n+' ('+ts.key+')');const c=$('#tipC'),txt=ts.free?'gratis':ts.cost!=null?String(ts.cost):ts.gain!=null?'+'+ts.gain:'';c.hidden=!txt;if(c.dataset.v!==txt){c.dataset.v=txt;c.textContent='';const i=document.createElement('i');i.className='coin';c.append(i,document.createTextNode(txt));}setText($('#tipD'),ts.d);}
+  if(ts){setText($('#tipN'),ts.n+' ('+ts.key+')');const c=$('#tipC'),txt=ts.free?'gratis':ts.cost!=null?String(ts.cost):ts.gain!=null?'+'+ts.gain:'';c.hidden=!txt;if(c.dataset.v!==txt){c.dataset.v=txt;c.textContent='';const i=document.createElement('i');i.className='coin';c.append(i,document.createTextNode(txt));}setText($('#tipD'),ts.d);paintVs($('#tipVs'),ts.vs);}
   // portret + infopaneel
   const st=$('#iStats'),pc=$('#pcv'),show=(s,type)=>{st.hidden=false;setText($('#iDmg'),type==='uplink'?'+'+Math.round(s.aura*100)+'%':fmt(s.dmg));setText($('#iRate'),type==='uplink'?'–':r1(s.rate));setText($('#iRange'),r1(s.range));};
+  paintVs($('#iVs'),sel?sel.type:roadMode?'':buildSel||'');
   const face=sel?sel.type:roadMode?'road':buildSel||'hero'+save.hero;if(pc.dataset.ic!==face){pc.dataset.ic=face;iconDraw(pc,face);}
   if(sel){const t=sel,b=T[t.type],om=t.type==='omega',g=t.type==='geers'||om;setText($('#iName'),b.n);
     setText($('#iSub'),om?'Ultiem wapen':g?`Superturret · ${G.geers} van 10 gebouwd`:`Niveau ${t.lvl} ${t.spec==='turbo'?'turbo turret':t.spec==='link'?'gelinkte turret':'turret'}`);show(t.s,t.type);
@@ -1064,7 +1074,7 @@ function refresh(){if(!G)return;if(sel&&!G.tw.includes(sel))sel=null;cur=cardSlo
   else{const H=HEROES[save.hero];setText($('#iName'),H.n);setText($('#iSub'),arena?arena.K.n:orders.length?`${orders.length} bouwopdracht${orders.length===1?'':'en'} in de rij`:H.role);
     st.hidden=false;setText($('#iDmg'),fmt(H.dmg*HM.hDmg*(armour>=3?1.3:1)*(arena?1:heroScale())));setText($('#iRate'),r1(H.rate*HM.hRate));setText($('#iRange'),r1(H.range*HM.hRange));
     setText($('#iDesc'),H.d+' Je held valt vanzelf aan binnen bereik.');$('#pBar').style.width=Math.max(0,hero.hp/maxHp()*100)+'%';setText($('#pBarT'),Math.max(0,Math.ceil(hero.hp))+' / '+Math.round(maxHp()));}
-  const nk=G.round+'_'+G.geers;if(nextRound!==nk){nextRound=nk;const cnt={};for(const s of E.makeWave(G.round))cnt[s.type]=(cnt[s.type]||0)+1;setText($('#qNext'),Object.keys(cnt).map(k=>cnt[k]+'× '+EN[k].n).join(', ')+(G.geers&&!G.omega?` · The Geers ${G.geers}/10`:''));}
+  const nk=G.round+'_'+G.geers;if(nextRound!==nk){nextRound=nk;paintNext();}
   paintSpeed();
   const inv=$('#invGrid');for(let i=0;i<4;i++){const c=inv.children[i],has=i<armour,k=has?'arm'+i:'slot';if(c.dataset.ic!==k){c.dataset.ic=k;iconDraw(c,k);c.classList.toggle('has',has);c.title=has?ARMOUR[i].n+': '+ARMOUR[i].d:'Leeg. Win een minigame om een stuk harnas te krijgen.';}}}
 let last=0,acc=0,slow=0;

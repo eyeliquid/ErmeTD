@@ -287,7 +287,18 @@ dialog.pop::backdrop{background:rgba(3,5,8,.8);backdrop-filter:blur(3px)}
 #invGrid{display:grid;grid-template-columns:repeat(2,50px);gap:4px}
 #invGrid canvas{display:block;width:50px;height:46px;border:1px solid #59616e;border-radius:3px}
 #invGrid canvas.has{border-color:var(--gold);box-shadow:0 0 8px rgba(246,207,77,.5)}
-#qNext,#qRoad{font:400 13px/1.3 var(--body)!important;color:var(--muted)!important}
+#qRoad{font:400 13px/1.3 var(--body)!important;color:var(--muted)!important}
+/* golfvoorvertoning: per vijand het aantal, met eronder de torens die er sterk tegen zijn */
+#qNext{display:flex;flex-direction:column;gap:3px;font:400 13px/1.25 var(--body);color:var(--text);border-top:1px solid rgba(168,132,44,.4);padding-top:6px}
+#qNext .hd{font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:11px}
+#qNext .en{display:flex;flex-direction:column} #qNext .en b{font-weight:700}
+#qNext .good{font-style:normal;color:var(--hp)} #qNext .good:before{content:"▲ "}
+.vs{display:flex;flex-direction:column;gap:1px;margin:4px 0 0!important;font:400 13px/1.3 var(--body)!important;text-align:left}
+.vs[hidden]{display:none} .vs .good{color:var(--hp)} .vs .bad{color:#ff8a7d} .vs b{font-weight:700}
+#iDesc+.vs{margin-top:2px!important}
+/* pijltje op de bouwknop: past deze toren bij de golf die eraan komt */
+#card button.good:after,#card button.bad:after{position:absolute;right:3px;top:1px;font:700 12px var(--body);text-shadow:0 1px 2px #000,0 0 3px #000}
+#card button.good:after{content:"▲";color:var(--hp)} #card button.bad:after{content:"▼";color:#ff6a5c}
 #qRoad.ok{color:var(--hp)!important}
 #joy{position:absolute;width:92px;height:92px;margin:-46px 0 0 -46px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.25);pointer-events:none}
 #joy i{position:absolute;left:28px;top:28px;width:36px;height:36px;border-radius:50%;background:rgba(246,207,77,.75)}
@@ -313,7 +324,7 @@ dialog.pop::backdrop{background:rgba(3,5,8,.8);backdrop-filter:blur(3px)}
   #console{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"map info" "card card";gap:6px;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))}
   #camctl{display:none}
   #mini{width:100px;height:104px}
-  #info{padding:6px 8px} #info h3{font-size:16px} #iDesc{display:none} #iStats dd{font-size:15px}
+  #info{padding:6px 8px} #info h3{font-size:16px} #iDesc{display:none} #iVs{display:none!important} #qNext .good,#qNext .hd{display:none} #iStats dd{font-size:15px}
   #card{grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:46px;padding:4px}
   #tip{left:6px;right:6px;width:auto}
 }

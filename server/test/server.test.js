@@ -147,3 +147,19 @@ test('lobby: spelers zien elkaar, presence en chat komen door', async () => {
   assert.notEqual((await c2.wait(m => m.t === 'welcome')).peer, wa.peer);
   await Promise.all([a.close(), b2.close(), c2.close()]);
 });
+
+test('matchups: een toren doet anderhalf keer schade tegen sterk en de helft tegen zwak', () => {
+  const Engine = require('../../client/js/engine.js');
+  const G = Engine.create({});
+  const mob = (type) => ({ type, hp: 1000, max: 1000, arm: 0, boss: false });
+  const dmg = (tower, type) => { const e = mob(type); Engine.hit(G, e, 100, 0, tower); return 1000 - e.hp; };
+  assert.equal(dmg('sentry', 'inf'), 150);
+  assert.equal(dmg('sentry', 'tank'), 50);
+  assert.equal(dmg('sentry', 'drone'), 100);
+  assert.equal(dmg(undefined, 'tank'), 100);
+  // elke vijand heeft minstens twee torens die er sterk tegen zijn, en elke toren is ergens sterk en ergens zwak
+  for (const en of Object.keys(Engine.EN)) assert.ok(Engine.counters(en).length >= 2, en);
+  for (const tw of Object.keys(Engine.VS)) { assert.ok(Engine.strongVs(tw).length >= 2, tw); assert.ok(Engine.weakVs(tw).length >= 2, tw); }
+  // de voorvertoning telt dezelfde vijanden als de golf zelf
+  for (const r of [1, 7, 10, 25, 100]) assert.equal(Engine.waveMix(r).reduce((n, o) => n + o.n, 0), Engine.makeWave(r).length);
+});

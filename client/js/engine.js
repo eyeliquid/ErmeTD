@@ -2,7 +2,7 @@ const Engine=(()=>{
 const N=13,ROUNDS=100,MID=6,C_IN=MID*N,C_OUT=MID*N+N-1,PREP=300,DIRS=[[1,0],[0,-1],[0,1],[-1,0]];
 // Balans: alles wat de moeilijkheid bepaalt staat hier.
 // Honderd rondes: de curve van vijftig is uitgerekt. Ronde 2r is nu ongeveer zo zwaar als ronde r was, en twee rondes leveren samen op wat één ronde opleverde.
-const B={hp0:14,lin:.06,g:1.063,g2:1.0296,late:80,gold0:2.5,goldLin:.035,startGold:10000/* TESTWAARDE: terug naar 260 voor de definitieve versie */,lives:20,
+const B={hp0:14,lin:.06,g:1.063,g2:1.0296,late:80,gold0:2.5,goldLin:.035,startGold:260,lives:20,
   bonA:12,bonB:4};
 const ROCK=new Set(); // geen bomen of rotsen meer: het hele veld is vrij
 // Er is geen vast pad. Vijanden komen links in het midden binnen en gaan rechts in het midden weg.
@@ -56,6 +56,25 @@ const EN={
  haz:{n:'Hazmat-trooper',hp:2.2,sp:1.05,immune:true,b:2.2},
  boss:{n:'Luchtschip',hp:28,sp:.55,arm:.25,b:25,leak:10,boss:true}
 };
+// Matchups: wat een toren tegen een vijand doet. 1.5 = sterk, .5 = zwak, niet genoemd = gewoon.
+// Het getal telt voor de schade per schot, voor het gif per seconde en voor hoe lang een vijand bevroren blijft.
+// The Geers en de Omega-toren staan er niet in: die zijn tegen alles even goed.
+const VS={
+ sentry:{inf:1.5,dog:1.5,tank:.5,boss:.5},
+ flak:{drone:1.5,boss:1.5,tank:.5,mech:.5},
+ cryo:{dog:1.5,mech:1.5,haz:.5,boss:.5},
+ toxin:{inf:1.5,dog:1.5,haz:.5,drone:.5,tank:.5},
+ tesla:{drone:1.5,mech:1.5,haz:.5,boss:.5},
+ prism:{tank:1.5,mech:1.5,boss:1.5,drone:.5,dog:.5},
+ rocket:{tank:1.5,haz:1.5,dog:.5,drone:.5},
+ rail:{tank:1.5,haz:1.5,boss:1.5,inf:.5,dog:.5,drone:.5},
+ wave:{inf:1.5,dog:1.5,tank:.5,boss:.5}
+};
+const vs=(tw,en)=>(VS[tw]&&VS[tw][en])||1;
+const ENEMIES=Object.keys(EN);
+// Voor de uitleg in beeld: tegen welke vijanden een toren sterk of zwak is, en welke torens goed zijn tegen een vijand.
+const strongVs=tw=>ENEMIES.filter(e=>vs(tw,e)>1),weakVs=tw=>ENEMIES.filter(e=>vs(tw,e)<1);
+const counters=en=>Object.keys(VS).filter(tw=>vs(tw,en)>1);
 // Talenten: tree T = torens, H = held. t = rij (0-6, gaat open bij 5*t punten in die boom), c = kolom (0-3), max = aantal rangen,
 // v = waarde per rang die in de tekst op {v} komt, req = talent recht erboven dat eerst vol moet zijn.
 const SKILLS=[
@@ -133,14 +152,19 @@ function makeWave(r){const q=[];let t=0;const n=8+Math.floor(r*.4),R=Math.round;
     case 4:add('tank',R(n*.4),.9);add(r>=14?'mech':'inf',R(n*.35),.7);break;
     default:add(r>=18?'haz':'inf',R(n*.4),.7);add('dog',R(n*.5),.4);add('tank',R(n*.25),.9);}
   return q.reverse();}
+// Wat er in ronde r aankomt: per soort het aantal en het aandeel in de totale levenspunten van de golf.
+function waveMix(r){const m={};let tot=0;for(const s of makeWave(r)){const o=m[s.type]||(m[s.type]={type:s.type,n:0,hp:0}),h=EN[s.type].hp*s.hm;o.n++;o.hp+=h;tot+=h;}
+  return Object.values(m).map(o=>({type:o.type,n:o.n,share:o.hp/tot}));}
+// Hoe goed een toren bij ronde r past: het gemiddelde matchup-getal, gewogen naar levenspunten. Boven 1 is een goede keuze, onder 1 een slechte.
+function waveFit(tw,r){let f=0;for(const o of waveMix(r))f+=o.share*vs(tw,o.type);return f;}
 function startWave(G){if(G.phase!=='build')return;G.phase='wave';G.wt=0;G.q=makeWave(G.round);G.ev.push({k:'wave',r:G.round});}
 function spawn(G,s){const d=EN[s.type],r=G.round,hp=d.hp*hpMul(r)*s.hm,p=posAt(G.path,0);
   G.en.push({id:G.nid++,type:s.type,hp,max:hp,d:0,sp:d.sp,arm:d.arm||0,regen:d.regen||0,immune:!!d.immune,boss:!!d.boss,
     big:s.hm>1,leak:d.leak||1,b:Math.max(1,Math.round(B.gold0*d.b*s.hm*(1+B.goldLin*r)*G.m.gold)),sc:Math.round(d.b*s.hm*r*5),
     x:p[0],y:p[1],dx:p[2],dy:p[3],fz:0,fi:0,sT:0,sl:0,pT:0,pD:0});}
 function kill(G,e){if(e.dead)return;e.dead=true;G.gold+=e.b;G.score+=e.sc;G.kills++;if(G.fxOn)G.fx.push({k:'die',b:[e.x,e.y],boss:e.boss});}
-function hit(G,e,dmg,pierce){if(e.dead)return;const arm=e.arm*(1-G.m.ap)*(1-(pierce||0));
-  e.hp-=dmg*(1-arm)*(e.boss?G.m.boss:1);if(e.hp<=0)kill(G,e);}
+function hit(G,e,dmg,pierce,src){if(e.dead)return;const arm=e.arm*(1-G.m.ap)*(1-(pierce||0));
+  e.hp-=dmg*(1-arm)*(e.boss?G.m.boss:1)*(src?vs(src,e.type):1);if(e.hp<=0)kill(G,e);}
 function aoe(G,x,y,r,fn){const r2=r*r;for(const e of G.en){if(e.dead)continue;const dx=e.x-x,dy=e.y-y;if(dx*dx+dy*dy<=r2)fn(e);}}
 
 function stats(G,t){const b=T[t.type],m=G.m,au=1+(t.aura||0);
@@ -188,23 +212,23 @@ function spec(G,t,k){if(t.type==='geers'||t.lvl<5||t.spec||(k!=='turbo'&&k!=='li
 function fire(G,t,e,s){const m=G.m,fx=G.fxOn?G.fx:null,a=[t.x,t.y],b=[e.x,e.y];
   switch(t.type){
     case'omega':hit(G,e,hpMul(G.round)*.6*m.dmg*(1+(t.aura||0)),.5);if(!e.dead){const sl=.45*(e.boss?.5:1);e.sl=e.sT>0?Math.max(e.sl,sl):sl;e.sT=2;}fx&&fx.push({k:'omega',a,b});break;
-    case'sentry':hit(G,e,s.dmg,0);fx&&fx.push({k:'shot',a,b});break;
-    case'rail':hit(G,e,s.dmg,1);fx&&fx.push({k:'rail',a,b});break;
-    case'flak':case'rocket':{const r=T[t.type].splash*m.splash;aoe(G,e.x,e.y,r,x=>hit(G,x,s.dmg,0));fx&&fx.push({k:t.type==='rocket'?'rocket':'boom',a,b,r});break;}
-    case'cryo':{const r=T.cryo.splash*m.splash;aoe(G,e.x,e.y,r,x=>{hit(G,x,s.dmg,0);
-      if(!x.dead&&!x.immune&&x.fi<=0){const d=s.fz*(x.boss?.4:1);x.fz=d;x.fi=d+2.2;}});fx&&fx.push({k:'ice',a,b,r});break;}
-    case'toxin':{const r=T.toxin.splash*m.splash;aoe(G,e.x,e.y,r,x=>{hit(G,x,s.dmg,0);if(x.dead)return;
-      x.pD=x.pT>0?Math.max(x.pD,s.pd):s.pd;x.pT=4;if(!x.immune){const sl=s.slow*(x.boss?.5:1);x.sl=x.sT>0?Math.max(x.sl,sl):sl;x.sT=4;}});
+    case'sentry':hit(G,e,s.dmg,0,'sentry');fx&&fx.push({k:'shot',a,b});break;
+    case'rail':hit(G,e,s.dmg,1,'rail');fx&&fx.push({k:'rail',a,b});break;
+    case'flak':case'rocket':{const r=T[t.type].splash*m.splash;aoe(G,e.x,e.y,r,x=>hit(G,x,s.dmg,0,t.type));fx&&fx.push({k:t.type==='rocket'?'rocket':'boom',a,b,r});break;}
+    case'cryo':{const r=T.cryo.splash*m.splash;aoe(G,e.x,e.y,r,x=>{hit(G,x,s.dmg,0,'cryo');
+      if(!x.dead&&!x.immune&&x.fi<=0){const d=s.fz*(x.boss?.4:vs('cryo',x.type));x.fz=d;x.fi=d+2.2;}});fx&&fx.push({k:'ice',a,b,r});break;}
+    case'toxin':{const r=T.toxin.splash*m.splash;aoe(G,e.x,e.y,r,x=>{hit(G,x,s.dmg,0,'toxin');if(x.dead)return;
+      const pd=s.pd*vs('toxin',x.type);x.pD=x.pT>0?Math.max(x.pD,pd):pd;x.pT=4;if(!x.immune){const sl=s.slow*(x.boss?.5:1);x.sl=x.sT>0?Math.max(x.sl,sl):sl;x.sT=4;}});
       fx&&fx.push({k:'tox',a,b,r});break;}
-    case'tesla':{const pts=[a,b],done=new Set([e.id]);let cur=e,d=s.dmg;hit(G,e,d,.5);
+    case'tesla':{const pts=[a,b],done=new Set([e.id]);let cur=e,d=s.dmg;hit(G,e,d,.5,'tesla');
       for(let i=1;i<T.tesla.chain;i++){let nx=null,bd=3.3;for(const o of G.en){if(o.dead||done.has(o.id))continue;
           const dx=o.x-cur.x,dy=o.y-cur.y,dd=dx*dx+dy*dy;if(dd<bd){bd=dd;nx=o;}}
-        if(!nx)break;d*=.7;done.add(nx.id);pts.push([nx.x,nx.y]);hit(G,nx,d,.5);cur=nx;}
+        if(!nx)break;d*=.7;done.add(nx.id);pts.push([nx.x,nx.y]);hit(G,nx,d,.5,'tesla');cur=nx;}
       fx&&fx.push({k:'bolt',pts});break;}
-    case'prism':if(t.tg!==e.id){t.tg=e.id;t.ramp=1;}hit(G,e,s.dmg*t.ramp,0);t.ramp=Math.min(2.5,t.ramp+.5/s.rate);fx&&fx.push({k:'beam',a,b});break;
+    case'prism':if(t.tg!==e.id){t.tg=e.id;t.ramp=1;}hit(G,e,s.dmg*t.ramp,0,'prism');t.ramp=Math.min(2.5,t.ramp+.5/s.rate);fx&&fx.push({k:'beam',a,b});break;
     case'wave':{const L=Math.hypot(e.x-t.x,e.y-t.y)||1,ux=(e.x-t.x)/L,uy=(e.y-t.y)/L,w=.5*m.splash;
       for(const o of G.en){if(o.dead)continue;const px=o.x-t.x,py=o.y-t.y,pr=px*ux+py*uy;if(pr<0||pr>s.range)continue;
-        if(Math.abs(px*uy-py*ux)<=w)hit(G,o,s.dmg,.3);}
+        if(Math.abs(px*uy-py*ux)<=w)hit(G,o,s.dmg,.3,'wave');}
       fx&&fx.push({k:'wave',a,b:[t.x+ux*s.range,t.y+uy*s.range]});break;}
   }}
 function step(G,dt){
@@ -215,7 +239,7 @@ function step(G,dt){
   for(const e of G.en){if(e.dead)continue;
     if(e.fi>0)e.fi-=dt;
     if(e.pT>0){e.pT-=dt;e.hp-=e.pD*dt;if(e.hp<=0){kill(G,e);continue;}}
-    else if(e.regen&&e.hp<e.max)e.hp=Math.min(e.max,e.hp+e.max*e.regen*dt);
+    else if(e.regen&&e.hp<e.max&&e.fz<=0)e.hp=Math.min(e.max,e.hp+e.max*e.regen*dt);
     let sp=e.sp;
     if(e.fz>0){e.fz-=dt;sp=0;}else if(e.sT>0){e.sT-=dt;sp*=1-e.sl;}
     e.d+=sp*dt;
@@ -250,7 +274,7 @@ function step(G,dt){
 function win(G){if(G.phase==='won'||G.phase==='over')return;G.phase='won';G.score+=5000+200*G.lives;}
 function lose(G){if(G.phase==='won'||G.phase==='over')return;G.phase='over';}
 return{N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,B,T,TYPES,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
-  buildCost,upCost,specCost,sellValue,stats,mods,skillTotal,skillSpent,skillState,SKILL_MAX,TIER,pointsFor,hpMul,makeWave,hit,recalc,win,lose};
+  buildCost,upCost,specCost,sellValue,stats,mods,skillTotal,skillSpent,skillState,SKILL_MAX,TIER,pointsFor,hpMul,makeWave,hit,recalc,win,lose,VS,vs,strongVs,weakVs,counters,waveMix,waveFit};
 })();
 
 // Dezelfde spelregels draaien op de server (controle van opgeslagen voortgang).
