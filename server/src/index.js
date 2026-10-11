@@ -8,11 +8,13 @@ const { open } = require('./db');
 const { sessions } = require('./auth');
 const { createApi } = require('./api');
 const room = require('./room');
+const { createSettings } = require('./settings');
 
 function createServer(overrides = {}) {
   const cfg = { ...config, ...overrides };
   const db = open(cfg.dbFile || path.join(cfg.dataDir, 'ratd.sqlite'));
   const sess = sessions(db, cfg.sessionDays);
+  const settings = createSettings(db);
   sess.prune();
   const pruneTimer = setInterval(() => sess.prune(), 6 * 3600000);
   pruneTimer.unref();
@@ -26,8 +28,11 @@ function createServer(overrides = {}) {
     online: () => (live ? live.count() : 0),
     boardChanged: () => live && live.boardChanged(),
     renamed: (id, name) => live && live.renamed(id, name),
+    onlineUsers: () => (live ? live.users() : new Set()),
+    settingsChanged: () => live && live.settingsChanged(),
+    kick: id => live && live.kick(id),
   };
-  const { router, getBoard } = createApi({ db, sess, hooks });
+  const { router, getBoard } = createApi({ db, sess, hooks, settings, cfg });
 
   app.use((req, res, next) => {
     res.set({
@@ -46,7 +51,7 @@ function createServer(overrides = {}) {
       const o = req.headers.origin;
       if (o && cfg.corsOrigins.includes(o)) {
         res.set({ 'Access-Control-Allow-Origin': o, Vary: 'Origin', 'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, OPTIONS', 'Access-Control-Max-Age': '600' });
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS', 'Access-Control-Max-Age': '600' });
       }
       if (req.method === 'OPTIONS') return res.status(204).end();
       next();
@@ -63,7 +68,7 @@ function createServer(overrides = {}) {
   }));
 
   const server = http.createServer(app);
-  live = room.attach(server, { db, sess, cfg, getBoard });
+  live = room.attach(server, { db, sess, cfg, getBoard, settings });
 
   return {
     server, db,
@@ -77,7 +82,10 @@ function createServer(overrides = {}) {
 
 if (require.main === module) {
   const s = createServer();
-  s.server.listen(config.port, config.host, () => console.log(`Red Alert Towerdefense draait op http://localhost:${config.port}`));
+  s.server.listen(config.port, config.host, () => {
+    console.log(`Red Alert Towerdefense draait op http://localhost:${config.port}`);
+    console.log(config.adminPassword.length >= 10 ? `Webadmin: http://localhost:${config.port}/admin` : 'Webadmin staat uit: zet ADMIN_PASSWORD (minstens 10 tekens) om hem aan te zetten.');
+  });
   const stop = () => { s.close().then(() => process.exit(0)); setTimeout(() => process.exit(0), 3000).unref(); };
   process.on('SIGTERM', stop);
   process.on('SIGINT', stop);

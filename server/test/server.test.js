@@ -5,9 +5,10 @@ const assert = require('node:assert/strict');
 const WebSocket = require('ws');
 const { createServer } = require('../src/index');
 
+const ADMIN = 'beheer-geheim-1';
 let s, base, wsBase;
 test.before(async () => {
-  s = createServer({ dbFile: ':memory:' });
+  s = createServer({ dbFile: ':memory:', adminPassword: ADMIN, registerPerHour: 100 });
   await new Promise(r => s.server.listen(0, '127.0.0.1', r));
   const { port } = s.server.address();
   base = `http://127.0.0.1:${port}`; wsBase = `ws://127.0.0.1:${port}/ws`;
@@ -175,4 +176,104 @@ test('moeilijkheidsgraden: taaiere vijanden en een hogere score', () => {
   // Kills en de winstbonus tellen ook mee met de vermenigvuldiger.
   const G = E.create({}, 2); G.lives = 10; E.win(G);
   assert.equal(G.score, Math.round(7000 * 1.75));
+});
+
+test('webadmin: zit achter het beheerwachtwoord', async () => {
+  const page = await fetch(base + '/admin');
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /Webadmin/);
+  assert.equal((await api('GET', '/admin/overview')).status, 401);
+  assert.equal((await api('GET', '/admin/overview', null, 'x'.repeat(43))).status, 401);
+  assert.equal((await api('PUT', '/admin/settings', { settings: { lives: 5 } })).status, 401);
+  assert.equal((await api('POST', '/admin/login', { password: 'verkeerd-wachtwoord' })).status, 401);
+  // het token van een gewone speler geeft geen toegang
+  const player = (await api('POST', '/register', { name: 'Nieuwsgierig', password: 'geheim123' })).body;
+  assert.equal((await api('GET', '/admin/overview', null, player.token)).status, 401);
+  const login = await api('POST', '/admin/login', { password: ADMIN });
+  assert.equal(login.status, 200);
+  assert.equal((await api('GET', '/admin/overview', null, login.body.token)).status, 200);
+  assert.equal((await api('POST', '/admin/logout', null, login.body.token)).status, 200);
+  assert.equal((await api('GET', '/admin/overview', null, login.body.token)).status, 401);
+});
+
+test('webadmin: zonder ADMIN_PASSWORD staat hij uit', async () => {
+  const off = createServer({ dbFile: ':memory:', adminPassword: '' });
+  await new Promise(r => off.server.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${off.server.address().port}/api/admin/login`;
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: '' }) });
+  assert.equal(res.status, 503);
+  await off.close();
+});
+
+test('webadmin: spelersoverzicht en acties op een speler', async () => {
+  const admin = (await api('POST', '/admin/login', { password: ADMIN })).body.token;
+  const p = (await api('POST', '/register', { name: 'Doelwit', password: 'geheim123' })).body;
+  await api('PUT', '/save', { save: { v: 2, pts: 2, earned: 3, games: 4, hero: 3, skills: { dmg: 1 } } }, p.token);
+  await api('POST', '/scores', { score: 4321, round: 12 }, p.token);
+  const live = peer(p.token, { st: 'lobby' });
+  await live.wait(m => m.t === 'welcome');
+
+  const ov = (await api('GET', '/admin/overview', null, admin)).body;
+  const row = ov.players.find(x => x.id === p.user.id);
+  assert.deepEqual([row.name, row.games, row.points, row.spent, row.score, row.round, row.online], ['Doelwit', 4, 2, 1, 4321, 12, true]);
+  assert.ok(row.createdAt > 0 && row.lastSeen > 0);
+  assert.equal(JSON.stringify(ov).includes('scrypt'), false); // nooit wachtwoordhashes naar buiten
+
+  // nieuw wachtwoord: oude sessie en oude wachtwoord werken niet meer
+  assert.equal((await api('POST', `/admin/players/${p.user.id}/password`, { password: 'kort' }, admin)).status, 400);
+  assert.equal((await api('POST', `/admin/players/${p.user.id}/password`, { password: 'nieuw-geheim' }, admin)).status, 200);
+  assert.equal((await api('GET', '/me', null, p.token)).status, 401);
+  assert.equal((await api('POST', '/login', { name: 'Doelwit', password: 'geheim123' })).status, 401);
+  assert.equal((await api('POST', '/login', { name: 'Doelwit', password: 'nieuw-geheim' })).status, 200);
+
+  assert.equal((await api('DELETE', `/admin/players/${p.user.id}/score`, null, admin)).status, 200);
+  assert.equal((await api('GET', '/scores')).body.rows.some(r => r.id === p.user.id), false);
+
+  const closed = new Promise(r => live.ws.on('close', r));
+  assert.equal((await api('DELETE', `/admin/players/${p.user.id}`, null, admin)).status, 200);
+  await closed; // de verbinding van een verwijderd account gaat dicht
+  assert.equal((await api('POST', '/login', { name: 'Doelwit', password: 'nieuw-geheim' })).status, 401);
+  assert.equal((await api('DELETE', `/admin/players/${p.user.id}`, null, admin)).status, 404);
+  assert.equal((await api('GET', '/admin/overview', null, admin)).body.players.some(x => x.id === p.user.id), false);
+});
+
+test('webadmin: instellingen worden gecontroleerd, bewaard en naar de lobby gestuurd', async () => {
+  const admin = (await api('POST', '/admin/login', { password: ADMIN })).body.token;
+  assert.equal((await api('GET', '/settings')).body.settings.startGold, 10000);
+  const a = peer(null, { st: 'lobby' });
+  assert.equal((await a.wait(m => m.t === 'welcome')).settings.lives, 20);
+
+  for (const bad of [{ lives: 0 }, { startGold: '260' }, { enemyHp: 99 }, { chatEnabled: 'ja' }, { prepSeconds: NaN }, 'x']) {
+    assert.equal((await api('PUT', '/admin/settings', { settings: bad }, admin)).status, 400);
+  }
+  assert.equal((await api('GET', '/settings')).body.settings.lives, 20); // een afgekeurde wijziging verandert niets
+
+  const put = await api('PUT', '/admin/settings', { settings: { startGold: 260, enemyHp: 1.5, registrationOpen: false, chatEnabled: false, motd: '  Toernooi\u0007 zaterdag  ', onbekend: 1 } }, admin);
+  assert.equal(put.status, 200);
+  assert.deepEqual(put.body.settings, { startGold: 260, lives: 20, prepSeconds: 300, enemyHp: 1.5, goldMul: 1, registrationOpen: false, chatEnabled: false, motd: 'Toernooi zaterdag' });
+  assert.equal((await a.wait(m => m.t === 'settings')).settings.startGold, 260);
+  assert.deepEqual((await api('GET', '/settings')).body.settings, put.body.settings);
+
+  // registratie dicht: geen nieuwe accounts, bestaande spelers kunnen nog inloggen
+  assert.equal((await api('POST', '/register', { name: 'Telaat', password: 'geheim123' })).status, 403);
+  assert.equal((await api('POST', '/login', { name: 'Tanya', password: 'geheim123' })).status, 200);
+  // chat uit: berichten komen niet door
+  a.send({ t: 'chat', text: 'hoort niemand' });
+  await new Promise(r => setTimeout(r, 150));
+  assert.equal(a.got.some(m => m.t === 'chat'), false);
+
+  await api('PUT', '/admin/settings', { settings: { registrationOpen: true, chatEnabled: true, startGold: 10000, enemyHp: 1, motd: '' } }, admin);
+  assert.equal((await api('POST', '/register', { name: 'Optijd', password: 'geheim123' })).status, 201);
+  await a.close();
+});
+
+test('de spelregels nemen de instellingen over', () => {
+  const Engine = require('../../client/js/engine.js');
+  const hp = Engine.hpMul(10);
+  Engine.tune({ startGold: 260, lives: 5, prepSeconds: 60, enemyHp: 2, goldMul: 9999 });
+  const G = Engine.create({});
+  assert.deepEqual([G.gold, G.lives, G.timer, Engine.PREP], [260, 5, 60, 60]);
+  assert.equal(Engine.hpMul(10), hp * 2);
+  assert.equal(Engine.B.goldX, 5); // buiten de grenzen wordt afgekapt
+  Engine.tune({ startGold: 10000, lives: 20, prepSeconds: 300, enemyHp: 1, goldMul: 1 });
 });

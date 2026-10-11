@@ -65,6 +65,7 @@ const Net = (() => {
         if (handlers.onOpen) handlers.onOpen(room);
         if (handlers.onChat) handlers.onChat(m.chat || [], true);
         if (handlers.onBoard) handlers.onBoard(m.board || []);
+        if (handlers.onSettings && m.settings) handlers.onSettings(m.settings);
         emit(joined, [], left);
         flush();
       } else if (m.t === 'join') {
@@ -76,6 +77,7 @@ const Net = (() => {
         if (upd.length) emit([], upd, []);
       } else if (m.t === 'chat') { if (handlers.onChat) handlers.onChat([m.m], false); }
       else if (m.t === 'board') { if (handlers.onBoard) handlers.onBoard(m.rows || []); }
+      else if (m.t === 'settings') { if (handlers.onSettings && m.settings) handlers.onSettings(m.settings); }
     }
 
     function open() {

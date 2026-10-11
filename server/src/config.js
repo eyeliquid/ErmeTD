@@ -15,7 +15,11 @@ module.exports = {
   corsOrigins: (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean),
   // Aantal proxy's voor de server (1 bij de meeste hosts). Nodig om het echte IP-adres te zien voor de inlogbeveiliging.
   trustProxy: int(process.env.TRUST_PROXY, 0),
+  // Wachtwoord van de webadmin op /admin. Leeg = de webadmin staat uit.
+  adminPassword: process.env.ADMIN_PASSWORD || '',
   sessionDays: int(process.env.SESSION_DAYS, 90),
+  // Hoeveel accounts er per uur vanaf één IP-adres gemaakt mogen worden.
+  registerPerHour: int(process.env.REGISTER_PER_HOUR, 8),
   maxPeers: int(process.env.MAX_PEERS, 200),
   maxPeersPerIp: int(process.env.MAX_PEERS_PER_IP, 8),
 };

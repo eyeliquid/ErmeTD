@@ -8,6 +8,8 @@ services:
     environment:
       # Staat er een proxy (Caddy, nginx, een hostingplatform) voor? Zet dit dan op 1.
       TRUST_PROXY: "0"
+      # Wachtwoord van de webadmin op /admin (minstens 10 tekens). Leeg = webadmin uit.
+      ADMIN_PASSWORD: ""
     volumes:
       - speldata:/data
 volumes:

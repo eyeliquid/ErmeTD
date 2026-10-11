@@ -639,7 +639,7 @@ function setText(el,v){if(el.textContent!==v)el.textContent=v;}
 function takenSlots(){const s=new Set();for(const p of peers){if(own(p))continue;const pr=p.presence||{};if((pr.st==='playing'||pr.st==='done')&&Number.isInteger(pr.sl))s.add(pr.sl);}return s;}
 function freeSlot(idx){const t=takenSlots(),free=[];for(let i=0;i<SLOTS;i++)if(!t.has(i))free.push(i);return free.length?free[(idx||0)%free.length]:0;}
 let waveTotal=1,nextRound=0;
-function beginGame(idx,mid){closePops();mySlot=freeSlot(idx);G=E.create(save.skills,save.diff);HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
+function beginGame(idx,mid){closePops();mySlot=freeSlot(idx);E.tune(gameCfg);G=E.create(save.skills,save.diff);HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
   matchId=mid||Date.now();myBm=0;myBh=0;msLast=null;finalMax=0;finalAt=0;built=false;nx=0;sentWave=0;arenaFor=0;roadMode=false;t0=performance.now();prepEnd=t0+E.PREP*1000;
   {const[ox,oz]=slotO(mySlot);hero={x:ox+6.5,z:oz+5.5,a:-1.57,hp:0,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false};}armour=0;arena=null;camMode='hero';hero.hp=maxHp();hcam.yaw=0;hcam.pitch=.62;hcam.d=stage.clientWidth<760?13:10;myState='playing';ready=false;
   $('#home').hidden=true;$('#game').hidden=false;$('#result').hidden=true;
@@ -1154,6 +1154,9 @@ const lobbyPeers=()=>peers.filter(p=>p.kind==='viewer'&&p.presence&&p.presence.s
 function row(cells,cls){const li=document.createElement('li');if(cls)li.className=cls;for(const[k,v,cl]of cells){const s=document.createElement('span');s.className=k+(cl?' '+cl:'');s.textContent=v;li.append(s);}return li;}
 /* Lobbychat: berichten gaan via de server. Die bewaart de laatste zestig, zodat ook wie net binnenkomt ze ziet. */
 let chatLog=[];const chatSeen=new Set();
+// Spelinstellingen uit de webadmin. Ze gelden voor het potje dat hierna begint; een lopend potje verandert niet.
+let gameCfg=null;const prepTxt=()=>{const s=Math.round((gameCfg&&+gameCfg.prepSeconds)||E.PREP);return s%60?s+' seconden':s===60?'1 minuut':s/60+' minuten';};const chatOn=()=>!gameCfg||gameCfg.chatEnabled!==false;
+function onSettings(s){if(!s||typeof s!=='object')return;gameCfg=s;const m=$('#motd'),t=typeof s.motd==='string'?cleanMsg(s.motd):'';m.hidden=!t;setText(m,t);setText($('#prepTxt'),prepTxt());renderLobby();}
 const cleanMsg=s=>String(s).replace(/[\u0000-\u001f\u007f\u2028-\u202e]/g,' ').trim().slice(0,160);
 function onChat(list,history){let add=false;for(const m of list){if(!m||chatSeen.has(m.id))continue;const text=typeof m.text==='string'?cleanMsg(m.text):'';if(!text)continue;
     chatSeen.add(m.id);chatLog.push({ts:+m.ts||Date.now(),text,by:m.by||null,peer:m.peer||'',name:typeof m.name==='string'?m.name:''});add=true;}
@@ -1177,7 +1180,7 @@ function paintMap(cells){const el=$('#world'),sig=JSON.stringify(cells);if(el.da
   cells.forEach((c,i)=>{const d=document.createElement('div');d.className='cell'+(c?' '+c.st+(c.me?' me':''):'');const k=document.createElement('span');k.className='n';k.textContent=String(i+1);d.append(k);
     if(c){n++;const w=document.createElement('span');w.className='who';w.textContent=c.name;const s=document.createElement('span');s.className='st';s.textContent=c.sub;d.append(w,s);d.title=`Vesting ${i+1}: ${c.name}, ${c.sub}`;}else d.title=`Vesting ${i+1}: vrij`;el.append(d);});
   setText($('#worldNote'),`${n} van ${SLOTS} vestingen bezet`);}
-function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array(SLOTS).fill(null);$('#chatIn').disabled=$('#chatSend').disabled=!room;$('#lobbyDot').className='live'+(room&&room.open?'':' off');
+function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array(SLOTS).fill(null);$('#chatIn').disabled=$('#chatSend').disabled=!room||!chatOn();$('#chatIn').placeholder=chatOn()?'Typ een bericht…':'De chat staat tijdelijk uit.';$('#lobbyDot').className='live'+(room&&room.open?'':' off');
   if(!room){paintRoster([{name:'Jij',chip:connAt===-1?'Solo':'Verbinden',cl:'',score:'',h:save.hero,df:save.diff,me:true}]);cells[0]={name:'Jij',st:'lobby',me:true,sub:'jouw vesting'};paintMap(cells);
     setText($('#lobbyNote'),connAt===-1?'solo':'verbinden…');
     setText(btn,'Start spel');btn.disabled=false;setText(help,connAt===-1?'De gezamenlijke lobby is hier niet bereikbaar. Je speelt alleen in de wereld.':'');return;}
@@ -1195,9 +1198,9 @@ function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array
   paintMap(cells);
   if(taken.size>=SLOTS||(!me&&lp.length>=SLOTS)){setText(btn,'Wereld vol');btn.disabled=true;setText(help,'Alle 20 vestingen zijn bezet. Wacht tot er een vrijkomt.');return;}
   btn.disabled=false;
-  if(!others.length){setText(btn,'Start spel');setText(help,'Je bent alleen in de lobby. Start direct, of wacht tot er meer spelers zijn. Elk potje begint met vijf minuten bouwen.');}
+  if(!others.length){setText(btn,'Start spel');setText(help,'Je bent alleen in de lobby. Start direct, of wacht tot er meer spelers zijn. Elk potje begint met '+prepTxt()+' bouwen.');}
   else if(host&&own(host)){setText(btn,'Start spel');const n=others.filter(p=>p.presence.rd).length;setText(help,`${n} van ${others.length} andere spelers klaar. Jij bent de eerste speler en kunt altijd starten.`);}
-  else{setText(btn,ready?'Toch niet klaar':'Ik ben klaar');setText(help,'Het spel start als de eerste speler start, of als alle andere spelers klaar zijn. Daarna heeft iedereen vijf minuten om een weg te bouwen.');}}
+  else{setText(btn,ready?'Toch niet klaar':'Ik ben klaar');setText(help,'Het spel start als de eerste speler start, of als alle andere spelers klaar zijn. Daarna heeft iedereen '+prepTxt()+' om een weg te bouwen.');}}
 const myIdx=()=>Math.max(0,lobbyPeers().findIndex(p=>own(p)));
 function hostStart(){const go=Date.now(),i=myIdx();seenGo.add(go);if(room){room.presence({go}).catch(()=>{});setTimeout(()=>room.presence({go:null}).catch(()=>{}),6000);}beginGame(i,go);}
 $('#startBtn').onclick=()=>{if(!room){beginGame(0,Date.now());return;}const lp=lobbyPeers(),others=lp.filter(p=>!own(p));
@@ -1325,11 +1328,12 @@ if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,pain
 if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
 // Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.
 myT=Date.now();
-const lobby=Net.connect({onPeers,onChat,onBoard,
+const lobby=Net.connect({onPeers,onChat,onBoard,onSettings,
   onOpen(r){room=r;connAt=performance.now();renderChat();renderLobby();},
   onFail(){if(!room){connAt=-1;renderLobby();renderChat();}},
   onClose(){renderLobby();}});
 lobby.presence({t:myT,st:myState,rd:false,h:save.hero,df:save.diff});
+Net.api('GET','/settings').then(r=>{if(!gameCfg)onSettings(r.settings);},()=>{});
 Net.api('GET','/scores').then(r=>{if(!board)onBoard(r.rows);},()=>{if(!board){boardFail=true;renderBoard();}});
 
 })();
