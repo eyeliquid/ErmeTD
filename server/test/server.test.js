@@ -163,3 +163,21 @@ test('matchups: een toren doet anderhalf keer schade tegen sterk en de helft teg
   // de voorvertoning telt dezelfde vijanden als de golf zelf
   for (const r of [1, 7, 10, 25, 100]) assert.equal(Engine.waveMix(r).reduce((n, o) => n + o.n, 0), Engine.makeWave(r).length);
 });
+
+test('turbo turrets blijven losse torens: er is geen The Geers of Omega-toren meer', () => {
+  const Engine = require('../../client/js/engine.js');
+  const G = Engine.create({});
+  G.gold = 1e6;
+  for (let i = 0; i < 4; i++) {
+    const t = Engine.build(G, 4 * Engine.N + 2 + i * 2, 'sentry');
+    for (let k = 0; k < 5; k++) Engine.upgrade(G, t);
+    assert.equal(Engine.spec(G, t, 'turbo'), true);
+  }
+  assert.equal(G.tw.length, 4);
+  assert.ok(G.tw.every((t) => t.type === 'sentry' && t.spec === 'turbo'));
+  assert.equal(Engine.T.geers, undefined);
+  assert.equal(Engine.T.omega, undefined);
+  // punten in de oude skill Geers-overdrive gaan mee naar Turbo-overdrive
+  const { cleanSave } = require('../src/validate');
+  assert.equal(cleanSave({ pts: 0, skills: { geers: 3 } }).skills.overdrive, 3);
+});

@@ -42,9 +42,7 @@ const T={
  rocket:{n:'Raketbatterij',d:'Groot bereik en een grote klap.',cost:260,dmg:75,rate:.4,range:4.6,splash:1.4,minr:1.2},
  rail:{n:'Railgun',d:'Enorme schade, dwars door pantser.',cost:300,dmg:230,rate:.35,range:5},
  wave:{n:'Golfkanon',d:'Schiet door een hele rij vijanden heen.',cost:340,dmg:95,rate:.5,range:3.6},
- uplink:{n:'Commandopost',d:'Versterkt de schade van turrets in de buurt.',cost:220,range:1.6},
- geers:{n:'The Geers',d:'Drie turbo turrets, samengesmolten tot een.',cost:0,range:5.5},
- omega:{n:'Omega-toren',d:'Het ultieme wapen: vernietigende stralen die elke vijand in bereik vertragen.',cost:0,range:3.2}
+ uplink:{n:'Commandopost',d:'Versterkt de schade van turrets in de buurt.',cost:220,range:1.6}
 };
 const TYPES=['sentry','flak','cryo','toxin','tesla','prism','rocket','rail','wave','uplink'];
 const EN={
@@ -58,7 +56,6 @@ const EN={
 };
 // Matchups: wat een toren tegen een vijand doet. 1.5 = sterk, .5 = zwak, niet genoemd = gewoon.
 // Het getal telt voor de schade per schot, voor het gif per seconde en voor hoe lang een vijand bevroren blijft.
-// The Geers en de Omega-toren staan er niet in: die zijn tegen alles even goed.
 const VS={
  sentry:{inf:1.5,dog:1.5,tank:.5,boss:.5},
  flak:{drone:1.5,boss:1.5,tank:.5,mech:.5},
@@ -97,7 +94,7 @@ const SKILLS=[
  {id:'turbo',tree:'T',t:4,c:2,max:5,ic:'bolt',n:'Turbo-injectie',d:'Turbo {v}% goedkoper',v:5},
  {id:'repair',tree:'T',t:4,c:3,max:2,ic:'plus',n:'Reparatieploeg',d:'+{v} leven na elke 10 rondes',v:1},
  {id:'boss',tree:'T',t:5,c:1,max:5,ic:'skull',n:'Bazenjager',d:'Torens doen +{v}% schade tegen bazen',v:6},
- {id:'geers',tree:'T',t:5,c:2,max:5,ic:'star',n:'Geers-overdrive',d:'The Geers doet {v}% meer schade',v:7,req:'turbo'},
+ {id:'overdrive',tree:'T',t:5,c:2,max:5,ic:'star',n:'Turbo-overdrive',d:'Turbo turrets doen {v}% meer schade',v:7,req:'turbo'},
  {id:'war',tree:'T',t:6,c:1,max:1,ic:'trophy',n:'Totale oorlog',d:'Alle torens: +10% schade en +10% vuursnelheid',v:0,req:'boss'},
  {id:'hdmg',tree:'H',t:0,c:0,max:5,ic:'sword',n:'Wapentraining',d:'Je held doet +{v}% schade',v:4},
  {id:'hhp',tree:'H',t:0,c:1,max:5,ic:'heart',n:'Taai',d:'+{v}% levenspunten voor je held',v:5},
@@ -124,7 +121,7 @@ const SKILL_MAX=SKILLS.reduce((a,s)=>a+s.max,0),TIER=5;
 function mods(sk){sk=sk&&!Array.isArray(sk)?sk:{};const r=id=>sk[id]|0,war=r('war')?1.1:1,lg=r('legend');return{
   gold:1+.04*r('bounty'),up:1-.05*r('engineer'),start:50*r('chest'),build:1-.025*r('bulk'),lives:2*r('fort'),
   dmg:(1+.03*r('dmg'))*war,rate:(1+.025*r('rate'))*war,range:1+.02*r('range'),freeze:1+.12*r('freeze'),tox:1+.14*r('toxin'),toxSlow:.035*r('toxin'),
-  interest:.01*r('interest'),bonus:1+.1*r('bonus'),sell:.7+.1*r('salvage'),link:1+.1*r('link'),turbo:1-.05*r('turbo'),geers:1+.07*r('geers'),
+  interest:.01*r('interest'),bonus:1+.1*r('bonus'),sell:.7+.1*r('salvage'),link:1+.1*r('link'),turbo:1-.05*r('turbo'),overdrive:1+.07*r('overdrive'),
   ap:.1*r('ap'),splash:1+.05*r('splash'),repair:r('repair'),boss:1+.06*r('boss'),
   hDmg:(1+.04*r('hdmg'))*(lg?1.15:1),hHp:(1+.05*r('hhp'))*(lg?1.15:1),hSpd:(1+.02*r('hspd'))*(lg?1.1:1),hRate:1+.03*r('hrate'),hArm:.03*r('harm'),
   hRange:1+.04*r('hrange'),hAp:.15*r('hap'),hRegen:.005*r('hregen'),hGold:.1*r('hgold'),hBoss:1+.05*r('hboss'),hCrit:.04*r('hcrit'),hCritDmg:.25*r('hcritd'),
@@ -140,7 +137,7 @@ const hpMul=r=>B.hp0*(1+B.lin*r)*Math.pow(B.g,r)*(r>B.late?Math.pow(B.g2,r-B.lat
 
 function create(skills){const m=mods(skills);
   return{m,gold:B.startGold+m.start,lives:B.lives+m.lives,round:1,cleared:0,phase:'prep',timer:PREP,wt:0,q:[],road:new Set(),trail:new Set(),path:null,rv:0,pv:null,pvk:-1,
-    tw:[],map:{},en:[],fx:[],ev:[],fxOn:false,score:0,kills:0,time:0,nid:1,geers:0};}
+    tw:[],map:{},en:[],fx:[],ev:[],fxOn:false,score:0,kills:0,time:0,nid:1};}
 
 function makeWave(r){const q=[];let t=0;const n=8+Math.floor(r*.4),R=Math.round;
   const add=(type,cnt,gap,hm)=>{for(let i=0;i<cnt;i++){q.push({t,type,hm:hm||1});t+=gap;}t+=1.2;};
@@ -168,18 +165,16 @@ function hit(G,e,dmg,pierce,src){if(e.dead)return;const arm=e.arm*(1-G.m.ap)*(1-
 function aoe(G,x,y,r,fn){const r2=r*r;for(const e of G.en){if(e.dead)continue;const dx=e.x-x,dy=e.y-y;if(dx*dx+dy*dy<=r2)fn(e);}}
 
 function stats(G,t){const b=T[t.type],m=G.m,au=1+(t.aura||0);
-  if(t.type==='geers')return{dmg:t.gdps*m.geers*m.dmg*au/5,rate:5,range:b.range*m.range};
-  if(t.type==='omega')return{dmg:hpMul(G.round)*.6*m.dmg*au,rate:2,range:b.range*m.range};
   const ln=t.spec==='link'?Math.min(4,t.nb||0):0,tb=t.spec==='turbo';
   if(t.type==='uplink')return{dmg:0,rate:0,range:(1.6+.15*t.lvl)*m.range*(1+.1*ln),aura:(.18+.04*t.lvl)*(tb?1.5:1)*(1+.15*m.link*ln)};
   const up=Math.pow(1.4,t.lvl);
-  return{dmg:b.dmg*up*m.dmg*au*(1+.25*m.link*ln)*(tb?1.3:1),rate:b.rate*(1+.05*t.lvl)*m.rate*(tb?1.8:1),
+  return{dmg:b.dmg*up*m.dmg*au*(1+.25*m.link*ln)*(tb?1.3*m.overdrive:1),rate:b.rate*(1+.05*t.lvl)*m.rate*(tb?1.8:1),
     range:b.range*(1+.04*t.lvl)*m.range*(1+.05*ln),
     fz:b.fz?b.fz*(1+.12*t.lvl)*m.freeze:0,pd:b.pd?b.pd*up*m.tox*au:0,slow:b.slow?Math.min(.6,b.slow+m.toxSlow+.02*t.lvl):0};}
 function recalc(G){
   for(const t of G.tw){t.nb=0;t.aura=0;const x=t.c%N,y=(t.c-x)/N;
     for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;
-      if(nx<0||ny<0||nx>=N||ny>=N)continue;const o=G.map[ny*N+nx];if(o&&(o.lvl>=5||o.type==='geers'))t.nb++;}}
+      if(nx<0||ny<0||nx>=N||ny>=N)continue;const o=G.map[ny*N+nx];if(o&&o.lvl>=5)t.nb++;}}
   for(const u of G.tw){if(u.type!=='uplink')continue;u.s=stats(G,u);
     for(const t of G.tw){if(t.type==='uplink')continue;const dx=t.x-u.x,dy=t.y-u.y;
       if(dx*dx+dy*dy<=u.s.range*u.s.range&&u.s.aura>t.aura)t.aura=u.s.aura;}}
@@ -191,27 +186,19 @@ const buildCost=(G,type)=>Math.round(T[type].cost*G.m.build);
 const upCost=(G,t)=>Math.round(T[t.type].cost*(.5+.25*t.lvl)*G.m.up);
 const specCost=(G,t,k)=>Math.round(T[t.type].cost*(k==='turbo'?3*G.m.turbo:1.5));
 const sellValue=(G,t)=>Math.round(t.spent*G.m.sell);
-function build(G,c,type){if(!canBuild(G,c)||!T[type]||type==='geers')return null;const cost=buildCost(G,type);if(G.gold<cost)return null;
+function build(G,c,type){if(!canBuild(G,c)||!T[type])return null;const cost=buildCost(G,type);if(G.gold<cost)return null;
   G.gold-=cost;const x=c%N,t={id:G.nid++,c,x:x+.5,y:(c-x)/N+.5,type,lvl:0,spec:null,cd:0,ang:.8,ramp:1,tg:0,spent:cost,nb:0,aura:0};
   G.tw.push(t);G.map[c]=t;G.rv++;recalc(G);return t;}
-function upgrade(G,t){if(t.type==='geers'||t.lvl>=5)return false;const c=upCost(G,t);if(G.gold<c)return false;
+function upgrade(G,t){if(t.lvl>=5)return false;const c=upCost(G,t);if(G.gold<c)return false;
   G.gold-=c;t.spent+=c;t.lvl++;recalc(G);return true;}
 function remove(G,t){G.tw.splice(G.tw.indexOf(t),1);delete G.map[t.c];G.rv++;}
 function sell(G,t){G.gold+=sellValue(G,t);remove(G,t);recalc(G);}
-const rawDps=t=>{const b=T[t.type];return b.dmg?b.dmg*Math.pow(1.4,5)*1.3*b.rate*1.25*1.8*(t.type==='prism'?1.6:1):150;};
-function spec(G,t,k){if(t.type==='geers'||t.lvl<5||t.spec||(k!=='turbo'&&k!=='link'))return false;const c=specCost(G,t,k);if(G.gold<c)return false;
+function spec(G,t,k){if(t.lvl<5||t.spec||(k!=='turbo'&&k!=='link'))return false;const c=specCost(G,t,k);if(G.gold<c)return false;
   G.gold-=c;t.spent+=c;t.spec=k;
-  if(k==='turbo'){const tb=G.tw.filter(o=>o.spec==='turbo'&&o!==t);
-    if(tb.length>=2){const parts=[tb[0],tb[1],t];t.gdps=1.1*parts.reduce((s,o)=>s+rawDps(o),0);
-      t.spent=parts.reduce((s,o)=>s+o.spent,0);remove(G,tb[0]);remove(G,tb[1]);
-      t.type='geers';t.spec='geers';t.lvl=5;G.geers++;G.ev.push({k:'geers',c:t.c});
-      // tien keer The Geers: het ultieme wapen vult elk vrij vak met een Omega-toren
-      if(G.geers>=10&&!G.omega){G.omega=true;let n=0;for(let c=0;c<N*N;c++)if(canBuild(G,c)){const x=c%N,o={id:G.nid++,c,x:x+.5,y:(c-x)/N+.5,type:'omega',lvl:5,spec:'omega',cd:0,ang:.8,ramp:1,tg:0,spent:0,nb:0,aura:0};G.tw.push(o);G.map[c]=o;n++;}G.rv++;G.ev.push({k:'omega',n});}}}
   recalc(G);return true;}
 
 function fire(G,t,e,s){const m=G.m,fx=G.fxOn?G.fx:null,a=[t.x,t.y],b=[e.x,e.y];
   switch(t.type){
-    case'omega':hit(G,e,hpMul(G.round)*.6*m.dmg*(1+(t.aura||0)),.5);if(!e.dead){const sl=.45*(e.boss?.5:1);e.sl=e.sT>0?Math.max(e.sl,sl):sl;e.sT=2;}fx&&fx.push({k:'omega',a,b});break;
     case'sentry':hit(G,e,s.dmg,0,'sentry');fx&&fx.push({k:'shot',a,b});break;
     case'rail':hit(G,e,s.dmg,1,'rail');fx&&fx.push({k:'rail',a,b});break;
     case'flak':case'rocket':{const r=T[t.type].splash*m.splash;aoe(G,e.x,e.y,r,x=>hit(G,x,s.dmg,0,t.type));fx&&fx.push({k:t.type==='rocket'?'rocket':'boom',a,b,r});break;}
@@ -248,12 +235,6 @@ function step(G,dt){
   for(const t of G.tw){if(t.type==='uplink')continue;
     t.cd-=dt;if(t.cd>0)continue;
     const s=t.s,r2=s.range*s.range,mr=T[t.type].minr||0,m2=mr*mr;
-    if(t.type==='geers'){const inr=[];for(const e of G.en){if(e.dead)continue;const dx=e.x-t.x,dy=e.y-t.y;if(dx*dx+dy*dy<=r2)inr.push(e);}
-      if(!inr.length){t.cd=0;continue;}inr.sort((p,q)=>q.d-p.d);t.cd=Math.max(t.cd,-dt)+1/s.rate;
-      t.ang=Math.atan2(inr[0].y-t.y,inr[0].x-t.x);
-      for(let i=0;i<3&&i<inr.length;i++){const e=inr[i];if(G.fxOn)G.fx.push({k:'geers',a:[t.x,t.y],b:[e.x,e.y]});
-        if(!e.immune){e.sl=Math.max(e.sT>0?e.sl:0,.25);e.sT=Math.max(e.sT,.6);}hit(G,e,s.dmg,.5);}
-      continue;}
     let best=null,bv=-1;
     for(const e of G.en){if(e.dead)continue;const dx=e.x-t.x,dy=e.y-t.y,d2=dx*dx+dy*dy;if(d2>r2||d2<m2)continue;
       let v=t.type==='rail'?e.hp:e.d;

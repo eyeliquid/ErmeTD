@@ -22,7 +22,8 @@ function cleanSave(d) {
   let spent = 0;
   if (d.skills && typeof d.skills === 'object' && !Array.isArray(d.skills)) {
     for (const s of Engine.SKILLS) {
-      const r = Math.min(s.max, Math.max(0, d.skills[s.id] | 0));
+      // rangen van de oude skill Geers-overdrive tellen voor Turbo-overdrive
+      const r = Math.min(s.max, Math.max(0, (d.skills[s.id] || (s.id === 'overdrive' && d.skills.geers)) | 0));
       if (r) { skills[s.id] = r; spent += r; }
     }
   }

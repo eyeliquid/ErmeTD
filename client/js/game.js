@@ -47,7 +47,7 @@ function clean(d){if(!d||typeof d!=='object')return null;const sk={},v2=d.v===2;
   // Oude opslag werkte met XP: 500 XP wordt 1 skillpunt. Nog oudere opslag had losse skills in een lijst; die tellen eerst mee als XP.
   if(!v2){let xp=Math.max(0,+d.xp||0);if(Array.isArray(d.skills)){const n=Math.min(20,new Set(d.skills.filter(x=>typeof x==='string')).size);for(let i=0;i<n;i++)xp+=500+550*i;}
     pts=Math.floor(xp/500);earned=Math.floor(earned/500);}
-  if(d.skills&&typeof d.skills==='object'&&!Array.isArray(d.skills))for(const s of SKILLS){const r=Math.min(s.max,Math.max(0,d.skills[s.id]|0));if(r)sk[s.id]=r;}
+  if(d.skills&&typeof d.skills==='object'&&!Array.isArray(d.skills))for(const s of SKILLS){const r=Math.min(s.max,Math.max(0,(d.skills[s.id]||(s.id==='overdrive'&&d.skills.geers))|0));if(r)sk[s.id]=r;}
   return{v:2,pts:Math.min(E.SKILL_MAX,Math.floor(pts)),earned:Math.floor(earned),games:Math.max(0,+d.games||0),best:Math.max(0,+d.best||0),skills:sk,hero:Math.max(0,Math.min(5,d.hero|0)),at:Math.max(0,+d.at||0)};}
 function award(n){if(!(n>0))return;save.pts+=n;save.earned+=n;gamePts+=n;persist();toastAdd=` · +${n} skillpunt${n>1?'en':''}`;}
 const blank=()=>({v:2,pts:0,earned:0,skills:{},games:0,best:0,hero:0,at:0});
@@ -151,8 +151,6 @@ function halo(col,size,op){const k='h'+col+(op||'');const m=mcache[k]||(mcache[k
 function decal(col,size,op){const m=new T3.Mesh(raw('decal',()=>new T3.PlaneGeometry(1,1).rotateX(-Math.PI/2)),new T3.MeshBasicMaterial({map:haloTex,color:col,blending:T3.AdditiveBlending,depthWrite:false,transparent:true,opacity:op,toneMapped:false}));
   m.scale.setScalar(size);return m;}
 function mesh(g,mat){const m=new T3.Mesh(g,mat||MAT);m.castShadow=true;m.receiveShadow=true;return m;}
-function gearParts(r,h,teeth,col){const a=[cy(r*.8,r*.8,h,col,0,0,0,20)];
-  for(let i=0;i<teeth;i++){const an=i/teeth*Math.PI*2;a.push(bx(r*.34,h,r*.24,col,Math.cos(an)*r*.88,0,Math.sin(an)*r*.88,-an));}return a;}
 const AIM={sentry:1,flak:1,toxin:1,rocket:1,rail:1,wave:1};
 function makeTower(type,slot,lvl,spec){const g=new T3.Group(),head=new T3.Group(),th='#'+TEAM[slot].getHexString(),anims=[];g.add(head);
   const base=fn=>g.add(mesh(geo(type+'b'+slot,()=>[cy(.47,.5,.12,'#3a3f47',0,.06,0,10),cy(.4,.47,.06,'#5a616c',0,.15,0,10),...fn()])));
@@ -179,17 +177,11 @@ function makeTower(type,slot,lvl,spec){const g=new T3.Group(),head=new T3.Group(
       gl('wring',()=>new T3.TorusGeometry(.14,.03,6,18).rotateY(Math.PI/2),'#ff3b2e',.52,.57,0,head,.6);break;}
     case'uplink':{base(()=>[bx(.5,.3,.5,'#3b5670',0,.32,0),cy(.035,.05,.85,'#aab4be',0,.88,0,8)]);hd(()=>[P(new T3.CylinderGeometry(.32,.06,.14,18),'#c9d2da',.05,1.08,0,0,0,-.9),bx(.1,.08,.1,th,0,.94,0)]);
       gl('beacon',()=>new T3.SphereGeometry(.06,8,6),'#ff5a3c',0,1.34,0,null,.7);anims.push(t=>head.rotation.y=t*.9+slot);break;}
-    case'omega':{base(()=>[cy(.36,.46,.3,'#241f36',0,.33,0,8),cy(.07,.2,1.15,'#2f2848',0,1.02,0,6),tor(.3,.035,'#5a4a8a',.5)]);
-      const c=gl('oct',()=>new T3.OctahedronGeometry(.2),'#c58bff',0,1.78,0,null,1.6);anims.push(t=>{c.rotation.y=t*2.4;c.position.y=1.78+Math.sin(t*3+slot)*.05;});break;}
-    case'geers':{base(()=>[cy(.5,.56,.28,'#5b4a1e',0,.32,0,12),cy(.1,.1,1,'#3a3f45',0,.9,0,8)]);
-      const g1=mesh(geo('gear1',()=>gearParts(.56,.12,10,'#c79a2a')));g1.position.y=.68;g.add(g1);
-      const g2=mesh(geo('gear2',()=>gearParts(.38,.12,8,'#e6c04a')));g2.position.y=.98;g.add(g2);
-      const c=gl('core',()=>new T3.SphereGeometry(.15,14,10),'#ff7a4e',0,1.4,0,null,2.2);anims.push(t=>{g1.rotation.y=t*1.6;g2.rotation.y=-t*2.6;c.scale.setScalar(1+.15*Math.sin(t*9));});break;}
   }
   // teamcirkel op de grond, zoals de selectiecirkels in een RTS
-  const ring=new T3.Mesh(raw('tring',()=>new T3.RingGeometry(.5,.58,36).rotateX(-Math.PI/2)),glow(spec==='turbo'?'#ff8a2a':spec==='link'?'#45d2ff':spec==='geers'?'#ffc83a':spec==='omega'?'#b06aff':th));ring.position.y=.03;g.add(ring);
-  if(type!=='geers'&&type!=='omega'&&lvl>0)g.add(new T3.Mesh(geo('pip'+lvl,()=>{const a=[];for(let i=0;i<lvl;i++){const an=Math.PI/2+(i-(lvl-1)/2)*.36;a.push(bx(.09,.09,.09,'#ffc83a',Math.cos(an)*.5,.24,Math.sin(an)*.5,-an));}return a;}),glow('#ffc83a')));
-  g.scale.setScalar(type==='geers'?1.3:type==='omega'?1:1+.045*lvl);g.userData={head,anims,aim:!!AIM[type]};return g;}
+  const ring=new T3.Mesh(raw('tring',()=>new T3.RingGeometry(.5,.58,36).rotateX(-Math.PI/2)),glow(spec==='turbo'?'#ff8a2a':spec==='link'?'#45d2ff':th));ring.position.y=.03;g.add(ring);
+  if(lvl>0)g.add(new T3.Mesh(geo('pip'+lvl,()=>{const a=[];for(let i=0;i<lvl;i++){const an=Math.PI/2+(i-(lvl-1)/2)*.36;a.push(bx(.09,.09,.09,'#ffc83a',Math.cos(an)*.5,.24,Math.sin(an)*.5,-an));}return a;}),glow('#ffc83a')));
+  g.scale.setScalar(1+.045*lvl);g.userData={head,anims,aim:!!AIM[type]};return g;}
 const ENGEO={
   inf:()=>[bx(.16,.26,.14,'#8f2a22',0,.27,0),bx(.07,.14,.07,'#2a2420',0,.07,.04),bx(.07,.14,.07,'#2a2420',0,.07,-.04),sp(.085,'#c9a888',0,.48,0),sp(.1,'#4a5530',0,.52,0,[1,.6,1]),brl(.02,.28,'#15171a',.14,.33,.08),bx(.12,.16,.06,'#3a3f2a',-.08,.3,0)],
   dog:()=>[bx(.36,.14,.13,'#6a4a30',0,.2,0),bx(.13,.12,.11,'#4d3422',.22,.27,0),bx(.1,.04,.04,'#4d3422',-.22,.26,0),...[[.12,.04],[.12,-.04],[-.12,.04],[-.12,-.04]].map(([x,z])=>bx(.05,.14,.05,'#4d3422',x,.07,z))],
@@ -408,8 +400,6 @@ function spawnFx(f,ox,oz){const A=h=>V(ox+f.a[0],h,oz+f.a[1]),B=f.b?V(ox+f.b[0],
     case'shot':fxBeam(A(.62),B,'#ffd98a',.04,.08);fxBall(A(.62),'#ffe9b0',.05,.16,.07,.9);fxBall(B,'#ffb060',.04,.12,.1,.8);break;
     case'rail':fxBeam(A(.66),B,'#45c8ff',.14,.3);fxBeam(A(.66),B,'#ffffff',.05,.3);fxBall(B,'#9fe8ff',.1,.5,.25,.8);break;
     case'beam':fxBeam(A(1.66),B,'#7ff0ff',.08,.14);fxBall(B,'#bff8ff',.08,.2,.12,.6);break;
-    case'omega':fxBeam(A(1.78),B,'#c58bff',.09,.16);fxBall(B,'#e0c0ff',.08,.26,.14,.7);break;
-    case'geers':fxBeam(A(1.85),B,'#ffc83a',.12,.2);fxBall(B,'#ffe08a',.1,.3,.16,.7);break;
     case'wave':fxBeam(A(.59),B,'#ff3b2e',.34,.26);fxBeam(A(.59),B,'#ffffff',.1,.26);break;
     case'rocket':missiles.push({a:A(.9),b:B,r:f.r,t:0,m:null});break;
     case'boom':fxBeam(A(.84),B,'#ffd9a0',.04,.09);fxBall(B,'#ff8a2c',.2,f.r*.85,.32,.8);fxBall(B,'#fff0c0',.1,f.r*.4,.14,.9);break;
@@ -439,7 +429,7 @@ function updFx(dt,time){
 /* --- vestingen: eigen spel + andere spelers --- */
 const ECODE={inf:'i',dog:'d',tank:'t',drone:'r',mech:'m',haz:'h',boss:'b'},EDEC=Object.fromEntries(Object.entries(ECODE).map(([k,v])=>[v,k]));
 const b36=n=>Math.max(0,Math.min(1295,n)).toString(36).padStart(2,'0');
-const encT=()=>G.tw.map(t=>b36(t.c)+(t.type==='geers'?'g':t.type==='omega'?'o':TYPES.indexOf(t.type))+t.lvl+(t.spec?t.spec[0]:'n')).join('');
+const encT=()=>G.tw.map(t=>b36(t.c)+TYPES.indexOf(t.type)+t.lvl+(t.spec?t.spec[0]:'n')).join('');
 const encE=()=>G.en.slice(0,150).map(e=>ECODE[e.type]+b36(Math.round(e.d*10))+Math.max(0,Math.min(9,Math.ceil(e.hp/e.max*9)))+(e.fz>0?'f':e.pT>0?'p':'n')).join('');
 // Weg in presence: tijdens de bouwfase 'P' + de wegvakken, daarna 'L' + de route op volgorde (gras = vak + 169).
 const encP=()=>G.path?'L'+G.path.cells.map(c=>b36(c+(G.road.has(c)?0:N*N))).join(''):'P'+[...G.road].map(b36).join('');
@@ -449,8 +439,8 @@ function fieldPath(s){if(typeof s!=='string'||!s)return{road:NOSET,trail:NOSET,p
   for(let i=1;i+2<=s.length&&cells.length<N*N;i+=2){const v=parseInt(s.slice(i,i+2),36);if(!(v>=0&&v<2*N*N))continue;const c=v%(N*N);cells.push(c);(v<N*N?road:trail).add(c);}
   o={road,trail,path:s[0]==='L'&&cells.length?E.mkPath(cells,!trail.size):null};if(pcache.size>120)pcache.clear();pcache.set(s,o);return o;}
 function decode(p){const pr=p.presence||{},fp=fieldPath(pr.pa),tw=[],en=[],s=typeof pr.tw==='string'?pr.tw:'',q=typeof pr.en==='string'?pr.en:'';
-  for(let i=0;i+5<=s.length&&tw.length<170;i+=5){const k=parseInt(s.slice(i,i+2),36),type=s[i+2]==='g'?'geers':s[i+2]==='o'?'omega':TYPES[+s[i+2]];if(!(k>=0&&k<N*N)||!type)continue;
-    const x=k%N;tw.push({c:k,x:x+.5,y:(k-x)/N+.5,type,lvl:Math.min(5,+s[i+3]||0),spec:{l:'link',t:'turbo',g:'geers',o:'omega'}[s[i+4]]||null,ang:null});}
+  for(let i=0;i+5<=s.length&&tw.length<170;i+=5){const k=parseInt(s.slice(i,i+2),36),type=TYPES[+s[i+2]];if(!(k>=0&&k<N*N)||!type)continue;
+    const x=k%N;tw.push({c:k,x:x+.5,y:(k-x)/N+.5,type,lvl:Math.min(5,+s[i+3]||0),spec:{l:'link',t:'turbo'}[s[i+4]]||null,ang:null});}
   const el=Math.min(1.2,(performance.now()-(rx.get(p.peer)||0))/1000)*(pr.st==='playing'?Math.min(3,+pr.sp||1):0);
   for(let i=0;fp.path&&i+5<=q.length&&en.length<150;i+=5){const type=EDEC[q[i]];if(!type)continue;const fl=q[i+4];
     const d=parseInt(q.slice(i+1,i+3),36)/10+(fl==='f'?0:EN[type].sp*el*.85);if(!(d<fp.path.len))continue;const pp=E.posAt(fp.path,d);
@@ -548,7 +538,7 @@ function render3D(time,dt){if(!gl3)return;
     for(const t of fl.tw){const key=fl.slot*1000+t.c,sig=t.type+t.lvl+(t.spec||'');let o=tobj.get(key);
       if(!o||o.sig!==sig){if(o)scene.remove(o.g);o={g:makeTower(t.type,fl.slot,t.lvl,t.spec),sig};o.g.position.set(ox+t.x,0,oz+t.y);scene.add(o.g);tobj.set(key,o);}
       seenT.add(key);const u=o.g.userData;if(u.aim&&t.ang!=null)u.head.rotation.y=-t.ang;for(const a of u.anims)a(time);
-      if(!fl.own&&t.tg&&t.type!=='uplink'&&Math.random()<dt*1.6)spawnFx({k:t.type==='rail'?'rail':t.type==='prism'?'beam':t.type==='geers'?'geers':t.type==='omega'?'omega':'shot',a:[t.x,t.y],b:[t.tg.x,t.tg.y]},ox,oz);}
+      if(!fl.own&&t.tg&&t.type!=='uplink'&&Math.random()<dt*1.6)spawnFx({k:t.type==='rail'?'rail':t.type==='prism'?'beam':'shot',a:[t.x,t.y],b:[t.tg.x,t.tg.y]},ox,oz);}
     for(const e of fl.en){const I=EI[e.type];if(!I||I.n>=I.cap)continue;const i=I.n++,es=e.big?1.6:1.25;
       const bob=e.type==='drone'?Math.sin(time*5+e.id)*.08:e.type==='boss'?Math.sin(time*1.4)*.06:e.fz>0?0:Math.abs(Math.sin(time*9+e.id))*.03;
       dummy.position.set(ox+e.x,bob,oz+e.y);dummy.quaternion.identity();dummy.rotation.set(0,-Math.atan2(e.dy||0,e.dx||1),0);dummy.scale.setScalar(es);dummy.updateMatrix();
@@ -574,7 +564,7 @@ function render3D(time,dt){if(!gl3)return;
       if(buildSel&&ok)showRange(x+.5,y+.5,T[buildSel].range*G.m.range);}
     for(const o of orders){const x=o.c%N,m=poolMesh(ghosts,gi++,()=>new T3.Mesh(new T3.CylinderGeometry(.42,.42,.9,8),new T3.MeshBasicMaterial({color:'#f6cf4d',wireframe:true,toneMapped:false})));m.position.set(ox+x+.5,.45,oz+(o.c-x)/N+.5);m.rotation.y=time;}
     for(const t of G.tw)if(t.spec==='link'){const x=t.c%N,y=(t.c-x)/N;
-      for(const o of G.tw){if(o===t||(o.lvl<5&&o.type!=='geers'))continue;const px=o.c%N,py=(o.c-px)/N;if(Math.abs(px-x)>1||Math.abs(py-y)>1)continue;
+      for(const o of G.tw){if(o===t||o.lvl<5)continue;const px=o.c%N,py=(o.c-px)/N;if(Math.abs(px-x)>1||Math.abs(py-y)>1)continue;
         const m=poolMesh(links,li++,()=>new T3.Mesh(raw('fxbeam',()=>new T3.BoxGeometry(1,1,1).translate(0,0,.5)),glow('#45d2ff')));
         m.position.set(ox+t.x,.2,oz+t.y);m.lookAt(ox+o.x,.2,oz+o.y);const w=.05+.02*Math.sin(time*7);m.scale.set(w,w,Math.hypot(o.x-t.x,o.y-t.y));}}}
   for(;gi<ghosts.length;gi++)ghosts[gi].visible=false;for(;li<links.length;li++)links[li].visible=false;
@@ -587,7 +577,7 @@ function renderIcons(){if(!T3)return;let r;try{r=new T3.WebGLRenderer({antialias
   const sc=new T3.Scene(),c=new T3.PerspectiveCamera(30,128/108,.1,20);c.position.set(2.1,2.3,2.6);c.lookAt(0,.68,0);
   sc.add(new T3.HemisphereLight('#9fb4e6','#2b2432',.8));const d=new T3.DirectionalLight('#ffd0a0',1.9);d.position.set(-3,4,2);sc.add(d);
   const shot=(k,o)=>{sc.add(o);r.render(sc,c);sc.remove(o);const cv=document.createElement('canvas');cv.width=256;cv.height=216;cv.getContext('2d').drawImage(r.domElement,0,0,256,216);ICON[k]=cv;};
-  for(const type of[...TYPES,'geers','omega']){const t=makeTower(type,SLOTS,0,null);t.userData.head.rotation.y=type==='uplink'?0:.5;if(type==='geers')t.scale.setScalar(.95);shot(type,t);}
+  for(const type of TYPES){const t=makeTower(type,SLOTS,0,null);t.userData.head.rotation.y=type==='uplink'?0:.5;shot(type,t);}
   HEROES.forEach((h,i)=>{const o=makeHero(i,SLOTS);o.scale.setScalar(1.45);o.rotation.y=.75;o.position.y=-.1;animHero(o,.5,0);shot('hero'+i,o);});
   r.dispose();if(r.forceContextLoss)r.forceContextLoss();}
 function iconDraw(cv,ic){const g=cv.getContext('2d'),W=cv.width,H=cv.height;g.clearRect(0,0,W,H);
@@ -657,8 +647,6 @@ function toLobby(){if(arena&&arena.g&&arena.g.obj)scene.remove(arena.g.obj);aren
 function events(){const[ox,oz]=slotO(mySlot);for(const e of G.ev){
     if(e.k==='clear'){award(E.pointsFor(e.r));toast(`Ronde ${e.r} afgeslagen · +${fmt(e.bonus)} credits`);}
     else if(e.k==='wave'&&e.r%10===0)toast('Een luchtschip nadert de vesting');
-    else if(e.k==='geers'){toast('Drie turbo turrets smelten samen: The Geers');sel=G.map[e.c]||null;if(gl3){const x=e.c%N;fxBall(V(ox+x+.5,1,oz+(e.c-x)/N+.5),'#ffc83a',.3,3,.8,.9);}}
-    else if(e.k==='omega'){toast(`Het ultieme wapen: ${e.n} Omega-torens vullen je vesting`);sel=null;buildSel=null;orders=[];if(gl3){fxRing(V(ox+6.5,0,oz+6.5),'#c58bff',10,1.4);fxBall(V(ox+6.5,1,oz+6.5),'#e0c0ff',.5,9,1.2,.8);}}
     else if(e.k==='leak'){stage.classList.add('leak');setTimeout(()=>stage.classList.remove('leak'),300);}}
   G.ev.length=0;if(gl3&&!document.hidden)for(const f of G.fx)spawnFx(f,ox,oz);G.fx.length=0;}
 /* --- samen spelen: bouwfase, snelheid en rondes lopen gelijk --- */
@@ -696,7 +684,7 @@ function walkable(x,z){if(Math.hypot(x-ACX,z-ACZ)<=AR)return true;if(runFree(x-R
   if(lx>=-.15&&lx<=13.15&&lz>=-.15&&lz<=13.15)return true;
   if(lz>=5.85&&lz<=7.15&&((lx>13&&c<COLS-1)||(lx<0&&c>0)))return true;
   if(lx>=7.85&&lx<=9.15&&((lz>13&&r<ROWS-1)||(lz<0&&r>0)))return true;return false;}
-function towerAt(x,z){if(!G||G.omega)return false;const[ox,oz]=slotO(mySlot),lx=x-ox,lz=z-oz,cx=Math.floor(lx),cz=Math.floor(lz);if(cx<0||cz<0||cx>=N||cz>=N)return false;
+function towerAt(x,z){if(!G)return false;const[ox,oz]=slotO(mySlot),lx=x-ox,lz=z-oz,cx=Math.floor(lx),cz=Math.floor(lz);if(cx<0||cz<0||cx>=N||cz>=N)return false;
   const t=G.map[cz*N+cx];return!!t&&Math.hypot(lx-t.x,lz-t.y)<.5;}
 function stepHero(dx,dz,manual){const h=hero,ok=(x,z)=>walkable(x,z)&&!(manual&&towerAt(x,z)&&!towerAt(h.x,h.z));
   if(ok(h.x+dx,h.z+dz)){h.x+=dx;h.z+=dz;return true;}if(ok(h.x+dx,h.z)){h.x+=dx;return true;}if(ok(h.x,h.z+dz)){h.z+=dz;return true;}return false;}
@@ -1033,10 +1021,10 @@ function hud(){if(!G)return;setText($('#hGold'),fmt(G.gold));setText($('#hLives'
 let cur=[],tipIdx=-1;
 function cardSlots(){const a=[];if(!G)return a;
   if(arena){if(arena.mode==='run')a[0]={ic:'shield',key:'F',n:'Schild',d:`Houdt ${String(2.5+HM.shDur).replace('.',',')} seconden alle kogels tegen. Daarna laadt het ${9-HM.shCd} seconden op.`,on:shieldT>0,wait:Math.ceil(shieldCd),act:useShield};return a;}
-  if(sel){const t=sel,g=t.type==='geers'||t.type==='omega',n=G.tw.filter(o=>o.spec==='turbo').length;
-    if(!g&&t.lvl<5)a[0]={ic:'up',key:'U',n:'Upgrade naar niveau '+(t.lvl+1),cost:E.upCost(G,t),d:'40% meer schade, en iets meer bereik en vuursnelheid.',act:()=>{if(!E.upgrade(G,t))toast('Te weinig credits');}};
-    if(!g&&t.lvl>=5&&!t.spec){a[0]={ic:'link',key:'L',n:'Link',cost:E.specCost(G,t,'link'),d:`+25% schade per naburige volledig geüpgradede turret. Nu ${Math.min(4,t.nb)} in de buurt.`,act:()=>{if(!E.spec(G,t,'link'))toast('Te weinig credits');}};
-      a[1]={ic:'turbo',key:'T',n:'Turbo',cost:E.specCost(G,t,'turbo'),d:`80% sneller en 30% meer schade. Je hebt ${n} turbo turret${n===1?'':'s'}; de derde smelt samen tot The Geers. The Geers gebouwd: ${G.geers} van 10.`,act:()=>{if(!E.spec(G,t,'turbo'))toast('Te weinig credits');else events();}};}
+  if(sel){const t=sel;
+    if(t.lvl<5)a[0]={ic:'up',key:'U',n:'Upgrade naar niveau '+(t.lvl+1),cost:E.upCost(G,t),d:'40% meer schade, en iets meer bereik en vuursnelheid.',act:()=>{if(!E.upgrade(G,t))toast('Te weinig credits');}};
+    if(t.lvl>=5&&!t.spec){a[0]={ic:'link',key:'L',n:'Link',cost:E.specCost(G,t,'link'),d:`+25% schade per naburige volledig geüpgradede turret. Nu ${Math.min(4,t.nb)} in de buurt.`,act:()=>{if(!E.spec(G,t,'link'))toast('Te weinig credits');}};
+      a[1]={ic:'turbo',key:'T',n:'Turbo',cost:E.specCost(G,t,'turbo'),d:'80% sneller en 30% meer schade.',act:()=>{if(!E.spec(G,t,'turbo'))toast('Te weinig credits');}};}
     a[8]={ic:'sell',key:'V',n:'Verkopen',gain:E.sellValue(G,t),d:'Sloop deze turret en krijg een deel van je credits terug.',act:()=>{E.sell(G,t);sel=null;}};
     a[11]={ic:'back',key:'Esc',n:'Terug',d:'Terug naar de bouwkaart.',act:()=>{sel=null;}};return a;}
   TYPES.forEach((type,i)=>a[i]={ic:type,key:String((i+1)%10),n:T[type].n,cost:E.buildCost(G,type),d:T[type].d,vs:type,fit:E.VS[type]?E.waveFit(type,G.round):1,on:buildSel===type,act:()=>{buildSel=buildSel===type?null:type;roadMode=false;}});
@@ -1049,7 +1037,7 @@ const mk=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=
 // Wat komt eraan, en welke torens werken daar goed tegen.
 function paintNext(){const q=$('#qNext');q.textContent='';q.append(mk('b','hd','Golf '+G.round+' bestaat uit'));
   for(const o of E.waveMix(G.round)){const li=mk('span','en');li.append(mk('b',null,o.n+'× '+EN[o.type].n),mk('i','good',E.counters(o.type).map(t=>SHORT[t]).join(', ')));q.append(li);}
-  if(G.geers&&!G.omega)q.append(mk('span','en',`The Geers ${G.geers}/10`));}
+}
 function paintVs(p,type){const k=E.VS[type]?type:'';if(p.dataset.v===k)return;p.dataset.v=k;p.textContent='';p.hidden=!k;if(!k)return;
   const a=mk('span','good'),b=mk('span','bad');a.append(mk('b',null,'Sterk tegen '),E.strongVs(type).map(e=>EN[e].n).join(', '));b.append(mk('b',null,'Zwak tegen '),E.weakVs(type).map(e=>EN[e].n).join(', '));p.append(a,b);}
 function refresh(){if(!G)return;if(sel&&!G.tw.includes(sel))sel=null;cur=cardSlots();const card=$('#card');
@@ -1063,10 +1051,10 @@ function refresh(){if(!G)return;if(sel&&!G.tw.includes(sel))sel=null;cur=cardSlo
   const st=$('#iStats'),pc=$('#pcv'),show=(s,type)=>{st.hidden=false;setText($('#iDmg'),type==='uplink'?'+'+Math.round(s.aura*100)+'%':fmt(s.dmg));setText($('#iRate'),type==='uplink'?'–':r1(s.rate));setText($('#iRange'),r1(s.range));};
   paintVs($('#iVs'),sel?sel.type:roadMode?'':buildSel||'');
   const face=sel?sel.type:roadMode?'road':buildSel||'hero'+save.hero;if(pc.dataset.ic!==face){pc.dataset.ic=face;iconDraw(pc,face);}
-  if(sel){const t=sel,b=T[t.type],om=t.type==='omega',g=t.type==='geers'||om;setText($('#iName'),b.n);
-    setText($('#iSub'),om?'Ultiem wapen':g?`Superturret · ${G.geers} van 10 gebouwd`:`Niveau ${t.lvl} ${t.spec==='turbo'?'turbo turret':t.spec==='link'?'gelinkte turret':'turret'}`);show(t.s,t.type);
-    setText($('#iDesc'),om?b.d:g?'Raakt drie vijanden tegelijk, vertraagt ze en slaat door pantser heen. Bouw er tien en het ultieme wapen komt vrij.':t.spec==='link'?`Gelinkt met ${Math.min(4,t.nb)} naburige turret${t.nb===1?'':'s'}.`:b.d);
-    $('#pBar').style.width=(g?100:t.lvl/5*100)+'%';setText($('#pBarT'),g?b.n:`Niveau ${t.lvl}/5`);}
+  if(sel){const t=sel,b=T[t.type];setText($('#iName'),b.n);
+    setText($('#iSub'),`Niveau ${t.lvl} ${t.spec==='turbo'?'turbo turret':t.spec==='link'?'gelinkte turret':'turret'}`);show(t.s,t.type);
+    setText($('#iDesc'),t.spec==='link'?`Gelinkt met ${Math.min(4,t.nb)} naburige turret${t.nb===1?'':'s'}.`:b.d);
+    $('#pBar').style.width=t.lvl/5*100+'%';setText($('#pBarT'),`Niveau ${t.lvl}/5`);}
   else if(roadMode){const pv=E.preview(G);setText($('#iName'),'Weg');setText($('#iSub'),'Gratis · alleen in de bouwfase');st.hidden=true;
     setText($('#iDesc'),'Sleep over je vesting om weg te leggen. De vijand komt binnen bij de rode poort links en loopt naar de blauwe poort rechts.');$('#pBar').style.width=(pv.road?100:0)+'%';setText($('#pBarT'),pv.road?'Weg loopt door':G.road.size+' vakken gelegd');}
   else if(buildSel){const b=T[buildSel];setText($('#iName'),b.n);setText($('#iSub'),`Bouwen · ${E.buildCost(G,buildSel)} credits`);show(E.stats(G,{type:buildSel,lvl:0,spec:null,aura:0,nb:0}),buildSel);
@@ -1074,7 +1062,7 @@ function refresh(){if(!G)return;if(sel&&!G.tw.includes(sel))sel=null;cur=cardSlo
   else{const H=HEROES[save.hero];setText($('#iName'),H.n);setText($('#iSub'),arena?arena.K.n:orders.length?`${orders.length} bouwopdracht${orders.length===1?'':'en'} in de rij`:H.role);
     st.hidden=false;setText($('#iDmg'),fmt(H.dmg*HM.hDmg*(armour>=3?1.3:1)*(arena?1:heroScale())));setText($('#iRate'),r1(H.rate*HM.hRate));setText($('#iRange'),r1(H.range*HM.hRange));
     setText($('#iDesc'),H.d+' Je held valt vanzelf aan binnen bereik.');$('#pBar').style.width=Math.max(0,hero.hp/maxHp()*100)+'%';setText($('#pBarT'),Math.max(0,Math.ceil(hero.hp))+' / '+Math.round(maxHp()));}
-  const nk=G.round+'_'+G.geers;if(nextRound!==nk){nextRound=nk;paintNext();}
+  const nk=G.round;if(nextRound!==nk){nextRound=nk;paintNext();}
   paintSpeed();
   const inv=$('#invGrid');for(let i=0;i<4;i++){const c=inv.children[i],has=i<armour,k=has?'arm'+i:'slot';if(c.dataset.ic!==k){c.dataset.ic=k;iconDraw(c,k);c.classList.toggle('has',has);c.title=has?ARMOUR[i].n+': '+ARMOUR[i].d:'Leeg. Win een minigame om een stuk harnas te krijgen.';}}}
 let last=0,acc=0,slow=0;

@@ -109,4 +109,4 @@ Elke toren doet 150% schade tegen de vijanden waar hij sterk tegen is en 50% teg
 | Railgun | Hammer Tank, Hazmat-trooper, Luchtschip | Conscript, Aanvalshond, Terror Drone |
 | Golfkanon | Conscript, Aanvalshond | Hammer Tank, Luchtschip |
 
-De Commandopost, The Geers en de Omega-toren hebben geen matchups.
+De Commandopost heeft geen matchups.
