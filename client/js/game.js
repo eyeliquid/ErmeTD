@@ -227,7 +227,22 @@ function makeTower(type,slot,lvl,spec){const g=new T3.Group(),head=new T3.Group(
         P(new T3.ConeGeometry(.4,.8,12),'#6a3d8f',-.16,.66,-.08,0,0,.5),sp(.11,'#e9e3f2',-.5,.98,-.08),tor(.44,.07,'#e9e3f2',.36)]));hdm.position.y=1.42;g.add(hdm);
       gl('slcore',()=>new T3.TorusGeometry(1,.05,6,32).rotateX(Math.PI/2),up?'#ff4a2a':'#b58cff',0,.58,0,null,3.4);
       if(up){const ey=[-.23,.23].map(x=>gl('sleye',()=>new T3.SphereGeometry(.08,10,8),'#ffdd55',x,1.5,.5,null,.7));
-        anims.push(t=>{g1.rotation.y=t*4;g2.rotation.y=-t*6;const s=1+.06*Math.sin(t*14);hdm.scale.set(s,s,s);hdm.rotation.z=.12*Math.sin(t*9);hdm.position.y=1.42+.05*Math.abs(Math.sin(t*7));for(const e of ey)e.scale.setScalar(1+.3*Math.sin(t*20));});break;}
+        // Wakker: twee armen met grote vuisten. Bij het wakker worden en bij elke aanval slaat hij met beide handen op de grond.
+        const arms=[-1,1].map(sd=>{const a=new T3.Group();a.position.set(sd*.85,1.3,.1);
+          a.add(mesh(geo('slarm',()=>[sp(.24,'#8a6a1c',0,0,0),bx(.3,.72,.3,'#8a6a1c',0,-.4,0),cy(.24,.24,.12,'#c79a2a',0,-.8,0,10),bx(.4,.66,.4,'#6b4f14',0,-1.1,0),
+            bx(.56,.44,.56,'#c79a2a',0,-1.45,0),bx(.58,.08,.2,'#e6c04a',0,-1.3,.2)])));g.add(a);return{a,sd};});
+        const S=g.userData.slam={at:-9,r:4,fired:true,again:false};let born=null;
+        const REST=-1.25,HIGH=-2.9,HIT=-.95,UPT=.26,DOWN=.08,BACK=.36,ease=u=>u*u*(3-2*u);
+        anims.push(t=>{if(born===null){born=t;S.at=t;S.r=6;S.fired=false;} // de eerste klap: hij wordt wakker
+          g1.rotation.y=t*4;g2.rotation.y=-t*6;for(const e of ey)e.scale.setScalar(1+.3*Math.sin(t*20));
+          let p=t-S.at,th=REST+.06*Math.sin(t*3),rz=0,dip=0;
+          if(p>=0&&p<UPT){const u=ease(p/UPT);th=REST+(HIGH-REST)*u;rz=.4*u;dip=-.12*u;}
+          else if(p>=UPT&&p<UPT+DOWN){const u=(p-UPT)/DOWN;th=HIGH+(HIT-HIGH)*u*u;rz=.4*(1-u);dip=-.12+.3*u*u;}
+          else if(p>=UPT+DOWN&&p<UPT+DOWN+BACK){const u=ease((p-UPT-DOWN)/BACK);th=HIT+(REST-HIT)*u;dip=.18*(1-u);}
+          else if(S.again&&p>=UPT+DOWN+BACK){S.again=false;S.at=t;S.fired=false;}
+          if(!S.fired&&p>=UPT+DOWN){S.fired=true;slamFx(g,S.r);}
+          for(const{a,sd}of arms){a.rotation.x=th;a.rotation.z=-sd*rz;}
+          const s=1+.04*Math.sin(t*14);hdm.scale.set(s,s,s);hdm.rotation.z=.08*Math.sin(t*9);hdm.rotation.x=dip;hdm.position.y=1.42-dip*.4;});break;}
       const zs=[0,1,2].map(i=>{const z=new T3.Mesh(geo('zzz',()=>[bx(.3,.07,.07,'#fff',0,.15,0),bx(.44,.07,.07,'#fff',0,0,0,0,.76),bx(.3,.07,.07,'#fff',0,-.15,0)]),glow('#d9c2ff'));g.add(z);return z;});
       anims.push(t=>{g1.rotation.y=t*.35;g2.rotation.y=-t*.55;const br=Math.sin(t*1.3+slot);hdm.scale.set(1+.03*br,1+.07*br,1+.03*br);hdm.rotation.z=.05*Math.sin(t*.65);
         zs.forEach((z,i)=>{const u=(t*.3+i/3)%1;z.position.set(.55+u*.9+.12*Math.sin(t*2+i),2.2+u*1.7,.2);z.scale.setScalar((.5+u*1.1)*(u>.85?(1-u)/.15:1));z.rotation.y=Math.sin(t+i)*.5;});});break;}
@@ -295,6 +310,7 @@ Object.assign(ENGEO,{
 const EI={},ETOP={inf:.75,dog:.5,tank:.65,drone:.95,mech:.75,haz:.78,boss:2.4,crate:.72,target:1.1,gen:1.45,sheep:.62,cart:.9,flag:1.25};
 let hpMesh,hpBack,dummy,WHITE,ICE,TOXC,cR=null;
 const tobj=new Map(),bobj=new Map(),labels=[],live=[],pool={beam:[],ball:[],ring:[]},missiles=[],fires=[];
+let fxNow=0,shakeT=0;const calm=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let hoverM,rangeM,selM,ghosts=[],links=[],roadM,trailM,kerbM,gateIn,gateOut,roadSig='';
 
 /* --- texturen: allemaal procedureel getekend --- */
@@ -505,6 +521,10 @@ function fxBeam(a,b,col,w,life){if(live.length>340)return;const m=getFx('beam');
 function fxBall(p,col,r0,r1,life,op){if(live.length>340)return;const m=getFx('ball');m.material.color.set(col);m.position.copy(p);Object.assign(m.userData,{t:0,life,r0,r1,op});m.scale.setScalar(r0);live.push(m);}
 function fxRing(p,col,r,life,op){if(live.length>340)return;const m=getFx('ring');m.material.color.set(col);m.position.set(p.x,.06,p.z);Object.assign(m.userData,{t:0,life,r0:r*.3,r1:r,op:op||.9});m.scale.setScalar(r*.3);live.push(m);}
 const V=(x,y,z)=>new T3.Vector3(x,y,z);
+// Twee vuisten slaan op de grond: een stofwolk bij elke vuist en een schokgolf over het hele bereik.
+function slamFx(g,r){const c=g.position;for(const sd of[-1,1]){const p=V(c.x+sd*.85,.3,c.z+1.27);fxRing(p,'#ffb060',1.3,.45,.8);fxBall(p,'#ffe0a0',.15,.7,.3,.7);}
+  fxRing(V(c.x,0,c.z+1),'#ff4a2a',r,.75,.6);fxRing(V(c.x,0,c.z+1),'#ffd27a',r*.55,.5,.5);fxBall(V(c.x,.4,c.z+1.2),'#ff8a2c',.3,1.8,.35,.55);
+  if(Math.hypot(camera.position.x-c.x,camera.position.z-c.z)<30)shakeT=Math.max(shakeT,.25);}
 function spawnFx(f,ox,oz){const A=h=>V(ox+f.a[0],h,oz+f.a[1]),B=f.b?V(ox+f.b[0],.36,oz+f.b[1]):null;
   switch(f.k){
     case'shot':fxBeam(A(.62),B,'#ffd98a',.04,.08);fxBall(A(.62),'#ffe9b0',.05,.16,.07,.9);fxBall(B,'#ffb060',.04,.12,.1,.8);break;
@@ -516,7 +536,9 @@ function spawnFx(f,ox,oz){const A=h=>V(ox+f.a[0],h,oz+f.a[1]),B=f.b?V(ox+f.b[0],
     case'ice':fxBeam(A(1.1),B,'#bff3ff',.06,.16);fxRing(B,'#9fe8ff',f.r,.42);fxBall(B,'#bff3ff',.1,f.r*.6,.3,.45);break;
     case'geers':fxBeam(A(1.25),B,'#ffc14a',.07,.12);fxBall(B,'#ff7a2c',.15,f.r*.6,.26,.55);break;
     case'snore':fxRing(B,'#7a4fd0',f.r,.8,.3);break;
-    case'roar':fxRing(B,'#ff4a2a',f.r,.6,.55);fxBall(V(B.x,1.4,B.z),'#ffb060',.3,1.6,.3,.6);break;
+    // De wakkere Slapende Geers: de klap zelf (met schokgolf) speelt het model af, zie slamFx.
+    case'roar':{let hit=false;for(const o of tobj.values()){const S=o.g.userData.slam;if(S&&Math.abs(o.g.position.x-B.x)<.6&&Math.abs(o.g.position.z-B.z)<.6){S.r=f.r;if(S.fired&&fxNow-S.at>=.7){S.at=fxNow;S.fired=false;}else S.again=true;hit=true;}}
+      if(!hit){fxRing(B,'#ff4a2a',f.r,.6,.55);fxBall(V(B.x,1.4,B.z),'#ffb060',.3,1.6,.3,.6);}break;}
     case'tox':fxBeam(A(1.04),B,'#8be85a',.05,.14);fxBall(B,'#5fc22e',.2,f.r*.9,.55,.5);break;
     case'bolt':{let p=V(ox+f.pts[0][0],1.46,oz+f.pts[0][1]);for(let i=1;i<f.pts.length;i++){const q=V(ox+f.pts[i][0],.38,oz+f.pts[i][1]);let a=p;
         for(let k=1;k<=3;k++){const u=k/3,j=k<3?.24:0,b=V(p.x+(q.x-p.x)*u+(Math.random()-.5)*j,p.y+(q.y-p.y)*u+(Math.random()-.5)*j,p.z+(q.z-p.z)*u+(Math.random()-.5)*j);fxBeam(a,b,'#cfefff',.06,.16);a=b;}
@@ -656,7 +678,7 @@ function render3D(time,dt){if(!gl3)return;
     if(keys.arrowup){cam.tx+=f[0]*kp;cam.tz+=f[1]*kp;}if(keys.arrowdown){cam.tx-=f[0]*kp;cam.tz-=f[1]*kp;}
     if(keys.arrowright){cam.tx+=r[0]*kp;cam.tz+=r[1]*kp;}if(keys.arrowleft){cam.tx-=r[0]*kp;cam.tz-=r[1]*kp;}
     if(keys.q)cam.yaw+=1.6*dt;if(keys.e)cam.yaw-=1.6*dt;}
-  camUpdate();sea.material.map.offset.set(time*.004,time*.003);setDark(!!(arena&&arena.dark));if(darkOn)darkL.position.set(hero.x,2.4,hero.z);
+  fxNow=time;camUpdate();if(shakeT>0){shakeT-=dt;if(!calm){const k=shakeT*.7;camera.position.x+=(Math.random()-.5)*k;camera.position.y+=(Math.random()-.5)*k;}}sea.material.map.offset.set(time*.004,time*.003);setDark(!!(arena&&arena.dark));if(darkOn)darkL.position.set(hero.x,2.4,hero.z);
   const fs=fieldsNow(),seenT=new Set(),seenB=new Set();for(const k in EI)EI[k].n=0;let hp=0;updRoads(fs);
   cR.set(1,0,0).applyQuaternion(camera.quaternion);
   for(const fl of fs){const[ox,oz]=slotO(fl.slot);
