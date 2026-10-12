@@ -363,3 +363,27 @@ test('duwen en sprinten: de skills schuiven de waarden op', () => {
   const seen = new Set();
   for (const s of Engine.SKILLS) { const k = s.tree + s.t + '-' + s.c; assert.ok(!seen.has(k), k); seen.add(k); }
 });
+
+test('De Slapende Geers wekken: 10 keer drukken, 10 seconden 20x kracht en bereik, en maar een keer', () => {
+  const Engine = require('../../client/js/engine.js');
+  const { N } = Engine;
+  const G = Engine.create({});
+  G.gold = 1e9;
+  for (const [i, type] of Engine.TYPES.entries()) { const t = Engine.build(G, N + 1 + i, type); for (let k = 0; k < 5; k++) Engine.upgrade(G, t); Engine.spec(G, t, 'ultra'); }
+  for (const t of G.tw) Engine.spec(G, t, 'turbo');
+  for (let i = 0; i < 4; i++) Engine.build(G, 3 * N + 1 + i * 2, 'geers');
+  const z = Engine.build(G, 9 * N + 6, 'sleeper');
+  const dmg = z.s.dmg, range = z.s.range;
+  for (let i = 0; i < 9; i++) assert.equal(Engine.poke(G, z), true);
+  assert.equal(z.spec, null);
+  Engine.poke(G, z);
+  assert.equal(z.spec, 'awake');
+  assert.ok(Math.abs(z.s.dmg - dmg * 20) < 1e-6 && Math.abs(z.s.range - range * 20) < 1e-6);
+  assert.equal(Engine.poke(G, z), false);
+  Engine.lock(G); Engine.startWave(G); G.q = [];
+  for (let t = 0; t < 10.2; t += .1) Engine.step(G, .1);
+  assert.equal(z.spec, 'spent');
+  assert.ok(Math.abs(z.s.dmg - dmg) < 1e-6);
+  assert.equal(Engine.poke(G, z), false);
+  assert.equal(Engine.canWake(z), false);
+});

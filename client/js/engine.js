@@ -54,6 +54,9 @@ const T={
  geers:{n:'Geers Toren',d:'Zware granaten die door pantser slaan, tegen elke vijand even sterk. 13 keer te upgraden.',cost:1200,dmg:150,rate:1.5,range:3.8,splash:1.1,max:13,up:1.22,rl:.02,uc:[.25,.06]},
  sleeper:{n:'De Slapende Geers',d:'Beslaat 3 bij 3 vakken. Zijn gesnurk vertraagt elke vijand in een groot gebied en doet zware schade.',cost:5000,dmg:900,rate:1.25,range:5.5,slow:.65,size:3,max:0}
 };
+// Wakker maken: zo vaak drukken, dan is hij zo lang wakker met zoveel keer kracht en bereik. Dat kan één keer per Slapende Geers.
+const WAKE={pokes:10,time:10,mul:20
+};
 // TYPES zijn de tien gewone torens. ALL bevat ook de twee Geers-torens die je pas later vrijspeelt.
 const TYPES=['sentry','flak','cryo','toxin','tesla','prism','rocket','rail','wave','uplink'],ALL=[...TYPES,'geers','sleeper'],GEERS_NEED=4;
 const EN={
@@ -187,11 +190,11 @@ function aoe(G,x,y,r,fn){const r2=r*r;for(const e of G.en){if(e.dead)continue;co
 const maxLvl=t=>{const m=T[t.type].max;return m==null?5:m;};
 const hasTiers=type=>TYPES.includes(type);
 const tierOf=t=>t.spec==='turbo'?2:t.spec==='ultra'?1:0;
-function stats(G,t){const b=T[t.type],m=G.m,au=1+(t.aura||0),tier=tierOf(t),ul=tier?1+.6*m.link:1,tb=tier===2;
+function stats(G,t){const b=T[t.type],m=G.m,au=1+(t.aura||0),tier=tierOf(t),ul=(tier?1+.6*m.link:1)*(t.spec==='awake'?WAKE.mul:1),tb=tier===2;
   if(t.type==='uplink')return{dmg:0,rate:0,range:(1.6+.15*t.lvl)*m.range*(tier?1.15:1),aura:(.18+.04*t.lvl)*(tier?1+.3*m.link:1)*(tb?1.5:1)};
   const up=Math.pow(b.up||1.4,t.lvl);
   return{dmg:b.dmg*up*m.dmg*au*ul*(tb?1.3*m.overdrive:1),rate:b.rate*(1+.05*t.lvl)*m.rate*(tier?1.15:1)*(tb?1.8:1),
-    range:b.range*(1+(b.rl||.04)*t.lvl)*m.range*(tier?1.1:1),
+    range:b.range*(1+(b.rl||.04)*t.lvl)*m.range*(tier?1.1:1)*(t.spec==='awake'?WAKE.mul:1),
     fz:b.fz?b.fz*(1+.12*t.lvl)*m.freeze:0,pd:b.pd?b.pd*up*m.tox*au*ul:0,slow:b.slow?Math.min(t.type==='sleeper'?.8:.6,b.slow+m.toxSlow+.02*t.lvl):0};}
 function recalc(G){
   for(const t of G.tw)t.aura=0;
@@ -226,6 +229,10 @@ function upgrade(G,t){if(t.lvl>=maxLvl(t))return false;const c=upCost(G,t);if(G.
   G.gold-=c;t.spent+=c;t.lvl++;recalc(G);return true;}
 function remove(G,t){G.tw.splice(G.tw.indexOf(t),1);for(const k of t.cells||[t.c])delete G.map[k];G.rv++;}
 function sell(G,t){G.gold+=sellValue(G,t);remove(G,t);recalc(G);}
+// De wekknop van De Slapende Geers. spec: null = slaapt, 'awake' = wakker, 'spent' = is al een keer wakker geweest.
+const canWake=t=>t.type==='sleeper'&&!t.spec;
+function poke(G,t){if(!canWake(t))return false;t.pokes=(t.pokes||0)+1;
+  if(t.pokes>=WAKE.pokes){t.spec='awake';t.awakeT=WAKE.time;t.cd=0;G.rv++;recalc(G);G.ev.push({k:'wake',on:true});}return true;}
 // k = 'ultra' (na 5 upgrades) of 'turbo' (vanuit ultra, als er nog een andere ultra toren staat)
 function spec(G,t,k){if(!hasTiers(t.type)||t.lvl<5)return false;
   if(k==='ultra'){if(t.spec)return false;}else if(k==='turbo'){if(!canTurbo(G,t))return false;}else return false;
@@ -256,7 +263,7 @@ function fire(G,t,e,s){const m=G.m,fx=G.fxOn?G.fx:null,a=[t.x,t.y],b=[e.x,e.y];
     case'geers':{const r=T.geers.splash*m.splash;aoe(G,e.x,e.y,r,x=>hit(G,x,s.dmg,.5,'geers'));fx&&fx.push({k:'geers',a,b,r});break;}
     // De Slapende Geers snurkt: alles binnen bereik krijgt schade en wordt vertraagd. Niemand is er immuun voor; bazen merken het half.
     case'sleeper':aoe(G,t.x,t.y,s.range,x=>{hit(G,x,s.dmg,.5,'sleeper');if(x.dead)return;const sl=s.slow*(x.boss?.5:1);x.sl=x.sT>0?Math.max(x.sl,sl):sl;x.sT=Math.max(x.sT,1.6);});
-      fx&&fx.push({k:'snore',a,b:a,r:s.range});break;
+      fx&&fx.push({k:t.spec==='awake'?'roar':'snore',a,b:a,r:Math.min(s.range,t.spec==='awake'?9:s.range)});break;
   }}
 function step(G,dt){
   if(G.phase==='over'||G.phase==='won'||G.phase==='prep')return;
@@ -272,6 +279,7 @@ function step(G,dt){
     e.d+=sp*dt;
     if(e.d>=G.path.len){e.dead=true;G.lives-=e.leak;G.ev.push({k:'leak',n:e.leak});continue;}
     const p=posAt(G.path,e.d);e.x=p[0];e.y=p[1];e.dx=p[2];e.dy=p[3];}
+  for(const t of G.tw)if(t.spec==='awake'){t.awakeT-=dt;if(t.awakeT<=0){t.awakeT=0;t.spec='spent';G.rv++;t.s=stats(G,t);G.ev.push({k:'wake',on:false});}}
   for(const t of G.tw){if(t.type==='uplink')continue;
     t.cd-=dt;if(t.cd>0)continue;
     const s=t.s,r2=s.range*s.range,mr=T[t.type].minr||0,m2=mr*mr;
@@ -298,7 +306,7 @@ function lose(G){if(G.phase==='won'||G.phase==='over')return;G.phase='over';}
 function tune(s){if(!s||typeof s!=='object')return;const n=(v,lo,hi,d)=>{v=+v;return Number.isFinite(v)?Math.max(lo,Math.min(hi,v)):d;};
   B.startGold=Math.round(n(s.startGold,0,100000,B.startGold));B.lives=Math.round(n(s.lives,1,999,B.lives));
   B.hpX=n(s.enemyHp,.25,5,B.hpX);B.goldX=n(s.goldMul,.25,5,B.goldX);PREP=API.PREP=Math.round(n(s.prepSeconds,10,1800,PREP));}
-const API={MOVES,N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,tune,B,DIFF,diffIdx,T,TYPES,ALL,GEERS_NEED,maxLvl,hasTiers,tierOf,canTurbo,missingTurbo,geersReady,geersCount,sleeperReady,unlocked,cellsOf,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
+const API={WAKE,canWake,poke,MOVES,N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,tune,B,DIFF,diffIdx,T,TYPES,ALL,GEERS_NEED,maxLvl,hasTiers,tierOf,canTurbo,missingTurbo,geersReady,geersCount,sleeperReady,unlocked,cellsOf,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
   buildCost,upCost,specCost,sellValue,stats,mods,skillTotal,skillSpent,skillState,SKILL_MAX,TIER,pointsFor,hpMul,makeWave,hit,recalc,win,lose,VS,vs,strongVs,weakVs,counters,waveMix,waveFit};
 return API;
 })();
