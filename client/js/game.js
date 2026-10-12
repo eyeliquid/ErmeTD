@@ -12,7 +12,9 @@ let G=null,speed=1,buildSel=null,sel=null,hover=-1,myState='lobby',ended=false,m
 // potje: iedereen die samen startte deelt matchId; built = klaar met bouwen, nx = klaar voor ronde nx, sentWave = golf vroeg gestuurd
 let matchId=0,built=false,prepEnd=0,t0=0,nx=0,sentWave=0,arenaFor=0,roadMode=false,paintLast=-1,myT=0;
 // own: dit tabblad. isMe geldt ook voor je andere tabbladen, en die tellen als aparte spelers.
-const own=p=>!!p&&(p.sameTab===undefined?!!p.isMe:!!p.sameTab);
+// ACT: de bot die nu aan de beurt is (zie asBot). Dan is hij "ik", en ben jij voor hem een medespeler.
+let ACT=null;
+const ownReal=p=>!!p&&(p.sameTab===undefined?!!p.isMe:!!p.sameTab),own=p=>ACT?p===ACT:ownReal(p);
 // missies: schild voor het parcours, en mijn schade aan de baas (blijft meetellen nadat ik ben uitgeschakeld)
 let sprintT=0,sprintCd=0,pushCd=0,pushOut=null,shieldT=0,shieldCd=0,myBm=0,myBh=0,msLast=null,finalMax=0,finalAt=0;
 // Parcours: een strook naast de arena met dwarsmuren. Elke muur heeft een opening, om en om onder (1) en boven (0).
@@ -25,7 +27,7 @@ let hero={x:0,z:0,a:0,hp:100,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false},ord
 // lab: een losse minigame uitproberen vanuit de lobby, buiten een potje om
 let lab=null;
 let camMode='hero',arena=null,arSeq=0,armour=0,myPeer=null,akCount=0,heroObj=null,heroSig='';
-const hcam={yaw:0,pitch:.5,d:9},joy={x:0,y:0},rheroes=new Map();
+let hcam={yaw:0,pitch:.5,d:9},rheroes=new Map();const joy={x:0,y:0};
 const HEROES=[
  {id:'commando',n:'Commando',role:'Afstand · twee pistolen',d:'Snelle schoten op middellange afstand.',hp:100,spd:5.2,range:4.5,dmg:7,rate:4,k:'gun'},
  {id:'shinobi',n:'Shinobi',role:'Melee · katana',d:'Razendsnel van dichtbij, maar kwetsbaar.',hp:90,spd:6.4,range:1.5,dmg:16,rate:3,k:'blade'},
@@ -52,7 +54,7 @@ function clean(d){if(!d||typeof d!=='object')return null;const sk={},v2=d.v===2;
     pts=Math.floor(xp/500);earned=Math.floor(earned/500);}
   if(d.skills&&typeof d.skills==='object'&&!Array.isArray(d.skills))for(const s of SKILLS){const r=Math.min(s.max,Math.max(0,(d.skills[s.id]||(s.id==='overdrive'&&d.skills.geers))|0));if(r)sk[s.id]=r;}
   return{v:2,pts:Math.min(E.SKILL_MAX,Math.floor(pts)),earned:Math.floor(earned),games:Math.max(0,+d.games||0),best:Math.max(0,+d.best||0),skills:sk,hero:Math.max(0,Math.min(5,d.hero|0)),diff:E.diffIdx(d.diff),at:Math.max(0,+d.at||0)};}
-function award(n){if(!(n>0)||lab)return;save.pts+=n;save.earned+=n;gamePts+=n;persist();toastAdd=` · +${n} skillpunt${n>1?'en':''}`;}
+function award(n){if(!(n>0)||lab||ACT)return;save.pts+=n;save.earned+=n;gamePts+=n;persist();toastAdd=` · +${n} skillpunt${n>1?'en':''}`;}
 const blank=()=>({v:2,pts:0,earned:0,skills:{},games:0,best:0,hero:0,diff:0,at:0});
 const putLocal=()=>{try{localStorage.setItem('ratd-save',JSON.stringify(save));}catch{}};
 function loadLocal(){try{const d=clean(JSON.parse(localStorage.getItem('ratd-save')));if(d)save=d;}catch{}}
@@ -62,7 +64,7 @@ let saveBusy=false,saveAgain=false;
 function pushSave(){if(!acct||!Net.hasToken())return;if(saveBusy){saveAgain=true;return;}saveBusy=true;
   Net.api('PUT','/save',{save:{...save,skills:{...save.skills}}}).then(r=>{setCloud(true);if(r.kept){cloudSave=clean(r.save);if(adopt())refreshUI();}},authFail)
     .then(()=>{saveBusy=false;if(saveAgain){saveAgain=false;pushSave();}});}
-function persist(){save.at=Date.now();putLocal();pushSave();}
+function persist(){if(ACT)return;save.at=Date.now();putLocal();pushSave();}
 const newer=d=>!!d&&(d.earned>save.earned||(d.earned===save.earned&&d.at>save.at));
 function adopt(){if(newer(cloudSave)){save={...cloudSave,skills:{...cloudSave.skills}};putLocal();return true;}return false;}
 
@@ -720,7 +722,7 @@ function updWorldUi(fs){if(!fs)return;const by=new Map(fs.map(f=>[f.slot,f]));
 
 /* ================= spel ================= */
 let toastT=0;
-function toast(msg,ms){const t=$('#toast');t.textContent=msg+toastAdd;toastAdd='';t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,ms||2400);}
+function toast(msg,ms){if(ACT)return;const t=$('#toast');t.textContent=msg+toastAdd;toastAdd='';t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,ms||2400);}
 function setText(el,v){if(el.textContent!==v)el.textContent=v;}
 function takenSlots(){const s=new Set();for(const p of peers){if(own(p))continue;const pr=p.presence||{};if(pr.st!=='playing'&&pr.st!=='done')continue;if(Number.isInteger(pr.sl))s.add(pr.sl);if(Array.isArray(pr.bs))for(const v of pr.bs)if(Number.isInteger(v))s.add(v);}return s;}
 function freeSlot(idx){const t=takenSlots(),free=[];for(let i=0;i<SLOTS;i++)if(!t.has(i))free.push(i);return free.length?free[(idx||0)%free.length]:0;}
@@ -793,7 +795,8 @@ function updHero(dt){sprintT=Math.max(0,sprintT-dt);sprintCd=Math.max(0,sprintCd
   const h=hero,H=HEROES[save.hero],v1=H.spd*HM.hSpd*(armour>=4?1.2:1)*(arena&&arena.slow||1)*(arena&&sprintT>0?1+E.MOVES.sprSpd+HM.sprSpd:1),sp=v1*dt,yaw=camMode==='hero'?hcam.yaw:cam.yaw,f=[-Math.sin(yaw),-Math.cos(yaw)],r=[Math.cos(yaw),-Math.sin(yaw)];
   let fw=joy.y,rt=joy.x;if(keys.w||(camMode==='hero'&&keys.arrowup))fw+=1;if(keys.s||(camMode==='hero'&&keys.arrowdown))fw-=1;if(keys.d)rt+=1;if(keys.a)rt-=1;
   if(arena&&arena.flip){fw=-fw;rt=-rt;} // spiegelwereld: de besturing staat omgekeerd
-  const kx=f[0]*fw+r[0]*rt,kz=f[1]*fw+r[1]*rt,kl=Math.hypot(kx,kz);h.moving=false;
+  let kx=f[0]*fw+r[0]*rt,kz=f[1]*fw+r[1]*rt;if(ACT){kx=ACT.mx;kz=ACT.mz;} // een bot stuurt zelf, in plaats van het toetsenbord
+  const kl=Math.hypot(kx,kz);h.moving=false;
   if(arena&&arena.ice){ // ijs: de held komt traag op gang en glijdt door
     let wx=0,wz=0;if(kl>.05){camMode='hero';const m=Math.min(1,kl);wx=kx/kl*m;wz=kz/kl*m;h.tx=null;}
     else if(h.tx!=null){const dx=h.tx-h.x,dz=h.tz-h.z,d=Math.hypot(dx,dz);if(d<.5)h.tx=null;else{wx=dx/d;wz=dz/d;}}
@@ -873,11 +876,11 @@ function enterArena(kind,r){if(arena||!G||ended||!KIND[kind])return;const K=KIND
   arena={mode,kind,K,r:r||0,t:K.T,T:K.T,age:0,seq:arSeq,kills:0,g:null,score:0,rivals:false,ms:mode==='mini'||mode==='lab'||mode==='chairs'||kind==='duel'}; // ms: de score telt mee tegen die van de anderen
   if(mode==='boss')bossInit(arena);else if(mode==='run')runInit(arena);else if(mode==='chairs')chairsInit(arena);else if(mode==='lab')labInit(arena);else miniInit(arena);
   camMode='hero';toast(K.go,6000);
-  if(gl3){fxRing(V(hero.x,0,hero.z),'#8fb6ff',2,.8);fxBall(V(hero.x,1,hero.z),'#bfd4ff',.3,2.2,.6,.8);}botsEnter(kind,arena.r);pushHero(true);refresh();}
+  if(gl3){fxRing(V(hero.x,0,hero.z),'#8fb6ff',2,.8);fxBall(V(hero.x,1,hero.z),'#bfd4ff',.3,2.2,.6,.8);}pushHero(true);refresh();}
 // Beloning: een stuk harnas, of credits als het harnas al compleet is.
 function reward(a,txt){if(armour<4){armour++;applyArmour(armour);hero.hp=maxHp();toast(txt+`${ARMOUR[armour-1].n}. ${ARMOUR[armour-1].d}`,5000);}
   else{const c=300+10*a.r;G.gold+=c;toast(txt+`+${c} credits`,4000);}}
-function leaveArena(res){const a=arena,K=a.K;arena=null;if(!lab)botsDone(a,res);if(a.g&&a.g.obj)scene.remove(a.g.obj);if(a.tw)for(const t of a.tw)if(t.obj)scene.remove(t.obj);if(a.objs)for(const o of a.objs)scene.remove(o);shieldT=0;sprintT=0;
+function leaveArena(res){const a=arena,K=a.K;arena=null;if(a.g&&a.g.obj)scene.remove(a.g.obj);if(a.tw)for(const t of a.tw)if(t.obj)scene.remove(t.obj);if(a.objs)for(const o of a.objs)scene.remove(o);shieldT=0;sprintT=0;
   if(lab){labEnd(a,res);return;}
   if(a.ms)msLast=[a.r,Math.floor(a.score||0),res==='dead'||res==='out'?2:1];
   const[ox,oz]=slotO(mySlot);hero.x=ox+6.5;hero.z=oz+5.5;hero.tx=null;hero.hp=maxHp();hcam.yaw=0;if(res==='win'&&HM.mission)G.gold+=HM.mission;if(res==='win'&&a.mode==='boss')award(1);
@@ -961,7 +964,7 @@ function updBoss(a,dt){const g=a.g,h=hero,B=a.B,L=missionLead(a);let sum=myBh;fo
   g.ct-=dt;if(g.ct<=0&&Math.hypot(h.x-g.x,h.z-g.z)<B.cr){g.ct=.9;hurt(B.ct);if(gl3)fxRing(V(h.x,0,h.z),'#ff6a4e',1,.25);}}
 function stepZones(a,dt){const h=hero;for(let i=a.zones.length-1;i>=0;i--){const z=a.zones[i];z.t-=dt;if(z.t>0)continue;a.zones.splice(i,1);
     if(gl3){fxBall(V(z.x,.3,z.z),'#ff6a2c',.3,z.r,.35,.8);fxRing(V(z.x,0,z.z),'#ffb060',z.r,.3);}
-    if(Math.hypot(h.x-z.x,h.z-z.z)<=z.r)hurt(z.dmg);botsZone(a,z);}}
+    if(Math.hypot(h.x-z.x,h.z-z.z)<=z.r)hurt(z.dmg);}}
 // Na het eindmonster: wie is uitgeschakeld wacht in zijn vesting af of de rest de Titaan velt.
 function finalWatch(){let sum=myBh,won=false,fighting=false;
   for(const p of peers){const pr=p.presence;if(own(p)||!pr||pr.mt!==matchId)continue;if(pr.bm===ROUNDS)sum+=Math.max(0,+pr.bh||0);if(pr.wn===1)won=true;
@@ -980,10 +983,12 @@ function useSprint(){if(!arena||sprintCd>0||hero.hp<=0)return;sprintT=sprintLen(
 // Verplaatst een punt in kleine stapjes, zodat niemand door een muur of de arenarand heen geduwd wordt.
 function shove(o,dx,dz){for(let i=0;i<8;i++){const x=o.x+dx/8,z=o.z+dz/8;if(walkable(x,z)){o.x=x;o.z=z;}else if(walkable(x,o.z))o.x=x;else if(walkable(o.x,z))o.z=z;else break;}}
 // Duwt iedere andere speler binnen bereik een klein stukje van je af. Bots verplaats je zelf; een mens krijgt de duw via presence (pu).
+// Duwt een bot, dan krijg jij de duw zodra zijn beurt voorbij is (b.shove).
 function usePush(){const a=arena,h=hero;if(!a||pushCd>0||h.hp<=0)return;const R=E.MOVES.pushRange,D=pushLen(),out=[];let n=0;
   const dir=(x,z)=>{const dx=x-h.x,dz=z-h.z,d=Math.hypot(dx,dz);return d>R?null:d<.05?[Math.cos(h.a)*D,Math.sin(h.a)*D]:[dx/d*D,dz/d*D];};
-  for(const b of bots){if(!b.ar||b.ar.r!==a.r||b.ar.kind!==a.kind||!(b.h.hp>0))continue;const v=dir(b.h.x,b.h.z);if(!v)continue;shove(b.h,v[0],v[1]);n++;if(gl3)fxBall(V(b.h.x,.8,b.h.z),'#ffe9a8',.1,.6,.25,.7);}
-  for(const r of rheroes.values()){if(!(r.ar>0)||!(r.hp>0))continue;const v=dir(r.x,r.z);if(!v)continue;out.push([r.peer,rd1(v[0]),rd1(v[1])]);n++;if(gl3)fxBall(V(r.x,.8,r.z),'#ffe9a8',.1,.6,.25,.7);}
+  for(const b of bots){if(b===ACT)continue;const c=b.c,o=c.arena,q=c.hero;if(!o||o.r!==a.r||o.kind!==a.kind||!(q.hp>0))continue;const v=dir(q.x,q.z);if(!v)continue;shove(q,v[0],v[1]);q.tx=null;q.vx=q.vz=0;n++;if(gl3)fxBall(V(q.x,.8,q.z),'#ffe9a8',.1,.6,.25,.7);}
+  if(ACT){const o=YOU.arena,q=YOU.hero;if(o&&o.r===a.r&&o.kind===a.kind&&q.hp>0){const v=dir(q.x,q.z);if(v){ACT.shove=v;n++;}}}
+  else for(const r of rheroes.values()){if(r.bot||!(r.ar>0)||!(r.hp>0))continue;const v=dir(r.x,r.z);if(!v)continue;out.push([r.peer,rd1(v[0]),rd1(v[1])]);n++;if(gl3)fxBall(V(r.x,.8,r.z),'#ffe9a8',.1,.6,.25,.7);}
   if(!n){toast('Niemand dichtbij genoeg om te duwen',1500);return;}
   pushCd=pushWait();h.atk=1;if(gl3)fxRing(V(h.x,0,h.z),'#ffe9a8',R,.3);
   if(out.length){pushOut=[Math.floor(Date.now()/100)%1e8,a.r,out.slice(0,24)];pushHero(true);}}
@@ -1147,7 +1152,7 @@ function updLab(a,dt){const h=hero;a.marks.length=a.orbs.length=a.rects.length=a
   if(a.K.regen&&h.hp>0)h.hp=Math.min(maxHp(),h.hp+maxHp()*a.K.regen*dt);
   a.hp0=h.hp;a.score=a.pts;rivals(a);if(a.fin&&h.hp>0)leaveArena(labRank(a));}
 const labRank=a=>a.fail?'lose':rankEnd(a);
-const LABAPI={get ACX(){return ACX;},get ACZ(){return ACZ;},AR,ARM,QD,QR,TAU,lcg,on:isleOn,pt:islePt,edge:isleEdge,get isle(){return ISLE;},get hero(){return hero;},get HM(){return HM;},maxHp,hurt,walkable,addMob,mobHit,
+const LABAPI={range:()=>HEROES[save.hero].range*HM.hRange,get ACX(){return ACX;},get ACZ(){return ACZ;},AR,ARM,QD,QR,TAU,lcg,on:isleOn,pt:islePt,edge:isleEdge,get isle(){return ISLE;},get hero(){return hero;},get HM(){return HM;},maxHp,hurt,walkable,addMob,mobHit,
   toast:(m,ms)=>toast(m,ms),speed:()=>HEROES[save.hero].spd*HM.hSpd*(armour>=4?1.2:1),
   ring:(x,z,col,r,life)=>{if(gl3)fxRing(V(x,0,z),col,r,life||.4);},
   ball:(x,y,z,col,r0,r1,life,op)=>{if(gl3)fxBall(V(x,y,z),col,r0,r1,life||.3,op==null?.8:op);},
@@ -1240,7 +1245,7 @@ function paintNext(){const q=$('#qNext');q.textContent='';q.append(mk('b','hd','
 }
 function paintVs(p,type){const k=E.VS[type]?type:'';if(p.dataset.v===k)return;p.dataset.v=k;p.textContent='';p.hidden=!k;if(!k)return;
   const a=mk('span','good'),b=mk('span','bad');a.append(mk('b',null,'Sterk tegen '),E.strongVs(type).map(e=>EN[e].n).join(', '));b.append(mk('b',null,'Zwak tegen '),E.weakVs(type).map(e=>EN[e].n).join(', '));p.append(a,b);}
-function refresh(){if(!G)return;if(sel&&!G.tw.includes(sel))sel=null;cur=cardSlots();const card=$('#card');
+function refresh(){if(!G||ACT)return;if(sel&&!G.tw.includes(sel))sel=null;cur=cardSlots();const card=$('#card');
   for(let i=0;i<12;i++){const b=card.children[i],s=cur[i];b.classList.toggle('empty',!s);if(!s){b.tabIndex=-1;continue;}b.tabIndex=0;
     if(b.dataset.ic!==s.ic){b.dataset.ic=s.ic;iconDraw(b.firstChild,s.ic);}
     setText(b.children[1],s.key);setText(b.children[2],s.wait?s.wait+' s':s.free?'gratis':s.cost!=null?String(s.cost):s.gain!=null?'+'+s.gain:'');
@@ -1280,233 +1285,257 @@ setInterval(()=>{const now=performance.now();if(now-last<600)return;let dt=Math.
   while(dt>.001){const d=Math.min(.1,dt);logic(d);dt-=d;}if(G)pushPresence();},500);
 
 /* ================= bots ================= */
-// Start je alleen, dan vullen acht bots de wereld. Een bot wordt in deze browser nagespeeld: hij heeft een eigen vesting met dezelfde spelregels
-// (Engine), een andere held dan jij en precies jouw talenten. Voor de rest van het spel is hij een medespeler: hij staat in `peers` met dezelfde
-// presence als een mens, zodat rondes, minigames en de wereld zonder uitzonderingen werken. Zijn t is hoger dan de jouwe, dus jij blijft speler 1.
-const BOTN=8,BOTNAMES=['Tanya','Boris','Natasha','Yuriko','Giles','Zhana','Warren','Moskvin'];
-// De volgorde waarin een bot torens bouwt, en de kolommen waarlangs zijn weg kan slingeren.
-const BSEQ=['flak','sentry','cryo','tesla','sentry','rocket','toxin','rail','flak','prism','wave','uplink','tesla','rail','rocket','prism'],BROADS=[[0,3,6,9,12],[0,4,8,12],[0,6,12]];
-// BF: het baasgevecht van de bots, voor als ze zonder jou verder vechten.
-let bots=[],netPeers=[],bacc=0,bslow=0,BF=null;
-const botLive=b=>b.G.phase!=='over'&&b.G.phase!=='won';
-const botMax=b=>HEROES[b.idx].hp*b.G.m.hHp*(b.armour>=2?1.4:1);
+// Start je alleen, dan vullen acht bots de wereld. Een bot is een volwaardige speler die in deze browser wordt nagespeeld: hij heeft een eigen
+// vesting, een andere held dan jij, precies jouw talenten en jouw moeilijkheidsgraad.
+//
+// Een bot volgt dezelfde spelregels als jij, omdat hij dezelfde code draait. Alles wat bij één speler hoort (vesting, held, harnas, minigame,
+// afkoeltijden) zit in een context. asBot wisselt die context even om en laat dan de gewone spelcode lopen: sync, updArena, updHero. Een bot
+// krijgt dus dezelfde klappen, dezelfde kogels en dezelfde botsingen, loopt naar een vak voordat hij bouwt en wint of verliest een minigame
+// volgens dezelfde telling. Naar buiten toe is hij een medespeler: hij staat in `peers` met dezelfde presence als een mens.
+// Het enige wat een bot zelf doet is beslissen: waar hij heen loopt, wat hij bouwt en wanneer hij sprint, duwt of zijn schild opzet (botBrain).
+// Zijn t is hoger dan de jouwe, dus jij blijft speler 1.
+const BOTN=8,BOTNAMES=['Tanya','Boris','Natasha','Yuriko','Giles','Zhana','Warren','Moskvin'],BROADS=[[0,3,6,9,12],[0,4,8,12],[0,6,12]];
+// YOU: jouw context zolang een bot aan de beurt is. meP: jij, zoals de bots je zien. PACK: waar de bots bij een baas bij elkaar gaan staan.
+let bots=[],netPeers=[],bacc=0,bslow=0,YOU=null,botPeers=[],PACK={a:null};
+const meP={peer:'~me',kind:'viewer',by:null,name:'Speler',presence:{}};
+const ctxGet=()=>({G,HM,hero,armour,mySlot,arena,arenaFor,built,nx,sentWave,myBh,myBm,msLast,finalMax,finalAt,shieldT,shieldCd,sprintT,sprintCd,pushCd,pushOut,akCount,orders,ended,myState,myT,myPeer,camMode,hcam,buildSel,sel,roadMode,ready,gl3,peers,rheroes,hi:save.hero});
+function ctxSet(c){({G,HM,hero,armour,mySlot,arena,arenaFor,built,nx,sentWave,myBh,myBm,msLast,finalMax,finalAt,shieldT,shieldCd,sprintT,sprintCd,pushCd,pushOut,akCount,orders,ended,myState,myT,myPeer,camMode,hcam,buildSel,sel,roadMode,ready,gl3,peers,rheroes}=c);save.hero=c.hi;}
+// Laat fn lopen alsof bot b de speler is. Zolang ACT gezet is doen meldingen, beeld, opslag en netwerk niets.
+function asBot(b,fn){const P=ctxGet();YOU=P;ctxSet(b.c);ACT=b;try{return fn();}finally{b.c=ctxGet();ACT=null;YOU=null;ctxSet(P);}}
 function mergePeers(){peers=bots.length?netPeers.concat(bots):netPeers;}
-function clearBots(){if(!bots.length)return;bots=[];BF=null;mergePeers();syncPeers();}
-function botHurt(b,d){const m=b.G.m;if(m.hDodge&&Math.random()<m.hDodge)return;b.h.hp-=d*(1-m.hArm);}
-function botGo(b,x,z,step){const h=b.h,dx=x-h.x,dz=z-h.z,d=Math.hypot(dx,dz);if(d<.03)return;if(d<=step){h.x=x;h.z=z;}else{h.x+=dx/d*step;h.z+=dz/d*step;}h.a=Math.atan2(dz,dx);}
-function inArena(x,z){const d=Math.hypot(x-ACX,z-ACZ),m=AR-.4;return d>m?[ACX+(x-ACX)/d*m,ACZ+(z-ACZ)/d*m]:[x,z];}
-// De weg van een bot: een slinger van de linkerpoort naar de rechterpoort. Daarna de bouwplekken, de beste eerst: hoe meer weg in de buurt, hoe beter.
-function botRoad(b){const g=b.G,M=E.MID,cols=BROADS[Math.random()*BROADS.length|0],flip=Math.random()<.5,cells=[],add=(x,y)=>cells.push((flip?N-1-y:y)*N+x);let y=M,up=true;
+function clearBots(){if(!bots.length)return;bots=[];mergePeers();syncPeers();}
+// De weg die een bot gaat leggen: een slinger van de linkerpoort naar de rechterpoort, in de volgorde waarin hij hem tekent.
+// Daarna de bouwplekken, de beste eerst: hoe meer weg in de buurt, hoe beter.
+function botRoad(ai){const M=E.MID,cols=BROADS[Math.random()*BROADS.length|0],flip=Math.random()<.5,cells=[],add=(x,y)=>cells.push((flip?N-1-y:y)*N+x);let y=M,up=true;
   cols.forEach((x,k)=>{const to=k===cols.length-1?M:up?1:N-2;for(;y!==to;y+=Math.sign(to-y))add(x,y);add(x,y);
     if(k<cols.length-1){for(let u=x+1;u<cols[k+1];u++)add(u,y);up=!up;}});
-  for(const c of cells)E.setRoad(g,c,true);
   const on=new Set(cells),sc=[];
   for(let c=0;c<N*N;c++){if(on.has(c)||c===E.C_IN||c===E.C_OUT)continue;const x=c%N,cy2=(c-x)/N;let n=0;
     for(const r of cells){const dx=r%N-x,dy=(r-r%N)/N-cy2;if(dx*dx+dy*dy<=6.5)n++;}sc.push([c,n+Math.random()]);}
-  b.cells=sc.sort((p,q)=>q[1]-p[1]).map(p=>p[0]);}
+  ai.roadQ=cells;ai.cells=sc.sort((p,q)=>q[1]-p[1]).map(p=>p[0]);}
 function spawnBots(){const hs=HEROES.map((h,i)=>i).filter(i=>i!==save.hero).sort(()=>Math.random()-.5),used=takenSlots(),free=[],mc=mySlot%COLS,mr=Math.floor(mySlot/COLS);
   const far=s=>Math.hypot(s%COLS-mc,Math.floor(s/COLS)-mr);
   for(let s=0;s<SLOTS;s++)if(s!==mySlot&&!used.has(s))free.push(s);
   free.sort((p,q)=>far(p)-far(q)); // de vestingen rond die van jou
-  bots=free.slice(0,BOTN).map((slot,i)=>{const g=E.create(save.skills),[ox,oz]=slotO(slot);g.maxLives=g.lives;
-    const b={peer:'bot-'+(i+1),kind:'viewer',by:null,name:'Bot '+BOTNAMES[i%BOTNAMES.length],sameTab:false,isMe:false,bot:true,presence:{},G:g,idx:hs[i%hs.length],slot,t:myT+1+i,
-      h:{x:ox+6.5,z:oz+5.5,a:-1.57,hp:0,cd:0},ak:0,as:0,armour:0,built:false,readyAt:4+Math.random()*10,nx:0,arenaFor:0,ar:null,order:null,think:1+Math.random()*2,seq:0,cells:[],
-      bh:0,bm:0,ms:null,react:.25+Math.random()*.5,skill:.3+Math.random()*.3};
-    botRoad(b);b.h.hp=botMax(b);botPres(b);return b;});
-  bacc=0;BF=null;mergePeers();syncPeers();}
-// Wat een mens van een medespeler ziet, vult een bot zelf in.
-function botPres(b){const g=b.G,h=b.h,a=b.ar,pr=b.presence;pr.st=botLive(b)?'playing':'done';pr.t=b.t;pr.mt=matchId;pr.sl=b.slot;pr.r=g.round;pr.l=g.lives;pr.s=g.score;pr.sp=speed;
-  pr.bd=b.built;pr.ps=g.phase==='prep'?0:1;pr.cl=g.cleared;pr.nx=b.nx;pr.sw=0;pr.wn=g.phase==='won'?1:0;
-  pr.h=b.idx;pr.p=[h.x,h.z,h.a];pr.hp=Math.max(0,Math.round(h.hp));pr.mh=Math.round(botMax(b));pr.ar=a?a.seq:0;pr.ak=b.ak;pr.am=a?a.r:0;pr.bm=b.bm;pr.bh=Math.round(b.bh);
-  pr.ms=a&&a.ms?[a.r,Math.floor(a.score),0]:b.ms;pr.sc=a&&a.sc||null;}
-function botFields(fs,used){for(const b of bots){if(used.has(b.slot))continue;used.add(b.slot);const g=b.G;
-    fs.push({slot:b.slot,own:false,bot:true,tw:g.tw,en:g.en,name:b.name,r:g.round,l:g.lives,done:!botLive(b),road:g.road,trail:g.trail,psig:'b'+g.rv});}}
-/* --- een bot in zijn vesting: bouwen, upgraden en meevechten --- */
-// Eén besluit per keer: een toren erbij zolang de vesting daar ruimte voor heeft, en anders de goedkoopste stap in de keten:
-// upgrade, ultra, turbo. Staat van elke soort een turbo, dan bouwt hij Geers Torens en daarna De Slapende Geers.
-function botThink(b){const g=b.G;if(b.order)return;
-  if(g.tw.length<Math.min(b.cells.length,5+Math.floor(g.round*.7))){const type=BSEQ[b.seq%BSEQ.length],c=b.cells.find(k=>E.canBuild(g,k));
-    if(c!==undefined&&g.gold>=E.buildCost(g,type)){b.order={c,type};b.seq++;return;}}
-  if(E.sleeperReady(g)){if(g.gold>=E.buildCost(g,'sleeper')){for(let c=0;c<N*N;c++)if(E.canBuild(g,c,'sleeper')){b.order={c,type:'sleeper'};return;}}}
-  else if(E.geersReady(g)&&E.geersCount(g)<E.GEERS_NEED){if(g.gold>=E.buildCost(g,'geers')){const c=b.cells.find(k=>E.canBuild(g,k));if(c!==undefined){b.order={c,type:'geers'};return;}}}
+  bots=free.slice(0,BOTN).map((slot,i)=>{const g=E.create(save.skills,save.diff),[ox,oz]=slotO(slot),idx=hs[i%hs.length];g.maxLives=g.lives;
+    const b={peer:'bot-'+(i+1),kind:'viewer',by:null,name:'Bot '+BOTNAMES[i%BOTNAMES.length],sameTab:false,isMe:false,bot:true,presence:{},mx:0,mz:0,shove:null,
+      c:{G:g,HM:g.m,hero:{x:ox+6.5,z:oz+5.5,a:-1.57,hp:HEROES[idx].hp*g.m.hHp,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false},armour:0,mySlot:slot,arena:null,arenaFor:0,built:false,nx:0,sentWave:0,myBh:0,myBm:0,msLast:null,finalMax:0,finalAt:0,
+        shieldT:0,shieldCd:0,sprintT:0,sprintCd:0,pushCd:0,pushOut:null,akCount:0,orders:[],ended:false,myState:'playing',myT:myT+1+i,myPeer:'bot-'+(i+1),camMode:'hero',hcam:{yaw:0,pitch:.5,d:9},buildSel:null,sel:null,roadMode:false,ready:false,gl3:false,peers:botPeers,rheroes:new Map(),hi:idx},
+      // karakter: hoe goed hij is (skill, van onhandig tot scherp), en daaruit zijn reactietijd in seconden; hoe graag hij duwt; zijn tempo bij het bouwen
+      ai:{skill:0,react:0,mean:Math.random(),pace:.8+Math.random()*.6,th:2+Math.random()*3,rt:2+Math.random()*4,rdy:22+Math.random()*40,roadQ:[],cells:[],click:0,ar:null,m:{},zn:new WeakMap(),seen:[],raw:null,wp:null,dec:0,hold:0,an:0,rr:4,lapse:0,lapseT:3}};
+    b.ai.skill=.3+.6*(i+Math.random())/BOTN;b.ai.react=.18+(1-b.ai.skill)*.3;botRoad(b.ai);asBot(b,()=>{b.presence=myPresence(true);});return b;});
+  bacc=0;mergePeers();syncPeers();}
+function botFields(fs,used){for(const b of bots){const c=b.c,g=c.G;if(used.has(c.mySlot))continue;used.add(c.mySlot);
+    fs.push({slot:c.mySlot,own:false,bot:true,tw:g.tw,en:g.en,name:b.name,r:g.round,l:g.lives,done:c.ended,road:g.road,trail:g.trail,psig:'b'+g.rv});}}
+// De andere helden, gezien vanuit bot b: jij en de overige bots. Zelfde vorm als rheroes.
+function botView(b){const v=new Map();v.set(meP.peer,{peer:meP.peer,you:true,x:hero.x,z:hero.z,ar:arena?arena.seq:0,hp:hero.hp});
+  for(const o of bots)if(o!==b){const c=o.c;v.set(o.peer,{peer:o.peer,x:c.hero.x,z:c.hero.z,ar:c.arena?c.arena.seq:0,hp:c.hero.hp});}return v;}
+const spdNow=()=>HEROES[save.hero].spd*HM.hSpd*(armour>=4?1.2:1)*(arena&&arena.slow||1)*(arena&&sprintT>0?1+E.MOVES.sprSpd+HM.sprSpd:1);
+const reachNow=()=>HEROES[save.hero].range*HM.hRange;
+/* --- een bot in zijn vesting: weg leggen, bouwen, upgraden en meevechten --- */
+// Eén besluit per keer, zoals een speler die zijn kaart afloopt: een toren erbij zolang de vesting daar ruimte voor heeft (het liefst een die
+// goed is tegen de komende golf, en een soort die er nog niet staat), en anders de goedkoopste stap in de keten: upgrade, ultra, turbo.
+// Staat van elke soort een turbo, dan bouwt hij Geers Torens en daarna De Slapende Geers. Bouwen gaat via een bouwopdracht, net als bij jou.
+function botPlan(ai){const g=G;if(orders.length)return;const pend=0;
+  if(g.tw.length<Math.min(ai.cells.length,5+Math.floor(g.round*.7))){const c=ai.cells.find(k=>E.canBuild(g,k));
+    if(c!==undefined){const have={};for(const t of g.tw)have[t.type]=(have[t.type]||0)+1;let type=null,bv=0;
+      for(const k of TYPES){if(!E.unlocked(g,k)||g.gold<pend+E.buildCost(g,k))continue;
+        const fit=E.VS[k]?(E.waveFit(k,g.round)+E.waveFit(k,Math.min(ROUNDS,g.round+1)))/2:g.tw.length>3?1:.4,v=fit*(have[k]?1:1.35)*(.75+Math.random()*.5);if(v>bv){bv=v;type=k;}}
+      if(type){orders.push({c,type});return;}}}
+  if(E.sleeperReady(g)){if(g.gold>=E.buildCost(g,'sleeper')){for(let c=0;c<N*N;c++)if(E.canBuild(g,c,'sleeper')){orders.push({c,type:'sleeper'});return;}}}
+  else if(E.geersReady(g)&&E.geersCount(g)<E.GEERS_NEED){if(g.gold>=E.buildCost(g,'geers')){const c=ai.cells.find(k=>E.canBuild(g,k));if(c!==undefined){orders.push({c,type:'geers'});return;}}}
   let best=null,kind='',bc=1e9;
   for(const t of g.tw){let k,c;
     if(t.lvl<E.maxLvl(t)){k='up';c=E.upCost(g,t);}else if(!E.hasTiers(t.type))continue;
     else if(!t.spec){k='ultra';c=E.specCost(g,t,k);}else if(E.canTurbo(g,t)){k='turbo';c=E.specCost(g,t,k);}else continue;
     if(c<bc){bc=c;best=t;kind=k;}}
   if(best&&g.gold>=bc){if(kind==='up')E.upgrade(g,best);else E.spec(g,best,kind);}}
-// De held van een bot valt aan zoals die van een speler. Geeft de dichtstbijzijnde vijand terug, zodat hij erheen kan lopen.
-function botShoot(b,dt){const g=b.G,h=b.h,H=HEROES[b.idx],m=g.m,[ox,oz]=slotO(b.slot),HR=H.range*m.hRange,inr=[];h.cd-=dt*speed;
-  let best=null,bv=1e18,near=null,nd=1e9;
-  for(const e of g.en){if(e.dead)continue;const d=Math.hypot(ox+e.x-h.x,oz+e.y-h.z);if(d<nd){nd=d;near=e;}
-    if(d<=HR+(e.boss?.7:0)){inr.push(e);const v=H.k==='snipe'?-e.hp:d;if(v<bv){bv=v;best=e;}}}
-  const out=near?{e:near,d:nd}:null;if(!best||h.cd>0)return out;
-  h.cd=1/(H.rate*m.hRate);b.ak++;const ta=Math.atan2(oz+best.y-h.z,ox+best.x-h.x);h.a=ta;
-  const base=H.dmg*m.hDmg*(b.armour>=3?1.3:1)*(Math.random()<m.hCrit?2+m.hCritDmg:1)*Math.pow(E.hpMul(g.round)/E.hpMul(1),.75);
-  const hit=(e,d,p)=>{const was=e.dead;E.hit(g,e,d*(e.boss?m.hBoss:1),1-(1-(p||0))*(1-m.hAp));if(e.dead&&!was&&m.hGold)g.gold+=Math.round(e.b*m.hGold);};
-  if(H.k==='slam'){for(const e of g.en)if(!e.dead&&Math.hypot(ox+e.x-h.x,oz+e.y-h.z)<=1.9+(e.boss?.7:0))hit(e,base);}
-  else if(H.k==='flame'){for(const e of inr){let da=Math.abs(Math.atan2(oz+e.y-h.z,ox+e.x-h.x)-ta);if(da>Math.PI)da=TAU-da;if(da<.6)hit(e,base);}}
-  else if(H.k==='bolt'){let cur=best,d=base;const done=new Set();
-    for(let i=0;i<3&&cur;i++){done.add(cur);hit(cur,d,.5);d*=.7;let nxt=null,bd=2.4;for(const e of g.en){if(e.dead||done.has(e))continue;const dd=Math.hypot(e.x-cur.x,e.y-cur.y);if(dd<bd){bd=dd;nxt=e;}}cur=nxt;}}
-  else hit(best,base,H.k==='snipe'?1:0);
-  return out;}
-function botHome(b,dt){const g=b.G,h=b.h,H=HEROES[b.idx],m=g.m,[ox,oz]=slotO(b.slot);h.hp=botMax(b);
-  b.think-=dt*speed;if(b.think<=0){b.think=.7+Math.random()*.9;botThink(b);}
-  let tx=null,tz=0;
-  if(b.order){const c=b.order.c,x=c%N;tx=ox+x+.5;tz=oz+(c-x)/N+.5;
-    if(Math.hypot(tx-h.x,tz-h.z)<1.6){E.build(g,c,b.order.type);b.order=null;tx=null;}} // net als bij een speler loopt de held eerst naar het vak
-  const tg=botShoot(b,dt);
-  if(tx===null&&tg&&tg.d>H.range*m.hRange*.8){tx=ox+tg.e.x;tz=oz+tg.e.y;}
-  if(tx!==null)botGo(b,Math.max(ox+.3,Math.min(ox+N-.3,tx)),Math.max(oz+.3,Math.min(oz+N-.3,tz)),H.spd*m.hSpd*(b.armour>=4?1.2:1)*dt);}
-// Bouwfase, golven en rondes lopen gelijk met die van jou, precies zoals bij een medespeler.
-function botSync(b){const g=b.G,ok=f=>bots.every(o=>o===b||!botLive(o)||f(o));
-  if(g.phase==='prep'){g.timer=G.timer;if(!b.built&&performance.now()-t0>b.readyAt*1000)b.built=true;if(G.phase!=='prep'){E.lock(g);b.built=true;}}
-  else if(g.phase==='build'){if(G.round===g.round&&(G.phase==='wave'||sentWave===g.round))E.startWave(g);}
-  else if(g.phase==='wait'){const r=g.cleared;if(G.cleared<r||!ok(o=>o.G.cleared>=r))return;
-    if(miniFor(r)&&b.arenaFor<r)return; // de minigame begint voor iedereen tegelijk, zodra jij erin stapt
-    if(b.ar||g.final)return;b.nx=g.round;if(nx>=g.round&&ok(o=>o.nx>=g.round))E.next(g);}}
-/* --- bots in de minigames --- */
-// Bots stappen tegelijk met jou een minigame in en spelen hem echt mee: ze lopen, ontwijken, scoren en kunnen sneuvelen.
-function botsEnter(kind,r){const K=KIND[kind],inn=bots.filter(botLive);BF=null;if(!K||!inn.length)return;
-  // ga: de kant van de baas waar de bots bij elkaar staan. Na elke klap schuift de groep een stuk op, zodat ze samen uit de rode cirkels lopen.
-  if(K.m==='boss')BF={r,kind,max:arena&&arena.max||Math.round((BOSS[kind]||BOSS.boss).hp*Math.pow(1+inn.length,1.1)),t:K.T,ga:Math.random()*TAU,dir:Math.random()<.5?1:-1,seen:0};
-  inn.forEach((b,i)=>{const h=b.h,an=TAU*i/inn.length+Math.random()*.5;b.arenaFor=r;b.order=null;h.hp=botMax(b);h.cd=.5+Math.random();
-    b.ar={r,kind,mode:K.m,seq:++b.as,age:0,t:K.T,score:0,ms:K.m==='mini'||K.m==='lab'||K.m==='chairs'||kind==='duel',an,rr:3.2+Math.random()*2.2,sw:2+Math.random()*16,inn:false,
-      wait:1+Math.random()*8,wp:0,pa:BF?BF.ga+Math.atan2(Math.sin(an-BF.ga),Math.cos(an-BF.ga)):an,hit:1,im:0,rp:[],u:null,ud:0,rd:0,jd:0,spot:-1,go:0,sc:null,carry:false,pt:null,skip:new Map(),miss:new Map(),hitK:null};
-    if(K.m==='run'){h.x=RUN.x+1.5;h.z=RUN.z+1.5+Math.random()*(RUN.W-3);h.a=0;}
-    else{const d=ISLE==='cross'||ISLE==='quad'?.4+Math.random()*1.2:5+Math.random()*2.5;h.x=ACX+Math.cos(an)*d;h.z=ACZ+Math.sin(an)*d;h.a=an+Math.PI;}
-    if(K.m==='boss'){b.bm=r;b.bh=0;}});}
-// Staat er nog een andere held op deze plek?
-function heroOn(a,x,z,R,b){if(hero.hp>0&&Math.hypot(hero.x-x,hero.z-z)<=R)return true;
-  for(const o of bots)if(o!==b&&o.ar&&o.ar.r===a.r&&o.h.hp>0&&Math.hypot(o.h.x-x,o.h.z-z)<=R)return true;return false;}
-function botDown(b,final){const a=b.ar;if(!final&&b.G.m.second&&!a.sc2){a.sc2=true;b.h.hp=botMax(b)*.3;return;}botLeave(b,'dead');}
-// Terug naar de eigen vesting, met de beloning van een winnaar.
-function botLeave(b,res){const a=b.ar,g=b.G,[ox,oz]=slotO(b.slot);if(!a)return;b.ar=null;if(a.ms)b.ms=[a.r,Math.floor(a.score),res==='dead'||res==='out'?2:1];
-  b.h.x=ox+6.5;b.h.z=oz+5.5;b.h.a=-1.57;b.h.hp=botMax(b);if(res!=='win')return;g.gold+=g.m.mission;
-  if(a.kind==='run')g.gold+=400;else if(a.kind!=='titan'){if(b.armour<4){applyArmour(++b.armour,g);b.h.hp=botMax(b);}else g.gold+=300+10*a.r;}}
-function botArena(b,dt){const a=b.ar,h=b.h,H=HEROES[b.idx],m=b.G.m,mx=botMax(b),pa=arena&&arena.r===a.r&&arena.kind===a.kind?arena:null; // pa: jij staat nog in dezelfde minigame
-  const rate=H.rate*m.hRate,dmg=H.dmg*m.hDmg*(b.armour>=3?1.3:1)*(1+m.hCrit*(1+m.hCritDmg));let step=H.spd*m.hSpd*(b.armour>=4?1.2:1)*dt,tx=h.x,tz=h.z;a.age+=dt;h.cd-=dt;
-  if(m.hRegen&&h.hp>0)h.hp=Math.min(mx,h.hp+mx*m.hRegen*dt);
-  if(a.mode==='run'){ // ieder zijn eigen doolhof: van opening naar opening, onder vuur van de torens
-    const k=a.wp>>1,lx=h.x-RUN.x;a.t-=dt;
-    if(k<RUN.walls.length){const[wx,sd]=RUN.walls[k],g=runGap(sd);tx=RUN.x+wx+(a.wp&1?.7:-.9);tz=RUN.z+(g[0]+g[1])/2;}else{tx=RUN.x+RUN.L-1;tz=RUN.z+RUN.W/2;}
-    if(Math.hypot(tx-h.x,tz-h.z)<.2)a.wp++;botGo(b,tx,tz,step*.85);
-    a.hit-=dt;if(a.hit<=0){a.hit=.8+Math.random()*.8;if(Math.random()<.22)botHurt(b,15);}
-    if(lx>=RUN.L-2)botLeave(b,'win');else if(h.hp<=0)botDown(b);else if(a.t<=0)botLeave(b,'draw');return;}
-  if(a.mode==='boss'){const u=pa?pa.ult:null; // een ultra-aanval die net afliep: wie niet op groen stond is dood
-    if(a.u!==u){const o=a.u;a.u=u;a.rp=[];a.im=0;a.ud=b.react+Math.random()*.8;
-      if(o&&o.kind==='safe'&&o.t<=0&&!o.safe.some(s=>Math.hypot(h.x-s.x,h.z-s.z)<=s.r)){h.hp=0;botDown(b,true);return;}}
-    if(!pa){ // jij bent uitgeschakeld: de bots vechten versneld door
-      b.bh+=dmg*rate*m.hBoss*.8*dt*4;a.score=b.bh;h.hp-=.5*(1-m.hArm)*dt*4;if(h.hp<=0)botDown(b);return;}}
-  if(!pa)return; // wie de andere minigames zonder jou afmaakt, staat in botsDone
-  if(h.hp<=0){botDown(b);if(!b.ar)return;}
-  if(a.mode==='lab'){botLab(b,pa,dt,step);return;}
-  // Inslagen ontwijken: eruit lopen, en er niet in lopen. Per aanval (z.k: alle inslagen die tegelijk verschenen) heeft een bot hem door of niet;
-  // alleen een aanval die hij mist kan hem raken (zie botsZone). Zo hangt zijn lot niet af van het gedrang tussen negen overlappende cirkels.
-  let flee=null;const zs=pa.zones||[],odds=a.kind==='titan'?.02:a.mode==='boss'?.04:a.kind==='storm'?.33:.2;
-  for(const z of zs){const d=Math.hypot(h.x-z.x,h.z-z.z);if(z.k===undefined)z.k=Math.round((pa.age-(z.T-z.t))*4);if(!a.miss.has(z.k))a.miss.set(z.k,Math.random()<odds);
-    if(flee||d>z.r+.4||a.miss.get(z.k)||z.T-z.t<b.react*.3)continue;
-    const kx=d<.05?Math.cos(a.an):(h.x-z.x)/d,kz=d<.05?Math.sin(a.an):(h.z-z.z)/d;flee=[z.x+kx*(z.r+.9),z.z+kz*(z.r+.9)];}
-  const move=(x,z,st)=>{[x,z]=inArena(x,z);const dx=x-h.x,dz=z-h.z,d=Math.hypot(dx,dz)||1,k=Math.min(d,1.2),px=h.x+dx/d*k,pz=h.z+dz/d*k;
-    if(!flee&&zs.some(q=>!a.miss.get(q.k)&&Math.hypot(px-q.x,pz-q.z)<q.r+.3))return;botGo(b,x,z,st);};
-  if(a.mode==='boss'){const g=pa.g,B=pa.B,u=pa.ult,HR=H.range*m.hRange,db=Math.hypot(h.x-g.x,h.z-g.z),hx=h.x-ACX,hz=h.z-ACZ,hd=Math.hypot(hx,hz);
-    if(u){const el=u.T-u.t;
-      if(el<a.ud){} // even schrikken
-      else if(u.kind==='safe'){let s=u.safe[0],bd=1e9;for(const o of u.safe){const d=Math.hypot(h.x-o.x,h.z-o.z);if(d<bd){bd=d;s=o;}}tx=s.x+Math.cos(a.an)*s.r*.5;tz=s.z+Math.sin(a.an)*s.r*.5;}
-      else if(u.kind==='rings'){let nr=null;for(const r of u.rings)if((el-r.t0)*4.2<hd){nr=r;break;}if(nr){const an=nr.g+(a.rr-4.3)*.1;tx=ACX+Math.cos(an)*a.rr;tz=ACZ+Math.sin(an)*a.rr;}}
-      else{const st=TAU/u.n,an=beamAng(u)+st*(.5+Math.floor(a.an/st));tx=ACX+Math.cos(an)*(a.rr+.6);tz=ACZ+Math.sin(an)*(a.rr+.6);}
-      if(u.kind==='rings'){const ha=Math.atan2(hz,hx);u.rings.forEach((r,j)=>{const R=(el-r.t0)*4.2,p=a.rp[j]||0;
-          if(R>0&&p<hd&&R>=hd){let da=Math.abs(ha-r.g)%TAU;if(da>Math.PI)da=TAU-da;if(da>r.w/2)botHurt(b,60);}a.rp[j]=Math.max(0,R);});}
-      else if(u.kind==='beams'){a.im-=dt;if(el>1.5&&a.im<=0){const bb=beamAng(u);
-          for(let k=0;k<u.n;k++){const an=bb+k*TAU/u.n,c=Math.cos(an),s=Math.sin(an);if(hx*c+hz*s>1&&Math.abs(hz*c-hx*s)<.55){botHurt(b,34);a.im=.7;break;}}}}}
-    else{ // bij de groep blijven, vlak bij de baas; ligt die plek onder vuur, dan eerst de cirkel uit
-      const R=Math.min(B.cr+1.1+((a.an*5)%1)*.6,HR+B.big-.25),jit=((a.an*3)%1-.5)*.5,ga=BF?BF.ga:a.pa,dA=ga-a.pa,ex=g.x+Math.cos(ga+jit)*R,ez=g.z+Math.sin(ga+jit)*R;
-      a.pa+=Math.sign(dA)*Math.min(Math.abs(dA),step/R);tx=g.x+Math.cos(a.pa+jit)*R;tz=g.z+Math.sin(a.pa+jit)*R;
-      if(flee&&zs.some(q=>Math.hypot(ex-q.x,ez-q.z)<q.r+.3)){tx=flee[0];tz=flee[1];}}
-    if(flee){[tx,tz]=inArena(tx,tz);botGo(b,tx,tz,step);}else move(tx,tz,step);
-    {const ex=h.x-g.x,ez=h.z-g.z,e=Math.hypot(ex,ez)||1,min=B.cr+.3;if(e<min&&!u){h.x=g.x+ex/e*min;h.z=g.z+ez/e*min;}} // niet door de baas heen lopen
-    if(db<=HR+B.big&&h.cd<=0&&g.hp>0){h.cd=1/rate;b.ak++;b.bh+=dmg*m.hBoss;h.a=Math.atan2(g.z-h.z,g.x-h.x);if(m.leech)h.hp=Math.min(mx,h.hp+mx*m.leech/rate);}
-    a.score=b.bh;return;}
-  if(a.mode==='chairs'){const ph=pa.phase,mineP=i=>!!pa.my&&pa.my.i===i;
-    if(ph==='run'){if(a.rd!==pa.rd){a.rd=pa.rd;a.sc=null;a.spot=-1;a.go=8.5+Math.random()*3;h.hp=mx;}
-      // een veld kiezen dat nog niemand heeft, en er pas laat op gaan staan: voor de tiende seconde stopt de tijd nooit. Pak jij het veld eerst, dan zoekt de bot een ander
-      if(a.spot<0||(!a.sc&&mineP(a.spot))){a.spot=-1;let bd=1e9;pa.spots.forEach((s,i)=>{if(mineP(i)||bots.some(o=>o!==b&&o.ar&&o.ar.mode==='chairs'&&o.ar.spot===i))return;const d=Math.hypot(h.x-s.x,h.z-s.z);if(d<bd){bd=d;a.spot=i;}});}
-      const s=pa.spots[a.spot];
-      if(!s){tx=ACX+Math.cos(a.an)*2;tz=ACZ+Math.sin(a.an)*2;} // geen veld vrij: in het midden wachten tot er een vrijkomt
-      else if(pa.rt>=Math.max(CH.open,a.go)){tx=s.x;tz=s.z;if(!a.sc&&Math.hypot(h.x-s.x,h.z-s.z)<pa.R*.7)a.sc=[pa.r,pa.rd,a.spot,Math.round(pa.rt*100)/100];}
-      else{let dx=ACX-s.x,dz=ACZ-s.z,d=Math.hypot(dx,dz);if(d<.1){dx=Math.cos(a.an);dz=Math.sin(a.an);d=1;}tx=s.x+dx/d*(pa.R+.8);tz=s.z+dz/d*(pa.R+.8);}
-      // op een veld staan kost levenspunten: wie bijna leeg is stapt er even af
-      if(a.sc){h.hp-=mx*CH.drain*pa.D*dt;if(h.hp<mx*.06){a.sc=null;a.go=pa.rt+2.5+Math.random()*3;}}else h.hp=Math.min(mx,h.hp+mx*CH.regen*dt);
-      [tx,tz]=inArena(tx,tz);botGo(b,tx,tz,step);}
-    else if(ph==='gap'){if(a.jd!==pa.rd){a.jd=pa.rd;if(!a.sc||a.sc[1]!==pa.rd){botLeave(b,'out');return;}a.score=pa.rd;h.hp=mx;}}
-    else if(ph==='intro'){const an=a.an+a.age*.25;botGo(b,ACX+Math.cos(an)*5,ACZ+Math.sin(an)*5,step*.5);}
-    return;}
-  const k=a.kind;
-  if(k==='hill'){ // af en toe de heuvel op; staat er al iemand, dan scoort niemand
-    const p=pa.home||[ACX,ACZ],f=(a.an*7)%1,d=a.inn?.4+f*1.4:3.6+f*1.6;a.sw-=dt;if(a.sw<=0){a.inn=!a.inn;a.sw=a.inn?1.5+Math.random()*1.5:12+Math.random()*14;}
-    tx=p[0]+Math.cos(a.an)*d;tz=p[1]+Math.sin(a.an)*d;if(Math.hypot(h.x-p[0],h.z-p[1])<=2.4&&!heroOn(a,p[0],p[1],2.4,b))a.score+=dt;}
-  else if(k==='hunt'){ // premiejacht: de monsters van een bot zie jij niet, zijn premie wel
-    a.wp-=dt;if(a.wp<=0||!a.pt){a.wp=1.5+Math.random()*2.5;a.pt=arPt(Math.random,1,AR-1.5);}tx=a.pt[0];tz=a.pt[1];
-    if(h.cd<=0){h.cd=1/rate;b.ak++;}a.score+=Math.min(1.1,dmg*rate*m.hMini/34*b.skill*(H.k==='blade'||H.k==='slam'?.75:1))*dt;h.hp-=2.2*(1-m.hArm)*dt;}
-  else if(k==='cores'){ // kernroof: een kern halen en naar het midden brengen
-    if(a.carry){step*=.72;tx=ACX;tz=ACZ;h.hp-=4*(1-m.hArm)*dt;if(Math.hypot(h.x-ACX,h.z-ACZ)<1.6){a.carry=false;a.score++;a.wait=5+Math.random()*7;}}
-    else{let c=null,bd=1e9,n=0;tx=ACX+Math.cos(a.an)*4.5;tz=ACZ+Math.sin(a.an)*4.5;a.wait-=dt;
-      if(a.wait<=0)for(const o of pa.items){if(o.t0>pa.age||pa.gone.has(o.i))continue;if(++n>3)break;
-          let no=a.skip.get(o.i);if(no===undefined){no=Math.random()<.6;a.skip.set(o.i,no);}if(no)continue; // niet elke bot gaat achter elke kern aan
-          const d=Math.hypot(h.x-o.x,h.z-o.z);if(d<bd){bd=d;c=o;}}
-      if(c){tx=c.x;tz=c.z;if(bd<1.1){pa.gone.add(c.i);a.carry=true;}}}}
-  else if(k==='storm'){ // vuurstorm: binnen de krimpende kring blijven
-    const R=AR-(AR-4.2)*Math.min(1,pa.age/55);a.wp-=dt;
-    if(a.wp<=0||!a.pt){a.wp=2+Math.random()*3;const an=Math.random()*TAU,d=Math.sqrt(Math.random())*Math.max(.5,R-1.3);a.pt=[ACX+Math.cos(an)*d,ACZ+Math.sin(an)*d];}
-    const pd=Math.hypot(a.pt[0]-ACX,a.pt[1]-ACZ),lim=Math.max(.3,R-1);if(pd>lim)a.pt=[ACX+(a.pt[0]-ACX)*lim/pd,ACZ+(a.pt[1]-ACZ)*lim/pd];
-    tx=a.pt[0];tz=a.pt[1];if(Math.hypot(h.x-ACX,h.z-ACZ)>R)h.hp-=22*dt;a.score=Math.min(pa.T-1,pa.age);}
-  if(flee){tx=flee[0];tz=flee[1];}
-  if(k!=='storm'&&h.hp>0)h.hp=Math.min(mx,h.hp+mx*.015*dt);
-  move(tx,tz,step);}
-// De minigames uit minigames.js speelt ieder voor zich. Een bot loopt over het eiland en bouwt een score op die bij zijn niveau past:
-// f is het deel van het doel dat hij haalt. Bij overleven betekent f onder de 1 dat hij op dat deel van de tijd sneuvelt.
-function botLab(b,pa,dt,step){const a=b.ar,h=b.h,K=pa.K,goal=K.goal||1;
-  if(a.f===undefined){a.f=.35+b.skill*.9+Math.random()*.2;a.q=[];a.wp=0;}
-  a.wp-=dt;if(!a.q.length&&a.wp<=0){a.wp=1+Math.random()*3;const p=islePt(0,AR-1);a.q=ISLE==='cross'||ISLE==='quad'?[[ACX,ACZ],p]:[p];} // op het kruis en de eilandjes via het midden
-  if(a.q.length){const p=a.q[0];botGo(b,p[0],p[1],step*.8);if(Math.hypot(p[0]-h.x,p[1]-h.z)<.3)a.q.shift();}
-  if(goal>=K.T-1){a.score=Math.min(K.T-1,pa.age);if(a.f<1&&pa.age>=a.f*K.T){h.hp=0;botLeave(b,'dead');}}
-  else a.score=goal*a.f*Math.min(1,pa.age/(K.T*.85));}
-// Een inslag in de arena raakt ook een bot die erin staat, als hij de aanval niet zag aankomen. Eén aanval raakt hem hooguit één keer.
-function botsZone(a,z){for(const b of bots){const o=b.ar;if(o&&o.r===a.r&&o.mode!=='run'&&o.miss.get(z.k)&&o.hitK!==z.k&&Math.hypot(b.h.x-z.x,b.h.z-z.z)<=z.r){o.hitK=z.k;botHurt(b,z.dmg);}}}
-// De minigame is afgelopen voor de bots die er nog in staan. over: de baas is geveld. ps: jouw score als je tot het eind meedeed, anders -1.
-// Net als bij spelers wint de hoogste score van wie nog staat, en bij gelijke stand wint iedereen die bovenaan staat.
-function botsFinish(kind,over,ps,only){const K=KIND[kind],inn=bots.filter(b=>b.ar&&b.ar.kind===kind);BF=null;
-  if(kind==='titan'){for(const b of bots){if(!botLive(b))continue;botLeave(b,over?'win':'draw');if(over)E.win(b.G);else E.lose(b.G);}return;}
-  let top=ps;for(const b of inn)top=Math.max(top,Math.floor(b.ar.score));
-  for(const b of inn){const sc=Math.floor(b.ar.score);botLeave(b,(K.m==='boss'?over&&(kind!=='duel'||sc>=top):only?b===only:sc>0&&sc>=top)?'win':'lose');}}
-// Jij verlaat een minigame. In het doolhof loopt ieder voor zich, en een baas bevechten de bots desnoods zonder jou. De rest houdt op zodra jij weg bent.
-function botsDone(a,res){if(!bots.length)return;const out=res==='dead'||res==='out';
-  if(a.mode==='run')return;
-  if(a.mode==='boss'){if(a.g.hp<=0)botsFinish(a.kind,true,a.kind==='duel'?Math.floor(myBh):-1);else if(!out)botsFinish(a.kind,false,-1);return;}
-  if(a.mode==='chairs'){ // lig jij eruit, dan gaat het laatste veld naar een van de bots die er nog een had
-    const inn=bots.filter(b=>b.ar&&b.ar.mode==='chairs'),had=inn.filter(b=>b.ar.sc&&b.ar.sc[1]===a.rd),from=had.length?had:inn;
-    botsFinish(a.kind,false,-1,out&&from.length?from[Math.random()*from.length|0]:{});return;}
-  botsFinish(a.kind,false,out?-1:Math.floor(a.score));}
+function brainHome(b,dt){const ai=b.ai,g=G,h=hero,[ox,oz]=slotO(mySlot);
+  if(g.phase==='prep'){ // de weg tekenen: een paar vakken per seconde. Ben jij al klaar, dan maakt de bot voort
+    const hurry=YOU.built,now=(performance.now()-t0)/1000;ai.rt-=dt;
+    if(ai.roadQ.length){if(ai.rt<=0){ai.rt=hurry?.04:(.14+Math.random()*.3)/ai.pace;const c=ai.roadQ.shift();if(!orders.some(o=>o.c===c))E.setRoad(g,c,true);}}
+    else if(!built){if(hurry)ai.rdy=Math.min(ai.rdy,now+1+Math.random()*3);if(now>=ai.rdy)built=true;}}
+  // nadenken kost tijd, en die tijd loopt niet mee met de spelsnelheid
+  ai.th-=dt;if(ai.th<=0){ai.th=(1.1+Math.random()*1.6)/ai.pace;if(g.phase!=='prep'||ai.roadQ.length<8)botPlan(ai);}
+  // de held: naar de dichtstbijzijnde vijand lopen, zoals jij met een klik zou doen
+  ai.click-=dt;if(orders.length||ai.click>0)return;ai.click=.35+Math.random()*.3;
+  let e=null,bd=1e9;for(const o of g.en){if(o.dead)continue;const d=Math.hypot(ox+o.x-h.x,oz+o.y-h.z);if(d<bd){bd=d;e=o;}}
+  const R=reachNow();if(!e||bd<=R*.85){h.tx=null;return;}
+  const w=R*.6,cl=(v,o)=>Math.max(o+.3,Math.min(o+N-.3,v));h.tx=cl(ox+e.x+(h.x-ox-e.x)/bd*w,ox);h.tz=cl(oz+e.y+(h.z-oz-e.y)/bd*w,oz);}
+/* --- een bot in een minigame: kijken, kiezen, lopen --- */
+// Vrije weg tussen twee punten? En de tussenstops per eiland, voor waar een rechte lijn over water of door een toren zou gaan.
+function clearWay(ax,az,bx2,bz2){const d=Math.hypot(bx2-ax,bz2-az),n=Math.max(1,Math.ceil(d/.4)),g=arena&&arena.mode==='boss'?arena.g:null,gr=g?arena.B.cr+.2:0;
+  for(let i=1;i<=n;i++){const f=i/n,x=ax+(bx2-ax)*f,z=az+(bz2-az)*f;if(!walkable(x,z)||(g&&Math.hypot(x-g.x,z-g.z)<gr))return false;}return true;}
+function isleNodes(){const o=[[ACX,ACZ]],add=(x,z)=>o.push([ACX+x,ACZ+z]);
+  if(ISLE==='quad')for(const[p,q]of[[1,1],[-1,1],[-1,-1],[1,-1]]){add(p*QD,q*QD);add(p*QD,0);add(0,q*QD);}
+  else if(ISLE==='cross')for(const[p,q]of[[1,0],[-1,0],[0,1],[0,-1]])add(p*4.6,q*4.6);
+  else for(let i=0;i<8;i++)add(Math.cos(i*TAU/8)*3.3,Math.sin(i*TAU/8)*3.3);
+  return o;}
+function wayTo(tx,tz){const h=hero,a=arena;
+  if(a.mode!=='run'&&!walkable(tx,tz)){ // het doel ligt in het water of achter de rand: de dichtstbijzijnde plek waar hij wel kan staan
+    look:for(let L=.4;L<=5;L+=.4)for(let k=0;k<12;k++){const x=tx+Math.cos(k*TAU/12)*L,z=tz+Math.sin(k*TAU/12)*L;if(walkable(x,z)){tx=x;tz=z;break look;}}}
+  if(a.mode==='run'||clearWay(h.x,h.z,tx,tz))return[tx,tz];
+  const ns=isleNodes().filter(n=>walkable(n[0],n[1])),D=(p,x,z)=>Math.hypot(p[0]-x,p[1]-z);let best=null,bc=1e9;
+  const first=ns.filter(n=>D(n,h.x,h.z)>.25&&clearWay(h.x,h.z,n[0],n[1]));
+  for(const n of first)if(clearWay(n[0],n[1],tx,tz)){const c=D(n,h.x,h.z)+D(n,tx,tz);if(c<bc){bc=c;best=n;}}
+  if(best)return best;
+  for(const n of first)for(const q of ns){if(q===n||!clearWay(n[0],n[1],q[0],q[1])||!clearWay(q[0],q[1],tx,tz))continue;const c=D(n,h.x,h.z)+D(n,q[0],q[1])+D(q,tx,tz);if(c<bc){bc=c;best=n;}}
+  return best||[tx,tz];}
+// Inslagen: een bot heeft een rode cirkel pas door na zijn reactietijd, en af en toe let hij even niet op. Hij leest de cirkel zoals jij: hoe
+// voller, hoe eerder de inslag. Staat hij in een cirkel die bijna vol is, dan zoekt hij de dichtstbijzijnde plek waar hij niet alsnog in een
+// volle cirkel staat, het liefst in de richting waar hij toch al heen wilde. Haalt hij dat lopend niet, dan sprint hij.
+function fleeZones(ai,gx,gz){const a=arena,zs=a.zones,h=hero,seen=ai.seen,sp=spdNow();seen.length=0;if(!zs||!zs.length)return null;let inn=false,tmin=9;
+  for(const z of zs){let t=ai.zn.get(z);if(t===undefined){t=a.age+ai.react*(.6+.8*Math.random())*(a.mode==='boss'&&z.r>=3?.4:1)+(a.mode!=='boss'&&Math.random()<.04+(1-ai.skill)*.1?.45+Math.random()*.5:Math.random()<.03?.4:0);ai.zn.set(z,t);} // de klap van een baas ziet hij aankomen
+    if(a.age<t)continue;seen.push(z);const d=Math.hypot(h.x-z.x,h.z-z.z);if(d<z.r+.3&&z.t<(z.r+.3-d)/sp+.4+ai.react*.5){inn=true;tmin=Math.min(tmin,z.t);}}
+  if(!inn){ai.fl=null;return null;}const ga=Math.atan2(gz-h.z,gx-h.x),boss=a.mode==='boss'&&!a.ult?a.g:null,bad=(x,z,eta)=>seen.some(q=>q.t<eta+.8&&Math.hypot(x-q.x,z-q.z)<q.r+.35);
+  if(ai.fl&&!bad(ai.fl[0],ai.fl[1],Math.hypot(ai.fl[0]-h.x,ai.fl[1]-h.z)/sp))return ai.fl; // bij de gekozen uitweg blijven, anders loopt hij te weifelen
+  for(let L=.8;L<=7;L+=.6){let best=null,bv=9;const eta=L/sp;
+    for(let k=0;k<16;k++){const an=k*TAU/16,x=h.x+Math.cos(an)*L,z=h.z+Math.sin(an)*L;if(!walkable(x,z)||(boss&&Math.hypot(x-boss.x,z-boss.z)<a.B.cr+.4))continue;
+      if(bad(x,z,eta))continue; // daar valt de inslag voordat hij weer weg kan
+      let da=Math.abs(an-ga)%TAU;if(da>Math.PI)da=TAU-da;if(da<bv){bv=da;best=[x,z];}}
+    if(best){if(eta>tmin-.4&&sprintCd<=0)useSprint();return ai.fl=best;}}
+  return ai.fl=null;}
+// Kogels: van de richtingen waarin hij kan lopen kiest hij die waarin de kogels het verst langs hem gaan, en anders die het dichtst bij zijn doel.
+function dodgeShots(list,rad,tx,tz,off,leash){const h=hero,sp=spdNow(),ox=off?off[0]:0,oz=off?off[1]:0;let best=null,bs=-1e9;
+  for(let k=-1;k<12;k++){const an=k*TAU/12,vx=k<0?0:Math.cos(an)*sp,vz=k<0?0:Math.sin(an)*sp,px=h.x+vx*.4,pz=h.z+vz*.4;let clear=9;
+    if(k>=0&&(!walkable(px,pz)||!walkable(h.x+vx*.15,h.z+vz*.15)))continue;if(leash&&Math.hypot(px-leash.x,pz-leash.z)>leash.r)continue;
+    for(const s of list){const rx=s.x+ox-h.x,rz=s.z+oz-h.z;if(rx*rx+rz*rz>36)continue;const wx=s.vx-vx,wz=s.vz-vz,ww=wx*wx+wz*wz||1e-6,t=Math.max(0,Math.min(.75,-(rx*wx+rz*wz)/ww)),d=Math.hypot(rx+wx*t,rz+wz*t);if(d<clear)clear=d;}
+    const sc=Math.min(clear,rad*2.4)*8-Math.hypot(tx-px,tz-pz)*.6-(k<0?0:.15);if(sc>bs){bs=sc;best=[px,pz];}}
+  return best;}
+function roam(ai,r1){const m=ai.m,a=arena;if(!m.p||a.age>m.pt||Math.hypot(hero.x-m.p[0],hero.z-m.p[1])<.5){m.p=islePt(0,r1||AR-1.5);m.pt=a.age+2+Math.random()*3;}return{x:m.p[0],z:m.p[1]};}
+function nearestMob(f){let b=null,bv=-1e9;for(const m of arena.mobs){if(m.hp<=0||m.pass)continue;const v=f?f(m):-Math.hypot(hero.x-m.x,hero.z-m.z);if(v>bv){bv=v;b=m;}}return b;}
+// Een plek van waaruit de held m kan raken: een melee-held erbovenop, een afstandsheld op driekwart van zijn bereik.
+// Komt een monster een afstandsheld te na, dan wijkt hij terug; bij de rand van het eiland buigt hij af langs de rand.
+function fightSpot(m,keep){const h=hero,R=reachNow(),d=Math.hypot(h.x-m.x,h.z-m.z)||1,w=Math.max(.9,R*(keep||.75)+(m.big?.4:0)),far=R>=2.5&&m.dmg>0;
+  if(d<=w+.25&&d>=w*(far?.8:.45))return{x:h.x,z:h.z};
+  if(d>w)return{x:m.x+(h.x-m.x)/d*w,z:m.z+(h.z-m.z)/d*w};
+  let ux=(h.x-m.x)/d,uz=(h.z-m.z)/d;const rx=h.x-ACX,rz=h.z-ACZ,rc=Math.hypot(rx,rz)||1;
+  if(!isleOn(h.x+ux*2,h.z+uz*2,.4)){const tx=-rz/rc,tz=rx/rc,s=tx*ux+tz*uz>=0?1:-1;ux=tx*s-rx/rc*.4;uz=tz*s-rz/rc*.4;}
+  return{x:h.x+ux*2.2,z:h.z+uz*2.2,now:true};}
+// De bazen. De bots staan op een rij aan één kant van de baas, de melee-helden vooraan: zo vallen de klappen onder hun voeten samen en is
+// één stap opzij voor iedereen genoeg. Bij een speciale aanval doet een bot wat jij ook moet doen: naar groen, de opening in, of meelopen tussen de stralen.
+// De bazen. De klap valt onder ieders voeten, en met negen spelers ligt het hele eiland dan vol rode cirkels. Wie in meer dan één cirkel staat
+// krijgt ze allemaal. De bots lossen dat op zoals een ingespeeld team: ze vormen twee groepjes aan weerskanten van de baas en staan binnen een
+// groepje op een kluitje, zodat hun cirkels samenvallen en er ruimte overblijft om weg te lopen. De klap komt op een vast ritme; vlak ervoor
+// loopt een groepje al een stuk om de baas heen, zodat de cirkels achter hen vallen en ze binnen bereik blijven. De traagste van het groepje
+// bepaalt waar het heen gaat, de rest loopt mee. Komt de klap toch onverwacht, dan rest alleen wegrennen (fleeZones).
+// PACK is wat de bots van elkaar weten: wie bij welk groepje hoort, waar elk groepje staat (an) en wanneer de volgende klap komt (pred).
+function goalBoss(ai){const a=arena,h=hero,g=a.g,B=a.B,u=a.ult,hx=h.x-ACX,hz=h.z-ACZ,hd=Math.hypot(hx,hz),m=ai.m,rage=g.hp<a.max*.3?1.3:1;
+  if(PACK.a!==a.r+a.kind){const an=Math.random()*TAU;PACK={a:a.r+a.kind,dir:1,pred:3,cyc:0,slam:-9,of:new Map(),g:[{an,until:0},{an:an+Math.PI,until:0}]}; // de eerste klap komt na drie seconden
+    bots.forEach((b,i)=>PACK.of.set(b.peer,i%2));}
+  if(u){const el=u.T-u.t;if(m.u!==u){m.u=u;m.ud=ai.react+.15+Math.random()*.6;}
+    PACK.pred=a.age+u.t+2/rage; // daarna begint het ritme opnieuw
+    if(el<m.ud)return null; // even schrikken
+    if(u.kind==='safe'){let s=u.safe[0],bd=1e9;for(const o of u.safe){const d=Math.hypot(h.x-o.x,h.z-o.z);if(d<bd){bd=d;s=o;}}return{x:s.x+Math.cos(ai.an)*s.r*.45,z:s.z+Math.sin(ai.an)*s.r*.45,sprint:bd/spdNow()>u.t-.4};}
+    if(u.kind==='rings'){let nr=null;for(const r of u.rings)if((el-r.t0)*4.2<hd){nr=r;break;}if(!nr)return null;const an=nr.g+(ai.rr-4.4)*.1;return{x:ACX+Math.cos(an)*ai.rr,z:ACZ+Math.sin(an)*ai.rr};}
+    const st=TAU/u.n,ba=beamAng(u),k=Math.round((Math.atan2(hz,hx)-ba)/st-.5),an=ba+st*(k+.5);return{x:ACX+Math.cos(an)*(ai.rr+.4),z:ACZ+Math.sin(an)*(ai.rr+.4)};}
+  m.u=null;
+  const k=PACK.of.get(ACT.peer)||0,P=PACK.g[k],R=Math.min(B.cr+1.05,1.5*HM.hRange+B.big-.3),raw=Math.atan2(h.z-g.z,h.x-g.x),me=P.an+Math.atan2(Math.sin(raw-P.an),Math.cos(raw-P.an)),
+    pt=an=>[g.x+Math.cos(an)*R,g.z+Math.sin(an)*R],soon=(an,t)=>{const[x,z]=pt(an);return ai.seen.some(q=>q.t<t&&Math.hypot(x-q.x,z-q.z)<q.r+.3);},
+    at=an=>{const t=me+Math.max(-.9,Math.min(.9,an-me)),[x,z]=pt(t);return{x,z,now:true};}; // langs de boog, niet dwars door de baas
+  // wie leidt dit groepje: de traagste die er nog staat
+  let lead=null;for(const b of bots){const c=b.c;if(PACK.of.get(b.peer)!==k||!c.arena||c.arena.r!==a.r||!(c.hero.hp>0))continue;if(!lead||HEROES[c.hi].spd<HEROES[lead.c.hi].spd)lead=b;}
+  if(lead===ACT){let born=-1;for(const z of a.zones)if(z.r>=3){born=a.age-(z.T-z.t);break;}
+    if(born>=0&&born>(m.last||-9)+.6){m.last=born;P.an=me+PACK.dir*2*Math.asin(Math.min(1,1.95/R));P.until=born+1.15; // de klap is gevallen: door tot voorbij de cirkel
+      if(Math.abs(born-PACK.slam)>.3){PACK.slam=born;PACK.pred=born+B.cd/rage;}}
+    else if(a.age<P.until){}
+    else if(a.age>=PACK.pred-.3){ // de klap komt eraan: alvast gaan lopen, om en om linksom en rechtsom, en niet een volle cirkel in
+      if(PACK.cyc!==PACK.pred){PACK.cyc=PACK.pred;PACK.dir=-PACK.dir;}
+      const d=soon(me+PACK.dir*.5,.9)&&!soon(me-PACK.dir*.5,.9)?-PACK.dir:PACK.dir;P.an=me+d*.8;}
+    else if(soon(P.an,1.4)){ // er valt straks een inslag op hun plek: opschuiven naar waar het vrij blijft
+      for(let o=.35;o<3.2;o+=.35){if(!soon(P.an+o,o*R/spdNow()+1.5)){P.an+=o;break;}if(!soon(P.an-o,o*R/spdNow()+1.5)){P.an-=o;break;}}}}
+  return Object.assign(at(P.an),{force:a.age<P.until||a.age>=PACK.pred-.3});}
+// Het doolhof: van opening naar opening. Komt er een kogel aan, dan gaat het schild op als het geladen is.
+function goalRun(ai){const a=arena,h=hero,lx=h.x-RUN.x,lz=h.z-RUN.z;let tx=RUN.L-1,tz=RUN.W/2,sh=false;
+  for(const[wx,sd]of RUN.walls){if(lx>wx+.55)continue;const g=runGap(sd),gz=(g[0]+g[1])/2;tz=gz;tx=Math.abs(lz-gz)>.9&&lx<wx-.2?wx-1.1:wx+.9;break;}
+  for(const s of a.shots){const rx=lx-s.x,rz=lz-s.z;if(Math.hypot(rx,rz)<2.6&&rx*s.vx+rz*s.vz>0){sh=true;break;}}
+  return{x:RUN.x+tx,z:RUN.z+tz,shield:sh&&Math.random()<.6,sprint:a.shots.length>0&&shieldT<=0,dodge:a.shots,rad:.55,off:[RUN.x,RUN.z],now:true};}
+// Stoelendans: een veld uitzoeken dat nog vrij is, ernaast wachten en er laat op stappen, want voor de tiende seconde stopt de tijd nooit en
+// op een veld staan kost levenspunten. Wie geen veld meer heeft en van duwen houdt, duwt iemand van zijn veld af.
+function goalChairs(ai){const a=arena,h=hero,m=ai.m;
+  if(a.phase==='intro'||a.phase==='gap'){const an=ai.an+a.age*.2;return{x:ACX+Math.cos(an)*4.5,z:ACZ+Math.sin(an)*4.5};}
+  if(a.phase!=='run')return null;
+  if(m.rd!==a.rd){m.rd=a.rd;m.spot=-1;m.go=8.3+Math.random()*3.2;}
+  const occ=chClaims(a),mine=a.my?a.my.i:-1,busy=i=>(occ.has(i)&&i!==mine)||bots.some(o=>o!==ACT&&o.c.arena&&o.c.arena.mode==='chairs'&&o.ai.m.spot===i);
+  if(m.spot<0||(m.spot!==mine&&occ.has(m.spot))){m.spot=-1;let bd=1e9;a.spots.forEach((s,i)=>{if(busy(i))return;const d=Math.hypot(h.x-s.x,h.z-s.z);if(d<bd){bd=d;m.spot=i;}});}
+  const s=a.spots[m.spot];
+  if(!s){ // geen veld vrij: bij een bezet veld gaan staan en, als hij dat in zich heeft, de ander eraf duwen
+    let t=null,bd=1e9;for(const r of rheroes.values()){if(!(r.ar>0)||!(r.hp>0)||!a.spots.some(q=>Math.hypot(r.x-q.x,r.z-q.z)<a.R))continue;const d=Math.hypot(h.x-r.x,h.z-r.z);if(d<bd){bd=d;t=r;}}
+    if(!t)return{x:ACX+Math.cos(ai.an)*2,z:ACZ+Math.sin(ai.an)*2};
+    if(ai.mean>.4&&a.rt>9&&pushCd<=0&&bd<E.MOVES.pushRange*.8)usePush();
+    return{x:t.x+(h.x-t.x)/(bd||1)*1.5,z:t.z+(h.z-t.z)/(bd||1)*1.5};}
+  if(mine===m.spot&&h.hp<maxHp()*.07)m.go=a.rt+2.5+Math.random()*3; // bijna leeg: er even af
+  if(a.rt>=Math.max(CH.open,m.go))return{x:s.x,z:s.z};
+  let dx=ACX-s.x,dz=ACZ-s.z,d=Math.hypot(dx,dz);if(d<.1){dx=Math.cos(ai.an);dz=Math.sin(ai.an);d=1;}return{x:s.x+dx/d*(a.R+.8),z:s.z+dz/d*(a.R+.8)};}
+// De vier wedstrijden op het ronde eiland.
+function goalMini(ai){const a=arena,h=hero,m=ai.m,k=a.kind;
+  if(k==='hill'){ // Heuvelkoning: alleen op de heuvel scoor je. Staat er al iemand, dan wacht een bot zijn beurt af, dringt even voor of duwt
+    const p=a.home||[ACX,ACZ],R=2.4,on=Math.hypot(h.x-p[0],h.z-p[1])<=R;let oth=0;for(const r of rheroes.values())if(r.ar>0&&r.hp>0&&Math.hypot(r.x-p[0],r.z-p[1])<=R)oth++;
+    if(m.until===undefined||a.age>m.until){m.want=h.hp>maxHp()*.35&&Math.random()<(oth?.2+ai.mean*.3:.8);m.until=a.age+(m.want?3+Math.random()*4:2.5+Math.random()*4);m.cont=0;}
+    if(m.want){if(on&&oth){if(!m.cont)m.cont=a.age+1.2+Math.random()*2.2;if(pushCd<=0&&ai.mean>.45&&Math.random()<.12)usePush();else if(a.age>m.cont){m.want=false;m.until=a.age+3+Math.random()*4;}}else m.cont=0;
+      return{x:p[0]+Math.cos(ai.an)*.9,z:p[1]+Math.sin(ai.an)*.9};}
+    const t=nearestMob();if(t&&Math.hypot(h.x-t.x,h.z-t.z)<4)return fightSpot(t);return{x:p[0]+Math.cos(ai.an)*4.3,z:p[1]+Math.sin(ai.an)*4.3};}
+  if(k==='hunt'){const t=nearestMob(o=>(o.val||1)*1.5-Math.hypot(h.x-o.x,h.z-o.z));return t?fightSpot(t):roam(ai,AR-2.5);}
+  if(k==='cores'){ // Kernroof: de dichtstbijzijnde kern halen, tenzij twee anderen er al dichter bij zijn, en hem naar het midden brengen
+    if(a.carry)return{x:ACX,z:ACZ};let c=null,bd=1e9,n=0;
+    for(const o of a.items){if(o.t0>a.age||a.gone.has(o.i))continue;if(++n>3)break;const d=Math.hypot(h.x-o.x,h.z-o.z);let closer=0;for(const r of rheroes.values())if(r.ar>0&&r.hp>0&&Math.hypot(r.x-o.x,r.z-o.z)<d-.5)closer++;
+      if(closer<2&&d<bd){bd=d;c=o;}}
+    if(c)return{x:c.x,z:c.z};const t=nearestMob();if(t&&Math.hypot(h.x-t.x,h.z-t.z)<4.5)return fightSpot(t);return{x:ACX+Math.cos(ai.an)*5.2,z:ACZ+Math.sin(ai.an)*5.2};}
+  // Vuurstorm: binnen de krimpende kring blijven
+  const R=AR-(AR-4.2)*Math.min(1,a.age/55),g=roam(ai,Math.max(1,R-1.4)),d=Math.hypot(g.x-ACX,g.z-ACZ),lim=Math.max(.5,R-1.2);
+  if(d>lim){m.p=[ACX+(g.x-ACX)*lim/d,ACZ+(g.z-ACZ)*lim/d];return{x:m.p[0],z:m.p[1]};}return g;}
+// Het brein van een bot in een minigame. Een paar keer per seconde kiest hij een doel, zoals een mens die kijkt en dan stuurt; daartussen loopt hij.
+// Gevaar gaat voor: eerst uit de rode cirkels, dan kogels ontwijken, dan pas het doel. Met omgekeerde besturing vergist hij zich af en toe.
+function brainArena(b,dt){const ai=b.ai,a=arena,h=hero;
+  if(ai.ar!==a){ai.ar=a;ai.m={};ai.zn=new WeakMap();ai.seen.length=0;ai.raw=null;ai.wp=null;ai.dec=.3+Math.random()*.5;ai.hold=0;ai.jump=false;ai.idle=0;ai.idleN=3+Math.random()*3;ai.fl=null;ai.dg=null;ai.an=Math.random()*TAU;ai.rr=3.5+Math.random()*1.9;ai.lapse=0;ai.lapseT=1+Math.random()*2;}
+  if(a.mode==='chairs'&&a.phase==='stop')return;
+  // Niemand speelt aan één stuk door op zijn scherpst: een bot kijkt af en toe even de kat uit de boom, de ene vaker dan de andere.
+  // Bij een baas doet hij dat niet: daar loopt het team op een vast ritme.
+  if(a.mode!=='boss'){ai.idleN-=dt;if(ai.idleN<=0){ai.idleN=2+Math.random()*4;if(Math.random()<(1-ai.skill)*.9)ai.idle=.3+Math.random()*.9;}}
+  if(ai.idle>0)ai.idle-=dt;
+  ai.dec-=dt;
+  if(ai.dec<=0&&!(ai.idle>0)){ai.dec=(.07+(1-ai.skill)*.28)*(.7+.6*Math.random());let g=null;
+    switch(a.mode){case'boss':g=goalBoss(ai);break;case'run':g=goalRun(ai);break;case'chairs':g=goalChairs(ai);break;case'lab':g=a.K.bot?a.K.bot(a,ai.m,ai):roam(ai);break;default:g=goalMini(ai);}
+    if(arena!==a||hero.hp<=0)return;
+    // een heel nieuw doel dringt pas na de reactietijd door
+    if(g&&ai.raw&&!g.now&&!ai.jump&&a.age>=ai.hold&&Math.hypot(g.x-ai.raw.x,g.z-ai.raw.z)>2.5){ai.hold=a.age+ai.react*(.5+Math.random()*.7);ai.jump=true;}
+    if(a.age>=ai.hold){ai.raw=g;ai.jump=false;}
+    const r=ai.raw;if(r){if(r.shield&&shieldCd<=0)useShield();if(r.sprint&&sprintCd<=0)useSprint();
+      ai.wp=wayTo(r.x,r.z);ai.dg=r.dodge&&r.dodge.length?dodgeShots(r.dodge,r.rad||.5,ai.wp[0],ai.wp[1],r.off,r.leash):null;}else ai.wp=ai.dg=null;}
+  const r=ai.raw;let tx=h.x,tz=h.z,flee=false;
+  const fl=fleeZones(ai,r?r.x:h.x,r?r.z:h.z);
+  if(fl){tx=fl[0];tz=fl[1];flee=true;}
+  else if(ai.idle>0)return;
+  else if(r&&ai.wp){tx=ai.wp[0];tz=ai.wp[1];if(ai.dg){tx=ai.dg[0];tz=ai.dg[1];}}
+  let dx=tx-h.x,dz=tz-h.z;const d=Math.hypot(dx,dz);if(d<.1)return;
+  if(!flee){const k=Math.min(d,1),px=h.x+dx/d*k,pz=h.z+dz/d*k;const lim=r&&r.force?.35:.9;if(ai.seen.some(q=>q.t<lim&&Math.hypot(px-q.x,pz-q.z)<q.r+.25))return;} // niet een bijna volle rode cirkel in lopen
+  const sp=spdNow(),st=sp*dt;let f=a.ice?1:Math.min(1,d/Math.max(.01,st));if(!flee&&r&&r.pace)f=Math.min(f,r.pace/sp);dx=dx/d*f;dz=dz/d*f;
+  if(a.mode==='boss'&&!a.ult){ // niet tegen de baas aan lopen: wie hem raakt krijgt klappen
+    const ex=h.x-a.g.x,ez=h.z-a.g.z,e=Math.hypot(ex,ez)||1,lim=a.B.cr+.4,rad=(dx*ex+dz*ez)/e;
+    if(e<lim+.5&&rad<0){const l0=Math.hypot(dx,dz);dx-=ex/e*rad;dz-=ez/e*rad;const l=Math.hypot(dx,dz);if(l>.01){dx*=l0/l;dz*=l0/l;}} // langs hem heen, op volle snelheid
+    if(e<lim){dx+=ex/e*.9;dz+=ez/e*.9;const l=Math.hypot(dx,dz);if(l>1){dx/=l;dz/=l;}}}
+  if(a.flip){ai.lapseT-=dt;if(ai.lapseT<=0){ai.lapse=.2+Math.random()*.3;ai.lapseT=(a.age<8?1.5:3)+Math.random()*3;}if(ai.lapse>0){ai.lapse-=dt;dx=-dx;dz=-dz;}}
+  b.mx=dx;b.mz=dz;}
+function botBrain(b,dt){if(arena)brainArena(b,dt);else brainHome(b,dt);}
 function botsTick(dt){if(!bots.length)return;
   // doet er toch een mens mee in dit potje, dan maken de bots plaats
-  if(netPeers.some(p=>!own(p)&&p.presence&&p.presence.mt===matchId)){clearBots();return;}
+  if(netPeers.some(p=>!ownReal(p)&&p.presence&&p.presence.mt===matchId)){clearBots();return;}
   bacc+=dt*speed;let n=0;while(bacc>=STEP&&n<14){bacc-=STEP;n++;}if(n>=14)bacc=0;
+  meP.peer=myPeer||'~me';meP.presence=myPresence(true);botPeers.length=0;for(const p of netPeers)if(!ownReal(p))botPeers.push(p);botPeers.push(...bots,meP);
   const fc=focus(),show=gl3&&!document.hidden;
-  for(const b of bots){const g=b.G,[ox,oz]=slotO(b.slot);
-    if(botLive(b)){botSync(b);
-      if(g.phase==='build'||g.phase==='wave'){g.fxOn=show&&Math.abs(ox+6.5-fc[0])+Math.abs(oz+6.5-fc[1])<34;for(let i=0;i<n;i++)E.step(g,STEP);}
-      if(b.ar)botArena(b,dt);else if(botLive(b))botHome(b,dt);}
-    g.ev.length=0;if(g.fx.length){if(show&&live.length<220)for(const f of g.fx)spawnFx(f,ox,oz);g.fx.length=0;}
-    botPres(b);}
-  if(BF){const inn=arena&&arena.r===BF.r&&arena.mode==='boss';
-    if(inn){const l=arena.g.last;BF.max=arena.max;BF.t=arena.t;if(l&&l[0]!==BF.seen){BF.seen=l[0];if(l[1]===0)BF.ga+=BF.dir*2.2;}}
-    else{let sum=myBm===BF.r?myBh:0;for(const b of bots)if(b.bm===BF.r)sum+=b.bh;BF.t-=dt*4;
-      if(sum>=BF.max)botsFinish(BF.kind,true,-1);else if(BF.t<=0||!bots.some(b=>b.ar))botsFinish(BF.kind,false,-1);}}
+  for(const b of bots){const c=b.c,g=c.G,[ox,oz]=slotO(c.mySlot);
+    if(!c.ended){c.peers=botPeers;c.rheroes=botView(b);g.fxOn=show&&(g.phase==='build'||g.phase==='wave')&&Math.abs(ox+6.5-fc[0])+Math.abs(oz+6.5-fc[1])<34;
+      asBot(b,()=>{sync();if(arena)updArena(dt);else if(G.phase!=='prep')for(let i=0;i<n;i++)E.step(G,STEP);
+        b.mx=b.mz=0;botBrain(b,dt);updHero(dt);
+        if(G.phase==='over'||G.phase==='won'){ended=true;myState='done';}
+        b.presence=myPresence(true);});
+      if(b.shove){const v=b.shove;b.shove=null;shove(hero,v[0],v[1]);hero.tx=null;hero.vx=hero.vz=0;if(gl3)fxBall(V(hero.x,.8,hero.z),'#ffe9a8',.1,.7,.25,.7);toast(b.name+' duwt je opzij',1200);}}
+    g.ev.length=0;if(g.fx.length){if(show&&live.length<220)for(const f of g.fx)spawnFx(f,ox,oz);g.fx.length=0;}}
   // komt een mens uit een ander potje op de plek van een bot te staan, dan verhuist de bot
   bslow-=dt;if(bslow<=0){bslow=1;const hum=new Set();
-    for(const p of netPeers){const pr=p.presence||{};if(!own(p)&&(pr.st==='playing'||pr.st==='done')&&Number.isInteger(pr.sl))hum.add(pr.sl);}
-    for(const b of bots){if(!hum.has(b.slot))continue;const used=takenSlots();used.add(mySlot);let s=0;while(s<SLOTS&&used.has(s))s++;if(s>=SLOTS)continue;
-      const[ax,az]=slotO(b.slot),[cx,cz]=slotO(s);b.slot=s;if(!b.ar){b.h.x+=cx-ax;b.h.z+=cz-az;}}}
+    for(const p of netPeers){const pr=p.presence||{};if(!ownReal(p)&&(pr.st==='playing'||pr.st==='done')&&Number.isInteger(pr.sl))hum.add(pr.sl);}
+    for(const b of bots){const c=b.c;if(!hum.has(c.mySlot))continue;const used=takenSlots();used.add(mySlot);let s=0;while(s<SLOTS&&used.has(s))s++;if(s>=SLOTS)continue;
+      const[ax,az]=slotO(c.mySlot),[cx,cz]=slotO(s);c.mySlot=s;if(!c.arena){c.hero.x+=cx-ax;c.hero.z+=cz-az;c.hero.tx=null;}c.orders=[];b.presence.sl=s;}}
   syncPeers();}
 
 /* ---------- invoer ---------- */
@@ -1647,19 +1676,21 @@ function onPeers(ch){netPeers=ch.peers;mergePeers();const now=performance.now();
     if(mine&&peers.some(p=>!own(p)&&p.presence&&p.presence.st==='playing'&&p.presence.sl===mySlot&&p.peer<mine.peer)){const[ax,az]=slotO(mySlot);mySlot=freeSlot(0);const[bx2,bz2]=slotO(mySlot);if(!arena){hero.x+=bx2-ax;hero.z+=bz2-az;hero.tx=null;}orders=[];pushPresence(true);}}
   if($('#game').hidden)renderLobby();}
 let lastPush=0;
-function pushPresence(force){if(!room||lab)return;const now=performance.now();if(!force&&now-lastPush<320)return;lastPush=now;
-  const p={st:myState,rd:ready};if(G){p.sl=mySlot;p.r=G.round;p.l=G.lives;p.s=G.score;p.sp=speed;p.tw=encT();p.mt=matchId;p.bd=built;p.ps=G.phase==='prep'?0:1;p.cl=G.cleared;p.nx=nx;p.sw=sentWave;p.pa=encP();p.wn=G.phase==='won'?1:0;p.bs=bots.length?bots.map(b=>b.slot):null;
-    if(myState==='playing')p.en=encE();else p.en='';Object.assign(p,heroPatch());}
-  room.presence(p).catch(()=>{});}
+// Hoe een speler er voor de anderen uitziet. Bots vullen dit op dezelfde manier in; lite laat weg wat alleen over het netwerk nodig is.
+function myPresence(lite){const p={st:myState,rd:ready};if(lite)p.t=myT;
+  if(G){p.sl=mySlot;p.r=G.round;p.l=G.lives;p.s=G.score;p.sp=speed;p.mt=matchId;p.bd=built;p.ps=G.phase==='prep'?0:1;p.cl=G.cleared;p.nx=nx;p.sw=sentWave;p.wn=G.phase==='won'?1:0;
+    if(!lite){p.tw=encT();p.pa=encP();p.en=myState==='playing'?encE():'';p.bs=bots.length?bots.map(b=>b.c.mySlot):null;}Object.assign(p,heroPatch());}
+  return p;}
+function pushPresence(force){if(!room||lab||ACT)return;const now=performance.now();if(!force&&now-lastPush<320)return;lastPush=now;room.presence(myPresence()).catch(()=>{});}
 const rd1=v=>Math.round(v*10)/10;
 function heroPatch(){return{h:save.hero,df:G.diff,p:[rd1(hero.x),rd1(hero.z),rd1(hero.a)],hp:Math.max(0,Math.round(hero.hp)),mh:Math.round(maxHp()),ar:arena?arena.seq:0,ak:akCount,am:arena?arena.r:0,bm:myBm,bh:Math.round(myBh),ms:arena&&arena.ms?[arena.r,Math.floor(arena.score||0),0]:msLast,mg:arena&&arena.claim?arena.claim.slice(-16):null,pu:arena?pushOut:null,...chairsPatch(),...bossPatch()};}
 function bossPatch(){const a=arena;if(!a||a.mode!=='boss'||missionLead(a))return{bp:null,ba:null};return{bp:[rd1(a.g.x),rd1(a.g.z),rd1(a.g.a)],ba:a.g.last};}
 let lastHero=0;
-function pushHero(force){if(!room||!G||lab)return;const now=performance.now();if(!force&&now-lastHero<100)return;lastHero=now;room.presence(heroPatch()).catch(()=>{});}
+function pushHero(force){if(!room||!G||lab||ACT)return;const now=performance.now();if(!force&&now-lastHero<100)return;lastHero=now;room.presence(heroPatch()).catch(()=>{});}
 function syncPeers(){const mine=peers.find(p=>own(p));if(mine)myPeer=mine.peer;const seen=new Set();
   for(const p of peers){if(own(p)||p.kind!=='viewer')continue;const pr=p.presence||{};
     if(!Array.isArray(pr.p)||(pr.st!=='playing'&&pr.st!=='done'))continue;const x=+pr.p[0],z=+pr.p[1];if(!isFinite(x)||!isFinite(z))continue;seen.add(p.peer);
-    let r=rheroes.get(p.peer);if(!r){r={x,z,a:0,walk:0,atk:0,ak:pr.ak|0,pu:Array.isArray(pr.pu)?pr.pu[0]:0,obj:null,lab:null,sig:'',peer:p.peer};rheroes.set(p.peer,r);}
+    let r=rheroes.get(p.peer);if(!r){r={x,z,a:0,walk:0,atk:0,ak:pr.ak|0,pu:Array.isArray(pr.pu)?pr.pu[0]:0,obj:null,lab:null,sig:'',peer:p.peer,bot:!!p.bot};rheroes.set(p.peer,r);}
     if(Array.isArray(pr.pu)&&pr.pu[0]!==r.pu){r.pu=pr.pu[0];if(+pr.ar>0)gotPush(pr.pu);}
     if(Math.hypot(x-r.x,z-r.z)>10){r.x=x;r.z=z;}
     r.tx=x;r.tz=z;r.ta=+pr.p[2]||0;r.idx=Math.max(0,Math.min(5,pr.h|0));r.slot=Number.isInteger(pr.sl)&&pr.sl>=0&&pr.sl<SLOTS?pr.sl:SLOTS;r.hp=+pr.hp||0;r.mh=+pr.mh||100;r.ar=+pr.ar||0;r.name=nameOf(p);
@@ -1756,7 +1787,7 @@ $('#miniBtn').onclick=openMini;$('#lAgain').onclick=()=>{if(lab)startLab(lab.kin
 loadLocal();loadAcct();bindAccount();buildHud();
 try{if(init3D()){bindCanvas();renderIcons();}}catch(err){gl3=false;console.error(err);}
 renderHome();renderLobby();renderChat();if(!acct)showGate('new');requestAnimationFrame(frame);
-if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>enterArena(m,r),bots:()=>bots,FIXED,miniFor,ISLES,isle:()=>ISLE,isleOn,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
+if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>{enterArena(m,r);for(const b of bots)asBot(b,()=>enterArena(m,r));},bots:()=>bots,asBot,FIXED,miniFor,ISLES,isle:()=>ISLE,isleOn,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
 // Sessie controleren: klopt het token nog, dan komt de voortgang van de server binnen.
 if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
 // Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.
