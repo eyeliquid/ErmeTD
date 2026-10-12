@@ -521,9 +521,11 @@ function fxBeam(a,b,col,w,life){if(live.length>340)return;const m=getFx('beam');
 function fxBall(p,col,r0,r1,life,op){if(live.length>340)return;const m=getFx('ball');m.material.color.set(col);m.position.copy(p);Object.assign(m.userData,{t:0,life,r0,r1,op});m.scale.setScalar(r0);live.push(m);}
 function fxRing(p,col,r,life,op){if(live.length>340)return;const m=getFx('ring');m.material.color.set(col);m.position.set(p.x,.06,p.z);Object.assign(m.userData,{t:0,life,r0:r*.3,r1:r,op:op||.9});m.scale.setScalar(r*.3);live.push(m);}
 const V=(x,y,z)=>new T3.Vector3(x,y,z);
+// Laat een wakkere Slapende Geers (nu of na de klap die hij al maakt) met beide vuisten op de grond slaan.
+function slamNow(g,r){const S=g&&g.userData.slam;if(!S)return;S.r=r;if(S.fired&&fxNow-S.at>=.7){S.at=fxNow;S.fired=false;}else S.again=true;}
 // Twee vuisten slaan op de grond: een stofwolk bij elke vuist en een schokgolf over het hele bereik.
-function slamFx(g,r){const c=g.position;for(const sd of[-1,1]){const p=V(c.x+sd*.85,.3,c.z+1.27);fxRing(p,'#ffb060',1.3,.45,.8);fxBall(p,'#ffe0a0',.15,.7,.3,.7);}
-  fxRing(V(c.x,0,c.z+1),'#ff4a2a',r,.75,.6);fxRing(V(c.x,0,c.z+1),'#ffd27a',r*.55,.5,.5);fxBall(V(c.x,.4,c.z+1.2),'#ff8a2c',.3,1.8,.35,.55);
+function slamFx(g,r){const c=g.position,k=g.scale.x;for(const sd of[-1,1]){const p=V(c.x+sd*.85*k,.3,c.z+1.27*k);fxRing(p,'#ffb060',1.3,.45,.8);fxBall(p,'#ffe0a0',.15,.7,.3,.7);}
+  fxRing(V(c.x,0,c.z+k),'#ff4a2a',r,.75,.6);fxRing(V(c.x,0,c.z+k),'#ffd27a',r*.55,.5,.5);fxBall(V(c.x,.4,c.z+1.2*k),'#ff8a2c',.3,1.8,.35,.55);
   if(Math.hypot(camera.position.x-c.x,camera.position.z-c.z)<30)shakeT=Math.max(shakeT,.25);}
 function spawnFx(f,ox,oz){const A=h=>V(ox+f.a[0],h,oz+f.a[1]),B=f.b?V(ox+f.b[0],.36,oz+f.b[1]):null;
   switch(f.k){
@@ -537,7 +539,7 @@ function spawnFx(f,ox,oz){const A=h=>V(ox+f.a[0],h,oz+f.a[1]),B=f.b?V(ox+f.b[0],
     case'geers':fxBeam(A(1.25),B,'#ffc14a',.07,.12);fxBall(B,'#ff7a2c',.15,f.r*.6,.26,.55);break;
     case'snore':fxRing(B,'#7a4fd0',f.r,.8,.3);break;
     // De wakkere Slapende Geers: de klap zelf (met schokgolf) speelt het model af, zie slamFx.
-    case'roar':{let hit=false;for(const o of tobj.values()){const S=o.g.userData.slam;if(S&&Math.abs(o.g.position.x-B.x)<.6&&Math.abs(o.g.position.z-B.z)<.6){S.r=f.r;if(S.fired&&fxNow-S.at>=.7){S.at=fxNow;S.fired=false;}else S.again=true;hit=true;}}
+    case'roar':{let hit=false;for(const o of tobj.values()){if(o.g.userData.slam&&Math.abs(o.g.position.x-B.x)<.6&&Math.abs(o.g.position.z-B.z)<.6){slamNow(o.g,f.r);hit=true;}}
       if(!hit){fxRing(B,'#ff4a2a',f.r,.6,.55);fxBall(V(B.x,1.4,B.z),'#ffb060',.3,1.6,.3,.6);}break;}
     case'tox':fxBeam(A(1.04),B,'#8be85a',.05,.14);fxBall(B,'#5fc22e',.2,f.r*.9,.55,.5);break;
     case'bolt':{let p=V(ox+f.pts[0][0],1.46,oz+f.pts[0][1]);for(let i=1;i<f.pts.length;i++){const q=V(ox+f.pts[i][0],.38,oz+f.pts[i][1]);let a=p;
@@ -893,7 +895,7 @@ function heroAttack(dt){const h=hero,H=HEROES[save.hero],HR=H.range*HM.hRange,ra
   }}
 /* --- arena: na elke tiende ronde --- */
 function applyArmour(n,g){g=g||G;if(n===1)g.m.dmg*=1.1;else if(n===2){g.lives+=5;g.maxLives+=5;}else if(n===3)g.m.rate*=1.08;else if(n===4)g.m.gold*=1.1;E.recalc(g);}
-// Na elke tiende ronde volgt een minigame. Drie levels liggen vast: 10 de Kolos, 50 De Geers draait door en 100 de Titaan.
+// Na elke tiende ronde volgt een minigame. Drie levels liggen vast: 10 de Kolos, 50 De Slapende Geers en 100 de Titaan.
 // Op de andere tientallen komt een willekeurige minigame uit alle overige, en binnen een potje nooit twee keer dezelfde.
 // De keuze volgt uit het potje (matchId), zodat alle spelers dezelfde krijgen.
 // Helden kunnen elkaar nergens raken: je wint op score, of door als laatste over te blijven.
@@ -1214,7 +1216,8 @@ const LABAPI={range:()=>HEROES[save.hero].range*HM.hRange,get ACX(){return ACX;}
   push:(dx,dz)=>{for(let i=0;i<8;i++)stepHero(dx/8,dz/8,false);hero.tx=null;hero.vx=hero.vz=0;},
   // de held neerzetten; met een kijkrichting erbij komt de camera er recht achter
   place:(x,z,a)=>{hero.x=x;hero.z=z;hero.tx=null;hero.vx=hero.vz=0;if(a!=null){hero.a=a;hcam.yaw=-Math.PI/2-a;}},
-  tower:(type,x,z,sc)=>{if(!gl3||!arena)return null;const o=makeTower(type,SLOTS,0,null);o.scale.setScalar(sc||1.3);o.position.set(x,0,z);scene.add(o);(arena.objs||(arena.objs=[])).push(o);return o;},
+  slam:(o,r)=>{if(gl3)slamNow(o,r||3);},
+  tower:(type,x,z,sc,spec)=>{if(!gl3||!arena)return null;const o=makeTower(type,SLOTS,0,spec||null);o.scale.setScalar(sc||1.3);o.position.set(x,0,z);scene.add(o);(arena.objs||(arena.objs=[])).push(o);return o;},
   drop:o=>{if(o&&gl3)scene.remove(o);},
   shield:{get on(){return shieldT>0;},slot:()=>shieldSlot()},
   // het casino: de vakken van de tafel, het wiel draaien, en credits erbij of eraf (geeft terug wat je hebt)

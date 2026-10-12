@@ -87,7 +87,7 @@ Vijf talenten in de boom Veldheer maken ze sterker: Brede schouders (verder duwe
 
 Rond het speelveld liggen vijf minigame-eilanden: onder het ronde eiland, boven het vierkante, links het kruis, rechts de vier eilandjes met bruggen en links onderin het casino met de roulettetafel. Elke minigame hoort bij één eiland (`isle` in zijn beschrijving). Het doolhof heeft een eigen baan naast het ronde eiland.
 
-Na elke tiende golf volgt een minigame. Drie levels liggen vast, in `FIXED` in `client/js/game.js`: level 10 de Kolos, level 50 De Geers draait door en level 100 de Titaan. Op de andere tientallen kiest `miniFor` een willekeurige uit alle overige, in één potje nooit twee keer dezelfde. De keuze volgt uit het potje, zodat alle spelers dezelfde krijgen.
+Na elke tiende golf volgt een minigame. Drie levels liggen vast, in `FIXED` in `client/js/game.js`: level 10 de Kolos, level 50 De Slapende Geers en level 100 de Titaan. Op de andere tientallen kiest `miniFor` een willekeurige uit alle overige, in één potje nooit twee keer dezelfde. De keuze volgt uit het potje, zodat alle spelers dezelfde krijgen.
 
 De genummerde minigames staan in `client/js/minigames.js`; bovenin dat bestand staat welke velden een minigame heeft. De getallen die de moeilijkheid bepalen (duur `T`, doel `goal`, levenspunten, schade, tempo) staan per minigame bij elkaar. In een potje speelt iedereen zijn eigen ronde op hetzelfde eiland en wint de hoogste score.
 
