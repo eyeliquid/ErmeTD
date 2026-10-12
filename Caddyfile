@@ -1,0 +1,15 @@
+# Caddy zet het spel online op HTTPS. Het certificaat van Let's Encrypt
+# vraagt Caddy zelf aan en vernieuwt het ook zelf.
+# Het domein komt uit DOMAIN in .env (standaard ermetd.harrevelt.nl).
+
+{$DOMAIN:ermetd.harrevelt.nl} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# Ook de lobby-WebSocket op /ws gaat hierdoor; Caddy geeft die vanzelf door.
+	reverse_proxy spel:3000
+}

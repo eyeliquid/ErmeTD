@@ -145,6 +145,25 @@ De overige instellingen staan in [`server/.env.example`](server/.env.example).
 
 Staat de frontend ergens anders dan de server, vul dan het adres van de server in bij `client/js/config.js` en zet het adres van de frontend op de server in `CORS_ORIGINS`.
 
+### Vanaf je eigen computer, op ermetd.harrevelt.nl
+
+`docker-compose.online.yml` zet [Caddy](https://caddyserver.com) voor het spel. Caddy vraagt zelf een certificaat aan bij Let's Encrypt, vernieuwt het op tijd en stuurt ook de lobby-WebSocket door. Het spel zelf is dan niet meer rechtstreeks bereikbaar, alleen via Caddy.
+
+1. **DNS.** Maak bij de DNS van harrevelt.nl een A-record `ermetd` dat naar je publieke IP-adres wijst (te zien op whatismyip.com). Verandert dat adres soms, gebruik dan dynamische DNS.
+2. **Router.** Stuur TCP-poort 80 en 443 (en UDP 443 voor HTTP/3) door naar je computer. Geef die computer een vast IP-adres in je router. Poort 80 is nodig voor Let's Encrypt.
+3. **Instellingen.** `cp .env.example .env` en vul `ADMIN_PASSWORD` in.
+4. **Starten.** Stop eerst de lokale versie (`docker compose down`, de database blijft bewaard) en start dan:
+
+   ```bash
+   docker compose -f docker-compose.online.yml up -d --build
+   ```
+
+   Na ongeveer een minuut staat het spel op <https://ermetd.harrevelt.nl>. Gaat er iets mis met het certificaat: `docker compose -f docker-compose.online.yml logs caddy`.
+
+Krijg je de poorten niet open (komt je IP-adres in de router niet overeen met whatismyip.com, dan zit je achter CGNAT), gebruik dan een Cloudflare Tunnel in plaats van Caddy.
+
+Het spel is alleen bereikbaar zolang je computer aanstaat en niet slaapt. Zet het startgoud in de webadmin op 260 voordat anderen meespelen.
+
 ## Ontwikkelen
 
 ```bash

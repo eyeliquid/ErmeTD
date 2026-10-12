@@ -1,0 +1,40 @@
+# Online zetten op je eigen domein, met HTTPS via Let's Encrypt.
+# Starten:  docker compose -f docker-compose.online.yml up -d --build
+# Daarvoor: kopieer .env.example naar .env en vul het in. Zie "Online zetten" in de README.
+#
+# Gebruikt dezelfde database als docker-compose.yml (volume speldata), dus accounts en scores blijven.
+services:
+  spel:
+    build: .
+    restart: unless-stopped
+    # Geen poort naar buiten: alleen Caddy praat met het spel.
+    expose:
+      - "3000"
+    environment:
+      # Caddy staat ervoor, dus 1 proxy.
+      TRUST_PROXY: "1"
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      - speldata:/data
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - spel
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:-ermetd.harrevelt.nl}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Hier bewaart Caddy het certificaat. Niet weggooien, anders vraagt hij steeds een nieuw aan.
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  speldata:
+  caddy_data:
+  caddy_config:
