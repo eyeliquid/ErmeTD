@@ -3,7 +3,7 @@
 //
 // Elke minigame is een beschrijving:
 //   id, n      sleutel en naam
-//   isle       het eiland waarop hij gespeeld wordt: round (rond), square (vierkant), cross (kruis), quad (vier eilandjes) of casino
+//   isle       het eiland waarop hij gespeeld wordt: round (rond), square (vierkant), cross (kruis), quad (vier eilandjes), casino of track (racecircuit)
 //   tier       1 redelijk makkelijk, 2 gemiddeld, 3 uitdagend, 4 heel uitdagend
 //   T, goal    duur in seconden, en de score die je alleen spelend moet halen
 //   d, win     uitleg en doel voor de keuzelijst; go is de melding bij de start
@@ -112,6 +112,121 @@ const twin = (a, i, hp) => add(a, i ? 'haz' : 'mech', Object.assign({ hp: hp || 
       ai(m, dt) { const h = H(), d = hyp(h.x - m.x, h.z - m.z); m.ct -= dt;
         if (m.st) { if (m.ct <= 0) { m.st = 0; m.ct = .6; } }
         else { m.a = Math.atan2(h.z - m.z, h.x - m.x); if (d > 2) go(m, h.x, h.z, m.sp, dt); else if (m.ct <= 0) { m.st = 1; m.ct = 2.3; zone(a, m.x, m.z, 2.6, 1, 30); } } } }));
+
+// ---- autorace ----
+const RSTEP = 15; // een poort per 15 punten van de baan: 12 poorten per ronde
+// een willekeurige gesloten baan: negen punten rond het midden op wisselende afstand, glad gemaakt tot 180 punten. Het zaad volgt uit het potje (a.rnd), dus iedereen rijdt dezelfde baan.
+const raceTrack = a => { const n = 9, cp = [], R = a.rnd; for (let i = 0; i < n; i++) { const an = i / n * TAU + (R() - .5) * .35, r = 5.4 + R() * 3.8; cp.push([Math.cos(an) * r, Math.sin(an) * r]); }
+  const P = [], M = 20, cl = v => Math.max(-9.6, Math.min(9.6, v));
+  for (let i = 0; i < n; i++) { const p0 = cp[(i - 1 + n) % n], p1 = cp[i], p2 = cp[(i + 1) % n], p3 = cp[(i + 2) % n];
+    for (let k = 0; k < M; k++) { const t = k / M, t2 = t * t, t3 = t2 * t, f = (q0, q1, q2, q3) => .5 * (2 * q1 + (q2 - q0) * t + (2 * q0 - 5 * q1 + 4 * q2 - q3) * t2 + (3 * q1 - q0 - 3 * q2 + q3) * t3);
+      P.push({ x: CX + cl(f(p0[0], p1[0], p2[0], p3[0])), z: CZ + cl(f(p0[1], p1[1], p2[1], p3[1])) }); } }
+  a.trk = P; };
+
+// ---- vissen ----
+const FISH = [{ v: 1, col: '#ff9a3c', s: .2, sp: 2.4, w: 46 }, { v: 3, col: '#3d8bff', s: .32, sp: 1.4, w: 26 }, { v: 8, col: '#ffd24a', s: .24, sp: 3.4, w: 8 }, { v: -3, col: '#6a4a30', s: .26, sp: .6, w: 20 }];
+const newFish = a => { let r = rand() * 100, k = FISH[0]; for (const f of FISH) { if (r < f.w) { k = f; break; } r -= f.w; } const p = pol(rand() * TAU, 1.2 + rand() * 3.8); a.fs.push({ x: p.x, z: p.z, dir: rand() * TAU, tt: rand(), k }); };
+// de dobber: 2,3 voor de held, richting het midden van de vijver
+const bobber = () => { const h = H(), d = dH(CX, CZ) || 1; return { x: h.x + (CX - h.x) / d * 2.3, z: h.z + (CZ - h.z) / d * 2.3 }; };
+const fishReel = a => { if (a.cd > 0) return; a.cd = .7; const b = bobber(); let got = null;
+  for (const f of a.fs) if (hyp(f.x - b.x, f.z - b.z) < .55 + f.k.s) { got = f; break; }
+  if (!got) { api.ring(b.x, b.z, '#8fb6ff', .6, .25); return; }
+  a.fs.splice(a.fs.indexOf(got), 1); newFish(a); a.pts = Math.max(0, a.pts + got.k.v); api.ring(b.x, b.z, got.k.col, 1.2, .35); api.ball(b.x, .6, b.z, got.k.col, .1, .6, .3);
+  api.toast(got.k.v < 0 ? 'Een oude laars: −3' : `Beet! +${got.k.v}`, 1000); };
+
+// ---- vier op een rij ----
+const C4C = .55; // een vak is 0,55 breed; een bord is 7 kolommen bij 6 rijen
+// acht borden op het vierkante eiland, vier aan elke kant van een middenstrook. z0 is de strook waar je voor het bord staat.
+const c4Board = j => { const s = j < 4 ? -1 : 1, x = CX - 6.15 + (j % 4) * 4.1; return { x, s, z0: CZ + s * 3.65, row: r => CZ + s * (4.875 + (5 - r) * C4C) }; };
+const c4Peer = (a, id) => a.local ? a.vp[id] : (api.peers(a).find(p => p.id === id) || {}).lp;
+// de stand van mijn partij: het bord, wie aan zet is, en een winnaar (1 of 2) of een vol bord
+function c4Game(a) { const o = c4Peer(a, a.opp), om = o && o.k === a.k ? o.mv || '' : '', p1 = a.p1 ? a.mv : om, p2 = a.p1 ? om : a.mv, g = { b: Array.from({ length: 7 }, () => []), turn: 1, win: 0, full: false, n: 0 };
+  for (let i = 0; i < 42; i++) { const s = i % 2 ? p2 : p1, c = s[i >> 1]; if (c == null) { g.turn = i % 2 ? 2 : 1; break; } const col = g.b[+c]; if (col.length >= 6) continue; col.push(i % 2 ? 2 : 1); g.n++;
+    if (!g.win && c4Four(g.b, +c, col.length - 1)) g.win = col[col.length - 1]; if (g.n >= 42) g.full = true; }
+  return g; }
+function c4Four(b, c, r) { const v = b[c][r], at = (x, y) => x >= 0 && x < 7 && y >= 0 && b[x][y] === v;
+  for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) { let n = 1; for (const s of [1, -1]) for (let k = 1; k < 4 && at(c + dx * k * s, r + dy * k * s); k++) n++; if (n >= 4) return true; } return false; }
+// een zet voor een computer: winnen als het kan, de ander blokkeren, niets weggeven, en liefst in het midden. noise: kans op een willekeurige zet
+function c4Ai(g, me, noise) { const ok = [0, 1, 2, 3, 4, 5, 6].filter(c => g.b[c].length < 6), tryC = (c, p) => { g.b[c].push(p); const w = c4Four(g.b, c, g.b[c].length - 1); g.b[c].pop(); return w; };
+  if (!ok.length) return 3; if (rand() < noise) return ok[Math.floor(rand() * ok.length)];
+  for (const c of ok) if (tryC(c, me)) return c; for (const c of ok) if (tryC(c, 3 - me)) return c;
+  const safe = ok.filter(c => { g.b[c].push(me); const bad = g.b[c].length < 6 && tryC(c, 3 - me); g.b[c].pop(); return !bad; });
+  const pool = safe.length ? safe : ok; return pool.sort((p, q) => Math.abs(p - 3) - Math.abs(q - 3) + (rand() - .5) * 1.5)[0]; }
+const c4Col = a => { const b = a.board, h = H(); if (!b || Math.abs(h.z - b.z0) > .9 || Math.abs(h.x - b.x) > 1.95) return -1; return Math.max(0, Math.min(6, Math.floor((h.x - (b.x - 1.925)) / C4C))); };
+function c4Drop(a, c) { if (a.ph !== 'play' || c < 0) return; const g = c4Game(a); if (g.turn !== (a.p1 ? 1 : 2) || g.win || g.full || g.b[c].length >= 6) return;
+  a.mv += c; a.lp = { h: a.h, k: a.k, mv: a.mv }; a.turnT = 12; a.botT = .8 + rand() * 1.8; api.ring(a.board.x + (c - 3) * C4C, a.board.row(g.b[c].length), a.p1 ? '#e8372a' : '#f6cf4d', .5, .3); }
+// indelen: iedereen die meedoet, in een volgorde die voor elke speler gelijk is
+function c4Start(a) { const ids = [api.me, ...api.peers(a).map(p => p.id)].sort(), R = a.rnd; a.names = { [api.me]: 'jou' }; for (const p of api.peers(a)) a.names[p.id] = p.name;
+  a.local = ids.length < 2; if (a.local) { a.vp = {}; for (let i = 1; i < 8; i++) { const id = 'cpu' + i; ids.push(id); a.vp[id] = { h: '', k: 0, mv: '' }; a.names[id] = 'Computer ' + i; } a.aiT = 1.5; }
+  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  a.ids = ids.slice(0, 16); a.rounds = Math.ceil(Math.log2(a.ids.length)); if (!a.ids.includes(api.me)) { a.ph = 'out'; a.res = 'Het toernooi is vol: je kijkt deze keer toe'; a.fail = true; a.fin = true; return; }
+  a.ph = 'wait'; }
+// de uitslag van een partij tussen x en y in ronde k: de winnaar, of null als hij nog loopt
+function c4Winner(a, x, y, k) { const hx = x === api.me ? a.h : (c4Peer(a, x) || {}).h || '', hy = y === api.me ? a.h : (c4Peer(a, y) || {}).h || '';
+  if (hx[k] === 'W' || hy[k] === 'L') return x; if (hy[k] === 'W' || hx[k] === 'L') return y; return null; }
+// wie er in ronde k nog meedoen, of null als een partij in een eerdere ronde nog loopt
+function c4Alive(a, k) { let L = a.ids; for (let r = 0; r < k; r++) { const n = []; for (let i = 0; i < L.length; i += 2) { if (i + 1 >= L.length) { n.push(L[i]); continue; } const w = c4Winner(a, L[i], L[i + 1], r); if (!w) return null; n.push(w); } L = n; } return L; }
+// mijn volgende partij: [tegenstander, ik begin, bord], 'champ' als ik gewonnen heb, of null als ik nog moet wachten
+function c4Next(a) { const L = c4Alive(a, a.k); if (!L) return null; if (L.length === 1) return 'champ'; const i = L.indexOf(api.me); if (i < 0) return null;
+  if (i % 2 === 0 && i + 1 >= L.length) { a.h += 'W'; a.k++; a.lp = { h: a.h, k: a.k, mv: '' }; api.toast('Je hebt een vrije ronde', 1800); return null; }
+  const j = i ^ 1; return [L[j], i % 2 === 0, i >> 1]; }
+function c4Pair(a, nx) { const [opp, p1, slot] = nx; a.opp = opp; a.p1 = p1; a.board = c4Board(slot); a.mv = ''; a.lp = { h: a.h, k: a.k, mv: '' }; a.ph = 'play'; a.turnT = 12; a.oppT = 20; a.oppName = a.names[opp] || 'een tegenstander';
+  if (a.local) a.vp[opp].k = a.k, a.vp[opp].mv = '';
+  api.place(a.board.x, a.board.z0, a.board.s < 0 ? -Math.PI / 2 : Math.PI / 2); api.toast(`Ronde ${a.k + 1}: jij tegen ${a.oppName}. Jij speelt ${p1 ? 'rood en begint' : 'geel'}`, 2600); }
+function c4Result(a, won, forfeit) { a.h += won ? 'W' : 'L';
+  if (a.local) { a.vp[a.opp].h += won ? 'L' : 'W'; // de andere computerpartijen van deze ronde krijgen een willekeurige winnaar
+    const R0 = c4AliveLocal(a, a.k); for (let i = 0; i < R0.length; i += 2) { const x = R0[i], y = R0[i + 1]; if (!y || x === api.me || y === api.me || x === a.opp || y === a.opp || a.vp[x].h.length > a.k) continue; const w = rand() < .5; a.vp[x].h += w ? 'W' : 'L'; a.vp[y].h += w ? 'L' : 'W'; } }
+  a.lp = { h: a.h, k: a.k, mv: a.mv };
+  if (!won) { a.pts = a.k; a.res = `Verloren van ${a.oppName}`; api.toast(`${a.oppName} wint. Je bent uitgeschakeld.`, 2500); a.ph = 'out'; a.fail = true; a.fin = true; return; }
+  a.pts = a.k + 1; a.k++; a.ph = 'wait'; api.toast(forfeit ? `${a.oppName} komt niet meer opdagen: je gaat door` : `Gewonnen van ${a.oppName}!`, 2200); }
+// zonder netwerk: wie er in ronde k meedoen, op basis van wat al bekend is (een lopende partij telt als nog open)
+function c4AliveLocal(a, k) { let L = a.ids; for (let r = 0; r < k; r++) { const n = []; for (let i = 0; i < L.length; i += 2) n.push(i + 1 >= L.length ? L[i] : c4Winner(a, L[i], L[i + 1], r) || L[i]); L = n; } return L; }
+function c4Draw(a, g) { const b = a.board, c = c4Col(a), mine = g.turn === (a.p1 ? 1 : 2);
+  rect(a, b.x, CZ + b.s * 6.525, 3.95, 3.4, '#1d3a7a', .95); rect(a, b.x, b.z0, 3.95, 1.4, mine ? '#35cf4a' : '#3a4252', .35);
+  if (c >= 0 && mine) rect(a, b.x + (c - 3) * C4C, CZ + b.s * 5.9, C4C - .06, 4.6, '#ffffff', .18);
+  for (let x = 0; x < 7; x++) for (let r = 0; r < 6; r++) { const v = g.b[x][r]; mark(a, b.x + (x - 3) * C4C, b.row(r), .22, v === 1 ? '#e8372a' : v === 2 ? '#f6cf4d' : '#08101e', v ? .95 : .85); } }
+
+// ---- snoepjesrijen ----
+const CC = 1.7, CANDY = ['#e8372a', '#ff9a3c', '#f6cf4d', '#35cf4a', '#3d8bff', '#b06aff'];
+const candyPos = i => ({ x: CX - 6.8 + ((i % 8) + .5) * CC, z: CZ - 6.8 + ((i >> 3) + .5) * CC });
+const candyCell = () => { const h = H(), c = Math.floor((h.x - CX + 6.8) / CC), r = Math.floor((h.z - CZ + 6.8) / CC); return c < 0 || r < 0 || c > 7 || r > 7 ? -1 : r * 8 + c; };
+// zou kleur t op plek i meteen een rij van drie maken met wat er links of boven al ligt?
+const candyLine = (g, i, t) => { const c = i % 8, r = i >> 3; return (c >= 2 && g[i - 1] === t && g[i - 2] === t) || (r >= 2 && g[i - 8] === t && g[i - 16] === t); };
+function candyRuns(g) { const out = new Set();
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 8;) { let e = c; while (e + 1 < 8 && g[r * 8 + e + 1] === g[r * 8 + c] && g[r * 8 + c] >= 0) e++; if (e - c >= 2) for (let k = c; k <= e; k++) out.add(r * 8 + k); c = e + 1; }
+  for (let c = 0; c < 8; c++) for (let r = 0; r < 8;) { let e = r; while (e + 1 < 8 && g[(e + 1) * 8 + c] === g[r * 8 + c] && g[r * 8 + c] >= 0) e++; if (e - r >= 2) for (let k = r; k <= e; k++) out.add(k * 8 + c); r = e + 1; }
+  return out; }
+// een wissel die een rij oplevert, of null
+function candyHint(g) { for (let i = 0; i < 64; i++) for (const j of [i + 1, i + 8]) { if ((j === i + 1 && i % 8 === 7) || j > 63) continue; [g[i], g[j]] = [g[j], g[i]]; const ok = candyRuns(g).size > 0; [g[i], g[j]] = [g[j], g[i]]; if (ok) return [i, j]; } return null; }
+function candyPick(a) { const c = candyCell(); if (c < 0) return; if (a.sel < 0 || a.sel === c) { a.sel = a.sel === c ? -1 : c; return; }
+  const s = a.sel, adj = Math.abs(s - c) === 8 || (Math.abs(s - c) === 1 && (s >> 3) === (c >> 3)); if (!adj) { a.sel = c; return; } a.sel = -1;
+  const g = a.gr;[g[s], g[c]] = [g[c], g[s]]; let runs = candyRuns(g);
+  if (!runs.size) { [g[s], g[c]] = [g[c], g[s]]; a.time -= 1.5; api.toast('Geen rij: dat kost tijd', 1000); return; }
+  let chain = 0; while (runs.size) { chain++; for (const i of runs) { g[i] = -1; if (runs.size < 12) { const p = candyPos(i); api.ring(p.x, p.z, '#ffffff', .8, .25); } } a.n += runs.size; a.time += runs.size * .8 + (runs.size >= 4 ? 1 : 0) + (chain > 1 ? 1 : 0);
+    for (let c2 = 0; c2 < 8; c2++) { let w = 7; for (let r = 7; r >= 0; r--) { const v = g[r * 8 + c2]; if (v >= 0) { g[w * 8 + c2] = v; w--; } } for (; w >= 0; w--) g[w * 8 + c2] = Math.floor(rand() * 6); }
+    runs = candyRuns(g); }
+  if (chain > 1) api.toast(`Kettingreactie ×${chain}!`, 1200);
+  if (!candyHint(g)) { for (let i = 0; i < 64; i++) { let t; do t = Math.floor(rand() * 6); while (candyLine(g, i, t)); g[i] = t; } api.toast('Geen zetten meer: het veld wordt geschud', 1500); } }
+
+// ---- rad van fortuin ----
+// fx past het vak toe en geeft terug wat het waard is in credits (voor de score); s schaalt met het level
+const WOF = [
+  { lb: '+150', col: '#2f7a3c', fx: (a, s) => wofGold(150 * s) },
+  { lb: 'Upgrade', col: '#2f5f9e', fx: () => { const n = api.upgrade(1); api.toast(n ? `Gratis upgrade: ${n}` : 'Gratis upgrade, maar er is niets te upgraden', 2200); return n ? 250 : 0; } },
+  { lb: '−200', col: '#8a2a22', fx: (a, s) => wofGold(-200 * s) },
+  { lb: '+300', col: '#2f7a3c', fx: (a, s) => wofGold(300 * s) },
+  { lb: '+3\nlevens', col: '#9e2f6a', fx: () => { api.lives(3); api.toast('+3 levens', 2000); return 150; } },
+  { lb: 'Bankroet', col: '#15171a', fx: () => { const g = api.gold(), l = Math.round(g * .3); api.gold(-l); api.toast(`Bankroet: je bent ${l} credits kwijt`, 2400); return -l; } },
+  { lb: '+600', col: '#2f7a3c', fx: (a, s) => wofGold(600 * s) },
+  { lb: 'Harnas', col: '#a8842c', fx: (a, s) => { const n = api.armourUp(); if (n) { api.toast(`Een stuk harnas: ${n}`, 2400); return 500; } return wofGold(500 * s); } },
+  { lb: 'Upgrade\nkwijt', col: '#5a2a5e', fx: () => { const n = api.upgrade(-1); api.toast(n ? `Upgrade kwijt: ${n}` : 'Upgrade kwijt, maar je had niets om kwijt te raken', 2200); return n ? -250 : 0; } },
+  { lb: 'Nog een\nkeer', col: '#2f8a8a', fx: a => { a.spins++; api.toast('Nog een keer draaien!', 2000); return 0; } },
+  { lb: '−2\nlevens', col: '#8a2a22', fx: () => { api.lives(-2); api.toast('−2 levens', 2000); return -100; } },
+  { lb: 'JACKPOT\n+1500', col: '#c79a2a', fx: (a, s) => wofGold(1500 * s) }];
+const wofGold = d => { d = Math.round(d); api.gold(d); api.toast(d >= 0 ? `+${d} credits` : `${d} credits`, 2000); return d; };
+function wofSpin(a) { a.ph = 'spin'; a.st = 0; a.on = 0; a.spins--; a.pick = Math.floor(rand() * WOF.length); const st = TAU / WOF.length, tgt = -Math.PI / 2 - a.pick * st;
+  a.from = a.ang; a.to = a.ang + TAU * (4 + Math.floor(rand() * 2)) + (((tgt - a.ang) % TAU) + TAU) % TAU + (rand() - .5) * st * .6; }
+function wofLand(a) { a.ph = 'show'; a.pt = 2.2; a.val += WOF[a.pick].fx(a, a.s); api.ring(CX, CZ, WOF[a.pick].col, 5, .5); }
 
 const list = [
 /* ============ redelijk makkelijk ============ */
@@ -470,7 +585,96 @@ const list = [
     if (m.rd !== a.rd || !m.f) { m.rd = a.rd; const pick = rand() < .7 ? R.f.filter(f => f.pay < 35) : R.f.filter(f => f.pay === 35); m.f = pick[Math.floor(rand() * pick.length)]; m.t0 = a.age + 1 + rand() * 6; }
     return a.age < m.t0 ? null : { x: CX + m.f.x, z: CZ + m.f.z }; },
   sub: a => { const s = a.net ? ` · saldo ${a.net > 0 ? '+' : ''}${a.net}` : ''; if (a.ph === 'bet') return `Ronde ${a.rd} van 5 · inzet ${a.chip}` + (a.at ? ` op ${a.at.lb} (betaalt ${a.at.pay}×)` : ' · ga op een vak staan') + ` · nog ${Math.max(0, Math.ceil(a.pt))} s` + s;
-    return (a.ph === 'spin' ? `Ronde ${a.rd} van 5 · de bal rolt` : a.ph === 'show' ? `Ronde ${a.rd} van 5 · het is ${a.num}` : a.rd ? `Ronde ${a.rd} van 5 gespeeld` : 'De tafel gaat open') + s; } }
+    return (a.ph === 'spin' ? `Ronde ${a.rd} van 5 · de bal rolt` : a.ph === 'show' ? `Ronde ${a.rd} van 5 · het is ${a.num}` : a.rd ? `Ronde ${a.rd} van 5 gespeeld` : 'De tafel gaat open') + s; } },
+/* ============ racen, vissen, vier op een rij, snoep en het rad ============ */
+// Autorace: elke keer een andere baan. Iedereen rijdt in een auto met dezelfde topsnelheid; naast de baan rijd je door het gras en ga je veel langzamer.
+{ id: 'race', isle: 'track', n: 'Autorace', tier: 2, T: 45, goal: 36,
+  d: 'Op het racecircuit ligt elke keer een andere baan. Je rijdt in een auto: hij trekt traag op en glijdt door in de bochten, en in het gras ga je veel langzamer. Rijd drie rondes langs de gouden poorten.', win: 'Doel: drie rondes binnen 45 seconden. Hoe sneller, hoe hoger je score.',
+  go: 'Autorace: drie rondes langs de gouden poorten. Blijf op het asfalt',
+  init(a) { a.car = true; a.ice = 3.2; raceTrack(a); a.cp = 0; a.ni = 0; const P = a.trk, q = P[3]; api.place(P[0].x, P[0].z, Math.atan2(q.z - P[0].z, q.x - P[0].x)); },
+  upd(a, dt) { const P = a.trk, N = P.length, W = 3.2; let bi = a.ni, bd = 1e9;
+    for (let k = -30; k <= 30; k++) { const i = (a.ni + k + N) % N, d = dH(P[i].x, P[i].z); if (d < bd) { bd = d; bi = i; } } a.ni = bi;
+    a.slow = (bd < W / 2 ? 8.5 : 3.4) / api.speed();
+    for (let i = 0; i < N; i += 2) { const p = P[i], q = P[(i + 2) % N]; rect(a, (p.x + q.x) / 2, (p.z + q.z) / 2, hyp(q.x - p.x, q.z - p.z) + .3, W, '#2a2d31', .96, Math.atan2(q.z - p.z, q.x - p.x)); }
+    { const p = P[0], q = P[1]; rect(a, p.x, p.z, .5, W, '#e8e8e8', .95, Math.atan2(q.z - p.z, q.x - p.x)); }
+    if (a.cp >= 36) return; const c = P[(a.cp + 1) * RSTEP % N]; mark(a, c.x, c.z, 1.8, '#f6cf4d', .35); orb(a, c.x, c.z, 1.7, .28, '#f6cf4d');
+    if (dH(c.x, c.z) >= 2.4) return; a.cp++; a.pts = a.cp; api.ring(c.x, c.z, '#f6cf4d', 1.8, .3);
+    if (a.cp >= 36) { a.pts = 36 + Math.ceil(a.t); a.fin = true; } else if (a.cp % 12 === 0) api.toast(`Ronde ${a.cp / 12 + 1} van 3`, 1500); },
+  bot(a, m) { const t = a.trk[(a.ni + 7) % a.trk.length]; return { x: t.x, z: t.z, now: true }; },
+  sub: (a, sec) => `${left(sec)} · ronde ${Math.min(3, Math.floor(a.cp / 12) + 1)} van 3 · poort ${a.cp % 12 + 1} van 12` },
+
+// Arcade vissen: de dobber drijft steeds een stukje voor je in de vijver, richting het midden. Loop langs de kant en haal op als er een vis onder zit.
+{ id: 'fish', isle: 'round', n: 'Arcade vissen', tier: 1, T: 60, goal: 15,
+  d: 'Midden op het ronde eiland ligt een vijver vol vissen. Je dobber drijft steeds een stukje voor je in het water. Loop langs de kant tot er een vis onder je dobber zwemt en haal op met F. Een kleine vis is 1 punt, een grote 3 en een gouden 8. Een oude laars kost 3 punten.', win: 'Doel: 15 punten in 60 seconden.',
+  go: 'Arcade vissen: loop langs de vijver en haal op met F zodra er een vis onder je dobber zwemt',
+  init(a) { a.block = (x, z) => hyp(x - CX, z - CZ) < 5.7; a.fs = []; for (let i = 0; i < 9; i++) newFish(a); a.cd = 0; const an = rand() * TAU, p = pol(an, 6.7); api.place(p.x, p.z, an + Math.PI); },
+  card: a => [{ ic: 'up', key: 'F', n: 'Ophalen', d: 'Haal je hengel op. Zwemt er een vis onder je dobber, dan heb je hem.', wait: Math.ceil(a.cd), act: () => fishReel(a) }],
+  upd(a, dt) { const b = bobber(); a.cd = Math.max(0, a.cd - dt);
+    mark(a, CX, CZ, 5.6, '#123f5c', .9, .05); mark(a, CX, CZ, 5.75, '#8fb6ff', .18, .048);
+    for (const f of a.fs) { f.tt -= dt; if (f.tt <= 0) { f.tt = .6 + rand() * 1.6; f.dir += (rand() - .5) * 2.2; }
+      const r = hyp(f.x - CX, f.z - CZ); if (r > 5) f.dir = Math.atan2(CZ - f.z, CX - f.x) + (rand() - .5) * .6;
+      f.x += Math.cos(f.dir) * f.k.sp * dt; f.z += Math.sin(f.dir) * f.k.sp * dt;
+      orb(a, f.x, f.z, .12, f.k.s, f.k.col); orb(a, f.x - Math.cos(f.dir) * f.k.s * 1.2, f.z - Math.sin(f.dir) * f.k.s * 1.2, .12, f.k.s * .55, f.k.col); }
+    const h = H(), dx = b.x - h.x, dz = b.z - h.z; glow(a, (h.x + b.x) / 2, (h.z + b.z) / 2, hyp(dx, dz), Math.atan2(dz, dx), '#e8e8e8', .45, .025);
+    orb(a, b.x, b.z, .22 + .05 * Math.sin(a.age * 5), .13, a.cd > 0 ? '#ffffff' : '#e8372a'); mark(a, b.x, b.z, .7, '#ffffff', .12); },
+  bot(a, m) { const b = bobber(); if (a.cd <= 0 && a.fs.some(f => f.k.v > 0 && hyp(f.x - b.x, f.z - b.z) < .55 + f.k.s)) fishReel(a);
+    let best = null, bv = -1e9; for (const f of a.fs) { if (f.k.v <= 0) continue; const an = Math.atan2(f.z - CZ, f.x - CX), p = pol(an, 6.6), v = f.k.v * 2 - dH(p.x, p.z) * .6 - Math.abs(hyp(f.x - CX, f.z - CZ) - 4.3); if (v > bv) { bv = v; best = p; } }
+    return best; },
+  sub: (a, sec) => `${left(sec)} · ${a.pts} van ${a.K.goal} punten` },
+
+// Vier op een rij: een toernooi met knock-out. Iedereen in de minigame wordt ingedeeld; wie wint gaat door, wie verliest gaat terug naar zijn vesting.
+// Elke speler laat via a.lp zijn eigen zetten in de lopende partij zien (mv) en zijn uitslagen tot nu toe (h: W of L per ronde).
+// Uit die gegevens rekent iedereen hetzelfde schema, dezelfde borden en dezelfde winnaars uit. Speel je alleen, dan zijn je tegenstanders computers.
+{ id: 'connect4', isle: 'square', n: 'Vier op een rij', tier: 2, T: 420, goal: 3,
+  d: 'Een toernooi vier op een rij, één tegen één met knock-out: wie wint gaat door naar de volgende ronde. Ga voor je bord in de strook staan, kies een kolom door ervoor te gaan staan en laat met F je steen vallen. Je hebt 12 seconden per zet. Is het bord vol zonder winnaar, dan wint wie als tweede begon. Speel je alleen, dan speel je tegen zeven computers.', win: 'Doel: het toernooi winnen.',
+  go: 'Vier op een rij: ga voor je bord staan, kies een kolom en laat met F je steen vallen',
+  init(a) { a.ph = 'intro'; a.pt = 3.5; a.h = ''; a.k = 0; a.mv = ''; a.lp = { h: '', k: 0, mv: '' }; a.turnT = 12; a.botT = 0; a.seen = 0; a.wait = 0; a.res = ''; },
+  card: a => a.ph === 'play' ? [{ ic: 'up', key: 'F', n: 'Steen laten vallen', d: 'Laat je steen vallen in de kolom waar je voor staat.', act: () => c4Drop(a, c4Col(a)) }] : [],
+  upd(a, dt) { a.pt -= dt;
+    if (a.ph === 'intro') { if (a.pt <= 0) c4Start(a); return; }
+    if (a.ph === 'out') return;
+    if (a.ph === 'wait') { const nx = c4Next(a); if (nx === 'champ') { a.pts = a.k; a.fin = true; return; } if (nx) c4Pair(a, nx); }
+    if (a.ph !== 'play') return;
+    const g = c4Game(a), my = a.p1 ? 1 : 2; c4Draw(a, g);
+    if (g.win || g.full) { const won = g.win ? g.win === my : !a.p1; c4Result(a, won); return; }
+    const mine = g.turn === my;
+    if (mine) { a.turnT -= dt; a.oppT = 20;
+      if (api.bot() || a.turnT <= 0) { a.botT -= dt; if (a.botT <= 0 || a.turnT <= 0) c4Drop(a, c4Ai(g, my, api.bot() ? .2 : 1)); } }
+    else { a.turnT = 12; a.botT = .8 + rand() * 1.8; if (a.local) { a.aiT -= dt; if (a.aiT <= 0) { a.vp[a.opp].mv += c4Ai(g, 3 - my, .25); a.aiT = .8 + rand() * 1.5; } }
+      else { a.oppT -= dt; a.gone = c4Peer(a, a.opp) ? 0 : (a.gone || 0) + dt; if (a.oppT <= 0 || a.gone > 5) c4Result(a, true, true); } } }, // komt de ander niet meer opdagen, dan win je
+  bot(a, m) { if (a.ph !== 'play') return null; const b = a.board, g = c4Game(a), c = g.turn === (a.p1 ? 1 : 2) ? c4Ai(g, a.p1 ? 1 : 2, .2) : 3; return { x: b.x + (c - 3) * C4C, z: b.z0 }; },
+  sub: a => { if (a.ph === 'intro') return 'Het toernooi wordt ingedeeld'; if (a.ph === 'wait') return `Ronde ${a.k + 1} · wacht op je volgende tegenstander`; if (a.ph !== 'play') return a.res;
+    const g = c4Game(a), mine = g.turn === (a.p1 ? 1 : 2); return `Ronde ${a.k + 1} van ${a.rounds} · tegen ${a.oppName} · ` + (mine ? `jij bent aan zet (${Math.max(0, Math.ceil(a.turnT))} s)` : 'je tegenstander is aan zet') + ` · jij speelt ${a.p1 ? 'rood' : 'geel'}`; } },
+
+// Snoep: rijen van drie of meer van dezelfde kleur verdwijnen, en elk snoepje geeft je tijd erbij. De klok loopt steeds sneller leeg; wie het langst doorgaat wint.
+{ id: 'candy', isle: 'square', n: 'Snoepjesrijen', tier: 2, T: 600, goal: 90,
+  d: 'Een levensgroot speelveld van 8 bij 8 snoepjes. Ga op een snoepje staan en druk F, ga dan op een snoepje ernaast staan en druk weer F om ze te wisselen. Rijen van drie of meer verdwijnen en geven je tijd erbij. Een wissel zonder rij kost tijd. De klok loopt steeds sneller leeg: wie het langst door kan spelen wint.', win: 'Doel: 90 seconden volhouden.',
+  go: 'Snoepjesrijen: ga op een snoepje staan en wissel met F. Drie op een rij geeft tijd',
+  init(a) { a.gr = []; for (let i = 0; i < 64; i++) a.gr.push(0); for (let i = 0; i < 64; i++) { let t; do t = Math.floor(rand() * 6); while (candyLine(a.gr, i, t)); a.gr[i] = t; } a.time = 20; a.sel = -1; a.n = 0; a.lp = 1; api.place(CX, CZ + 7.6, -Math.PI / 2); },
+  card: a => [{ ic: 'turbo', key: 'F', n: a.sel < 0 ? 'Snoepje kiezen' : 'Wisselen', d: 'Kies het snoepje waar je op staat, of wissel het met het snoepje dat je al koos.', act: () => candyPick(a) }],
+  upd(a, dt) { a.time -= dt * (1 + a.age / 45); a.pts = Math.min(a.T - 1, Math.floor(a.age)); if (a.time <= 0) { a.time = 0; if (api.peers(a).length) a.fail = true; a.fin = true; return; } // speelt er nog iemand door, dan heb je verloren
+    const c = candyCell(); for (let i = 0; i < 64; i++) { const p = candyPos(i), t = a.gr[i]; rect(a, p.x, p.z, CC - .12, CC - .12, i === a.sel ? '#ffffff' : i === c ? '#6c727c' : ((i % 8) + (i >> 3)) % 2 ? '#2a2236' : '#352b44', i === a.sel ? .55 : .9);
+      if (t >= 0) orb(a, p.x, p.z, .45, .45, CANDY[t]); }
+    const f = Math.min(1, a.time / 30); rect(a, CX - 6.8 + 6.8 * f, CZ - 7.5, 13.6 * f, .45, f > .3 ? '#35cf4a' : '#e8372a', .9); },
+  bot(a, m) { if (!m.mv || a.gr[m.mv[0]] < 0) m.mv = candyHint(a.gr); if (!m.mv) return null; const want = a.sel === m.mv[0] ? m.mv[1] : m.mv[0], p = candyPos(want);
+    if (candyCell() === want && dH(p.x, p.z) < .5) { candyPick(a); if (a.sel < 0) m.mv = null; } return { x: p.x, z: p.z }; },
+  sub: a => `Nog ${a.time.toFixed(1).replace('.', ',')} s op de klok · ${a.n} snoepjes · ${Math.floor(a.age)} s volgehouden` },
+
+// Rad van fortuin: drie keer draaien. Elk vak geeft of kost credits, levens, een stuk harnas of een upgrade van een van je torens.
+{ id: 'wheel', isle: 'round', n: 'Rad van fortuin', tier: 1, T: 75, goal: 1,
+  d: 'Een groot rad midden op het ronde eiland. Ga op de groene plaat staan om te draaien; dat mag drie keer. Je wint of verliest credits, levens, een upgrade van een van je torens of een stuk harnas. Op Nog een keer krijg je een extra draai, op Bankroet ben je 30% van je credits kwijt. Credits worden hoger naarmate het level hoger is.', win: 'Doel: na drie keer draaien meer gewonnen dan verloren.',
+  go: 'Rad van fortuin: ga op de groene plaat staan om aan het rad te draaien',
+  init(a) { a.disc = api.disc(WOF.map(w => w.lb), WOF.map(w => w.col), 4.6, CX, CZ - .4); a.block = (x, z) => hyp(x - CX, z - CZ + .4) < 4.8; a.ang = -Math.PI / 2; a.spins = 3; a.ph = 'wait'; a.on = 0; a.val = 0; a.s = 1 + a.r / 30;
+    api.place(CX, CZ + 7.4, -Math.PI / 2); },
+  upd(a, dt) { const pl = { x: CX, z: CZ + 6.2 }, on = dH(pl.x, pl.z) < 1.2;
+    if (a.ph === 'wait') { a.on = on && a.spins > 0 ? a.on + dt : 0; if (a.on >= .8) wofSpin(a); }
+    else if (a.ph === 'spin') { a.st += dt; const u = Math.min(1, a.st / 4), e = 1 - Math.pow(1 - u, 3); a.ang = a.from + (a.to - a.from) * e; if (u >= 1) wofLand(a); }
+    else if (a.ph === 'show') { a.pt -= dt; if (a.pt <= 0) { if (a.spins > 0) a.ph = 'wait'; else { a.pts = Math.max(0, Math.round(a.val)); a.fin = true; return; } } }
+    if (a.disc) a.disc.rotation.y = -a.ang;
+    mark(a, pl.x, pl.z, 1.2, a.ph === 'wait' && a.spins > 0 ? '#35ff5a' : '#6c727c', .45 + (a.on > 0 ? .3 : 0)); orb(a, CX, CZ - 5.25, .5, .3, '#e8372a'); glow(a, CX, CZ - 4.9, .9, Math.PI / 2, '#e8372a', .9, .12); },
+  bot(a, m) { return a.ph === 'wait' && a.spins > 0 ? { x: CX + .3, z: CZ + 6.2 } : { x: CX + 2.5, z: CZ + 7 }; },
+  sub: a => `Nog ${a.spins} ${a.spins === 1 ? 'draai' : 'draaien'} · ${a.val >= 0 ? 'gewonnen' : 'verloren'} voor ${Math.abs(Math.round(a.val))} credits` + (a.ph === 'spin' ? ' · het rad draait' : a.ph === 'wait' && a.spins ? ' · ga op de groene plaat staan' : '') }
+
 ];
 list.center = (x, z, k) => { CX = x; CZ = z; ISLE = k; };
 return list;
