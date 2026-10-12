@@ -917,8 +917,9 @@ const KIND={
  duel:{m:'boss',T:150,n:'Kolosjacht',go:'Kolosjacht: de Kolos is terug. Wie hem de meeste schade toebrengt wint'},
  titan:{m:'boss',T:300,n:'De Titaan',go:'De Titaan is ontwaakt. Bij elke 10% levens die hij verliest volgt een speciale aanval'}};
 // th: levensdrempels waarop een speciale aanval volgt, mv: de aanvallen die dan om de beurt komen
+// regen van inslagen: rb + rn per speler + xk cirkels (standaard 4 + 1 per speler), rr = straal van een cirkel (standaard 2.3)
 const BOSS={
- boss:{N:'De Kolos',hp:2200,sc:2.6,by:3.3,bw:3,big:1.3,th:[.75,.5],mv:['safe'],z0:38,z1:30,xk:0,ct:15,cr:1.5,stop:2.4,sp:2.5,cd:2.4,cd2:8},
+ boss:{N:'De Kolos',hp:1900,sc:2.6,by:3.3,bw:3,big:1.3,th:[.75,.5],mv:['safe'],z0:32,z1:26,xk:0,rb:2,rn:.6,rr:2,ct:15,cr:1.5,stop:2.4,sp:2.5,cd:3.2,cd2:10},
  duel:{N:'De Kolos',hp:3400,sc:2.9,by:3.7,bw:3.2,big:1.4,th:[.7,.4],mv:['safe'],z0:44,z1:34,xk:2,ct:18,cr:1.6,stop:2.5,sp:2.9,cd:2.2,cd2:7},
  titan:{N:'De Titaan',hp:7000,sc:4.6,by:5.7,bw:5,big:2.3,th:[.9,.8,.7,.6,.5,.4,.3,.2,.1],mv:['safe','rings','beams'],z0:48,z1:38,xk:4,ct:22,cr:2.6,stop:3.3,sp:2.7,cd:2,cd2:6}};
 const TAU=6.2832;
@@ -969,7 +970,7 @@ function missionLead(a){let b=null;const rk=p=>+p.presence.t||0;for(const p of m
 // aanval: [volgnummer, soort, zaad]. Soort 0 is een klap onder de voeten van elke held, soort 1 een regen van inslagen over de hele arena.
 function bossAttack(a,ev){const seq=+ev[0],kind=+ev[1],B=a.B;if(!(seq>a.seen))return;a.seen=seq;a.g.atk=1;
   if(kind===0){a.zones.push({x:hero.x,z:hero.z,r:3,t:1.1,T:1.1,dmg:B.z0});for(const o of rheroes.values())if(o.ar>0&&o.hp>0)a.zones.push({x:o.x,z:o.z,r:3,t:1.1,T:1.1,dmg:B.z0});}
-  else{const rnd=lcg(Math.max(1,Math.min(2147483646,ev[2]|0))),k=Math.min(18,4+a.n+B.xk);for(let i=0;i<k;i++){const an=rnd()*6.283,d=Math.sqrt(rnd())*7.6,T=1.3+i*.13;a.zones.push({x:ACX+Math.cos(an)*d,z:ACZ+Math.sin(an)*d,r:2.3,t:T,T,dmg:B.z1});}}}
+  else{const rnd=lcg(Math.max(1,Math.min(2147483646,ev[2]|0))),k=Math.min(18,(B.rb??4)+Math.ceil(a.n*(B.rn??1))+B.xk),rr=B.rr||2.3;for(let i=0;i<k;i++){const an=rnd()*6.283,d=Math.sqrt(rnd())*7.6,T=1.3+i*.13;a.zones.push({x:ACX+Math.cos(an)*d,z:ACZ+Math.sin(an)*d,r:rr,t:T,T,dmg:B.z1});}}}
 // Speciale aanvallen. De Kolos kent alleen de ultra-aanval; de Titaan wisselt er drie af, steeds een tikje zwaarder.
 //  safe  ultra-aanval: alleen op een groene plek overleef je de klap
 //  rings schokgolven: ringen rollen vanuit het midden naar buiten, alleen de opening is veilig
