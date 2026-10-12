@@ -24,9 +24,9 @@ async function api(method, path, body, token) {
 }
 
 // Een lobbyverbinding die berichten verzamelt en op een bepaald bericht kan wachten.
-function peer(token, presence = {}, resume = null) {
+function peer(token, presence = {}, resume = null, lobby = undefined) {
   const ws = new WebSocket(wsBase), got = [], waiters = [];
-  ws.on('open', () => ws.send(JSON.stringify({ t: 'hello', token, presence, resume })));
+  ws.on('open', () => ws.send(JSON.stringify({ t: 'hello', token, presence, resume, lobby })));
   ws.on('message', d => {
     const m = JSON.parse(d.toString()); got.push(m);
     for (const w of [...waiters]) if (w.fn(m)) { waiters.splice(waiters.indexOf(w), 1); w.resolve(m); }
@@ -110,11 +110,23 @@ test('lobby: spelers zien elkaar, presence en chat komen door', async () => {
   assert.equal(wa.you.by, acc.user.id);
   assert.ok(Array.isArray(wa.board));
 
+  // je komt binnen zonder lobby en kiest er zelf een uit de lijst
+  assert.equal(wa.lobby, null);
+  assert.deepEqual(wa.peers, []);
+  const open = wa.lobbies.find(l => l.state === 'open');
+  assert.ok(open && open.max === 25);
+  a.send({ t: 'join', id: open.id });
+  const ea = await a.wait(m => m.t === 'entered');
+  assert.equal(ea.lobby.id, open.id);
+
   const b = peer(null, { st: 'lobby', t: 2 });
   const wb = await b.wait(m => m.t === 'welcome');
   assert.equal(wb.you.by, null);
   assert.match(wb.you.name, /^Gast /);
-  assert.deepEqual(wb.peers.map(p => [p.peer, p.name, p.presence.st]), [[wa.peer, 'Lobbyist', 'lobby']]);
+  assert.equal(wb.lobbies.find(l => l.id === open.id).n, 1);
+  b.send({ t: 'join', id: open.id });
+  const eb = await b.wait(m => m.t === 'entered');
+  assert.deepEqual(eb.peers.map(p => [p.peer, p.name, p.presence.st]), [[wa.peer, 'Lobbyist', 'lobby']]);
   const join = await a.wait(m => m.t === 'join');
   assert.equal(join.peer.peer, wb.peer);
 
@@ -143,14 +155,76 @@ test('lobby: spelers zien elkaar, presence en chat komen door', async () => {
   // weggaan, en terugkomen op dezelfde plek
   await b.close();
   assert.equal((await a.wait(m => m.t === 'leave')).peer, wb.peer);
-  const b2 = peer(null, { st: 'lobby' }, { peer: wb.peer, key: wb.key });
+  const b2 = peer(null, { st: 'lobby' }, { peer: wb.peer, key: wb.key }, open.id);
   const wb2 = await b2.wait(m => m.t === 'welcome');
   assert.equal(wb2.peer, wb.peer);
+  assert.equal(wb2.lobby.id, open.id);
   assert.equal(wb2.chat.at(-1).text, 'hallo  commandanten');
   // met een verkeerde sleutel krijg je een nieuwe plek
   const c2 = peer(null, {}, { peer: wa.peer, key: 'fout' });
   assert.notEqual((await c2.wait(m => m.t === 'welcome')).peer, wa.peer);
   await Promise.all([a.close(), b2.close(), c2.close()]);
+});
+
+test('lobby\'s: meerdere naast elkaar, en op slot zodra het spel start', async () => {
+  const a = peer(null, { st: 'lobby', t: 1 });
+  const wa = await a.wait(m => m.t === 'welcome');
+  a.send({ t: 'create', name: '  Tankclub\u0007  ' });
+  const ea = await a.wait(m => m.t === 'entered');
+  assert.equal(ea.lobby.name, 'Tankclub');
+  const id = ea.lobby.id;
+
+  // een tweede lobby: spelers en chat van de ene zie je niet in de andere
+  const x = peer(null, { st: 'lobby' });
+  const wx = await x.wait(m => m.t === 'welcome');
+  assert.ok(wx.lobbies.some(l => l.id === id));
+  x.send({ t: 'create', name: 'Andere lobby' });
+  const ex = await x.wait(m => m.t === 'entered');
+  assert.deepEqual(ex.peers, []);
+  const other = ex.lobby;
+
+  const b = peer(null, { st: 'lobby', t: 2 }, null, id);
+  const wb = await b.wait(m => m.t === 'welcome');
+  assert.equal(wb.lobby.id, id);
+  assert.deepEqual(wb.peers.map(p => p.peer), [wa.peer]);
+  assert.equal((await a.wait(m => m.t === 'join')).peer.peer, wb.peer);
+  b.send({ t: 'chat', text: 'alleen voor de tankclub' });
+  await a.wait(m => m.t === 'chat' && m.m.text === 'alleen voor de tankclub');
+  await new Promise(r => setTimeout(r, 150));
+  assert.equal(x.got.some(m => m.t === 'chat' || m.t === 'join'), false);
+
+  // de eerste speler start: de lobby gaat op slot en er komt een nieuwe open lobby bij
+  a.send({ t: 'p', d: { go: Date.now(), st: 'playing' } });
+  const list = (await x.wait(m => m.t === 'lobbies' && m.list.some(l => l.id === id && l.state === 'playing'))).list;
+  assert.ok(list.some(l => l.state === 'open'));
+  b.send({ t: 'p', d: { st: 'playing' } });
+  const c = peer(null, { st: 'lobby' });
+  await c.wait(m => m.t === 'welcome');
+  c.send({ t: 'join', id });
+  assert.equal((await c.wait(m => m.t === 'denied')).code, 'started');
+  // ook via hello kom je er niet meer in
+  const c2 = peer(null, { st: 'lobby' }, null, id);
+  assert.equal((await c2.wait(m => m.t === 'welcome')).lobby, null);
+  // wie speelt kan niet van lobby wisselen
+  b.send({ t: 'join', id: other.id });
+  assert.equal((await b.wait(m => m.t === 'denied')).code, 'busy');
+
+  // wegvallen midden in een potje: je neemt je plek in de lobby op slot weer in
+  await b.close();
+  const b2 = peer(null, { st: 'playing' }, { peer: wb.peer, key: wb.key });
+  assert.equal((await b2.wait(m => m.t === 'welcome')).lobby.id, id);
+
+  // iedereen terug in de lobby: hij gaat weer open
+  a.send({ t: 'p', d: { st: 'lobby', go: null } });
+  b2.send({ t: 'p', d: { st: 'lobby' } });
+  await x.wait(m => m.t === 'lobbies' && m.list.some(l => l.id === id && l.state === 'open'));
+  c.send({ t: 'join', id });
+  assert.equal((await c.wait(m => m.t === 'entered')).lobby.id, id);
+
+  // weggaan uit een lobby
+  x.send({ t: 'leave' });
+  assert.equal((await x.wait(m => m.t === 'entered' && m.lobby === null)).lobby, null);
+  await Promise.all([a, b2, c, c2, x].map(p => p.close()));
 });
 
 test('moeilijkheidsgraden: taaiere vijanden en een hogere score', () => {

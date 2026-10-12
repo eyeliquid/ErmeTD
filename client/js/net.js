@@ -1,6 +1,6 @@
 // Netwerklaag: praat met de backend. Twee delen:
 //  - Net.api:  accounts, voortgang en scores via HTTP (/api/...)
-//  - Net.room: de realtime lobby via een WebSocket (/ws)
+//  - Net.room: de realtime lobby's via een WebSocket (/ws)
 // Het spel zelf weet niets van adressen of protocollen; dat zit allemaal hier.
 const Net = (() => {
   const base = String((window.RATD_CONFIG && window.RATD_CONFIG.api) || '').replace(/\/+$/, '');
@@ -34,7 +34,20 @@ const Net = (() => {
     const mine = {};          // mijn volledige presence, ook om na een hapering opnieuw te sturen
     const sent = new Map();   // laatst verstuurde waarde per veld, zodat alleen wijzigingen de lijn op gaan
     let ws = null, me = null, resume = null, retry = 0, timer = 0, closed = false, wasOpen = false, fast = false;
-    const room = { open: false, peer: null, by: null };
+    // lobby: de lobby waar je in zit (of null), lobbies: de lijst om uit te kiezen.
+    const room = { open: false, peer: null, by: null, lobby: null, lobbies: [] };
+    const lobbyCb = () => { if (handlers.onLobby) try { handlers.onLobby(room); } catch (err) { console.error(err); } };
+    // Andere spelers vervangen door die van een (nieuwe) lobby.
+    function enter(lobby, list, chat) {
+      const left = [...peers.values()].filter(p => p !== me);
+      for (const p of left) peers.delete(p.peer);
+      const joined = [];
+      for (const d of list) { if (me && d.peer === me.peer) continue; const p = mkPeer(d, false); peers.set(p.peer, p); joined.push(p); }
+      room.lobby = lobby || null;
+      if (handlers.onChat) handlers.onChat(chat || [], true, true);
+      lobbyCb();
+      return { joined, left };
+    }
 
     const wsUrl = () => {
       const u = new URL((base || location.origin) + '/ws');
@@ -54,20 +67,28 @@ const Net = (() => {
         for (const id in m.u) { if (me && id === me.peer) continue; const p = peers.get(id); if (p) { patch(p.presence, m.u[id]); upd.push(p); } }
         if (upd.length) emit([], upd, []);
       } else if (m.t === 'welcome') {
-        const left = list().filter(p => p !== me);
+        const old = list().filter(p => p !== me);
         peers.clear();
         me = mkPeer({ peer: m.peer, by: m.you.by, name: m.you.name, presence: mine }, true);
         peers.set(me.peer, me);
-        const joined = [me];
-        for (const d of m.peers) { const p = mkPeer(d, false); peers.set(p.peer, p); joined.push(p); }
         resume = { peer: m.peer, key: m.key };
         room.open = true; room.peer = m.peer; room.by = m.you.by; retry = 0; wasOpen = true;
+        room.lobbies = Array.isArray(m.lobbies) ? m.lobbies : [];
         if (handlers.onOpen) handlers.onOpen(room);
-        if (handlers.onChat) handlers.onChat(m.chat || [], true);
+        const { joined } = enter(m.lobby, m.peers || [], m.chat);
         if (handlers.onBoard) handlers.onBoard(m.board || []);
         if (handlers.onSettings && m.settings) handlers.onSettings(m.settings);
-        emit(joined, [], left);
+        emit([me, ...joined], [], old);
         flush();
+      } else if (m.t === 'entered') {
+        const { joined, left } = enter(m.lobby, m.peers || [], m.chat);
+        emit(joined, [], left);
+      } else if (m.t === 'lobbies') {
+        room.lobbies = Array.isArray(m.list) ? m.list : [];
+        if (room.lobby) { const L = room.lobbies.find(l => l.id === room.lobby.id); if (L) room.lobby = L; }
+        lobbyCb();
+      } else if (m.t === 'denied') {
+        if (handlers.onDenied) handlers.onDenied(m);
       } else if (m.t === 'join') {
         const p = mkPeer(m.peer, false); peers.set(p.peer, p); emit([p], [], []);
       } else if (m.t === 'leave') {
@@ -89,7 +110,7 @@ const Net = (() => {
       sock.onopen = () => {
         sent.clear();
         for (const k in mine) sent.set(k, JSON.stringify(mine[k]));
-        sock.send(JSON.stringify({ t: 'hello', token, resume, presence: mine }));
+        sock.send(JSON.stringify({ t: 'hello', token, resume, presence: mine, lobby: room.lobby ? room.lobby.id : undefined }));
       };
       sock.onmessage = onMessage;
       sock.onclose = () => {
@@ -124,6 +145,11 @@ const Net = (() => {
       flush();
       return Promise.resolve();
     };
+    const cmd = o => { if (ws && ws.readyState === 1 && room.open) { ws.send(JSON.stringify(o)); return true; } return false; };
+    // Lobby kiezen, maken of verlaten. Het antwoord komt binnen via onLobby (gelukt) of onDenied (niet gelukt).
+    room.join = id => cmd({ t: 'join', id });
+    room.create = name => cmd({ t: 'create', name });
+    room.leave = () => cmd({ t: 'leave' });
     room.chat = text => { if (ws && ws.readyState === 1 && room.open) { ws.send(JSON.stringify({ t: 'chat', text })); return true; } return false; };
     // Na in- of uitloggen: opnieuw aanmelden bij de lobby, met dezelfde plek.
     room.reauth = () => { if (ws) { fast = true; try { ws.close(); } catch {} } else { retry = 0; open(); } };

@@ -61,8 +61,18 @@
         <button class="btn-pop" id="infoBtn" aria-haspopup="dialog">Spelinfo</button>
       </div>
     </header>
-    <div class="panel plate">
-      <div class="phead"><i class="live off" id="lobbyDot"></i><h2>Lobbychat</h2><small id="lobbyNote">verbinden…</small></div>
+    <div class="panel plate" id="pick" hidden>
+      <div class="phead"><i class="live off" id="pickDot"></i><h2>Kies een lobby</h2><small id="pickNote">verbinden…</small></div>
+      <p class="pick-lead">Doe mee met een open lobby of maak er zelf een. Zodra een lobby start, kan er niemand meer bij tot dat potje voorbij is.</p>
+      <ul class="rows lobbies inset" id="lobbyList" aria-label="Lobby's"></ul>
+      <form id="newLobby" class="newlobby" autocomplete="off" novalidate>
+        <div class="field"><label class="label" for="lobbyName">Nieuwe lobby</label><input id="lobbyName" type="text" maxlength="24" placeholder="Naam van je lobby" enterkeyhint="go"></div>
+        <button type="submit" id="newLobbyBtn">Lobby maken</button>
+      </form>
+      <p class="pick-err" id="pickErr" role="alert" hidden></p>
+    </div>
+    <div class="panel plate" id="lobbyPanel">
+      <div class="phead"><i class="live off" id="lobbyDot"></i><h2 id="lobbyTitle">Lobbychat</h2><small id="lobbyNote">verbinden…</small><button class="linkbtn" id="lobbyLeave" type="button" hidden>Andere lobby</button></div>
       <p id="motd" class="motd" role="status" hidden></p>
       <div class="chat inset">
         <div id="chatLog" role="log" aria-live="polite" aria-label="Lobbychat" tabindex="0"></div>

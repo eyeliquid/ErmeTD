@@ -1653,13 +1653,13 @@ function buildHud(){const card=$('#card');for(let i=0;i<12;i++){const b=document
 const nameOf=p=>own(p)?'Jij':p.name||'Commandant '+String(p.peer).slice(-3).toUpperCase();
 const lobbyPeers=()=>peers.filter(p=>p.kind==='viewer'&&p.presence&&p.presence.st==='lobby').sort((a,b)=>((+a.presence.t||0)-(+b.presence.t||0))||(a.peer<b.peer?-1:1)).slice(0,SLOTS);
 function row(cells,cls){const li=document.createElement('li');if(cls)li.className=cls;for(const[k,v,cl]of cells){const s=document.createElement('span');s.className=k+(cl?' '+cl:'');s.textContent=v;li.append(s);}return li;}
-/* Lobbychat: berichten gaan via de server. Die bewaart de laatste zestig, zodat ook wie net binnenkomt ze ziet. */
+/* Lobbychat: berichten gaan via de server. Die bewaart per lobby de laatste zestig, zodat ook wie net binnenkomt ze ziet. */
 let chatLog=[];const chatSeen=new Set();
 // Spelinstellingen uit de webadmin. Ze gelden voor het potje dat hierna begint; een lopend potje verandert niet.
 let gameCfg=null;const prepTxt=()=>{const s=Math.round((gameCfg&&+gameCfg.prepSeconds)||E.PREP);return s%60?s+' seconden':s===60?'1 minuut':s/60+' minuten';};const chatOn=()=>!gameCfg||gameCfg.chatEnabled!==false;
 function onSettings(s){if(!s||typeof s!=='object')return;gameCfg=s;const m=$('#motd'),t=typeof s.motd==='string'?cleanMsg(s.motd):'';m.hidden=!t;setText(m,t);setText($('#prepTxt'),prepTxt());renderLobby();}
 const cleanMsg=s=>String(s).replace(/[\u0000-\u001f\u007f\u2028-\u202e]/g,' ').trim().slice(0,160);
-function onChat(list,history){let add=false;for(const m of list){if(!m||chatSeen.has(m.id))continue;const text=typeof m.text==='string'?cleanMsg(m.text):'';if(!text)continue;
+function onChat(list,history,reset){if(reset){chatLog=[];chatSeen.clear();}let add=reset;for(const m of list){if(!m||chatSeen.has(m.id))continue;const text=typeof m.text==='string'?cleanMsg(m.text):'';if(!text)continue;
     chatSeen.add(m.id);chatLog.push({ts:+m.ts||Date.now(),text,by:m.by||null,peer:m.peer||'',name:typeof m.name==='string'?m.name:''});add=true;}
   if(!add)return;chatLog.sort((a,b)=>a.ts-b.ts);if(chatLog.length>80)chatLog=chatLog.slice(-80);renderChat(history);}
 function renderChat(toEnd){const box=$('#chatLog'),stick=toEnd||box.scrollHeight-box.scrollTop-box.clientHeight<40;box.textContent='';
@@ -1681,12 +1681,42 @@ function paintMap(cells){const el=$('#world'),sig=JSON.stringify(cells);if(el.da
   cells.forEach((c,i)=>{const d=document.createElement('div');d.className='cell'+(c?' '+c.st+(c.me?' me':''):'');const k=document.createElement('span');k.className='n';k.textContent=String(i+1);d.append(k);
     if(c){n++;const w=document.createElement('span');w.className='who';w.textContent=c.name;const s=document.createElement('span');s.className='st';s.textContent=c.sub;d.append(w,s);d.title=`Vesting ${i+1}: ${c.name}, ${c.sub}`;}else d.title=`Vesting ${i+1}: vrij`;el.append(d);});
   setText($('#worldNote'),`${n} van ${SLOTS} vestingen bezet`);}
-function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array(SLOTS).fill(null);$('#chatIn').disabled=$('#chatSend').disabled=!room||!chatOn();$('#chatIn').placeholder=chatOn()?'Typ een bericht…':'De chat staat tijdelijk uit.';$('#lobbyDot').className='live'+(room&&room.open?'':' off');
+/* Lobbykeuze: er zijn meerdere lobby's. Wie online is kiest er een; een lobby die gestart is gaat op slot. */
+const inLobby=()=>!!room&&!!room.lobby;
+let pickErr='',myLobby=null;
+function onLobby(r){const id=r.lobby?r.lobby.id:null;
+  if(id!==myLobby){myLobby=id;pickErr='';ready=false;
+    // De eerste speler is wie het langst in deze lobby zit.
+    if(id&&myState==='lobby'){myT=Date.now();r.presence({t:myT,rd:false}).catch(()=>{});}}
+  renderLobby();}
+function onDenied(m){pickErr=typeof m.message==='string'?m.message:'Dat lukte niet.';renderLobby();}
+function renderPick(){const lob=room.lobbies||[],ul=$('#lobbyList');$('#pickDot').className='live'+(room.open?'':' off');
+  const nOpen=lob.filter(l=>l.state==='open').length;
+  setText($('#pickNote'),room.open?`${lob.length} lobby${lob.length===1?'':"'s"} · ${nOpen} open`:'verbinding verbroken, opnieuw verbinden…');
+  const sig=JSON.stringify([lob,room.open]);
+  if(ul.dataset.k!==sig){ul.dataset.k=sig;ul.textContent='';
+    if(!lob.length){const p=document.createElement('p');p.className='empty';p.textContent=room.open?'Nog geen lobby\'s. Maak de eerste.':'Lobby\'s laden…';ul.append(p);}
+    for(const l of lob){const li=document.createElement('li'),open=l.state==='open',full=l.n>=l.max;li.className=open&&!full?'':'shut';
+      const nm=document.createElement('span');nm.className='nm';nm.textContent=l.name;const sub=document.createElement('small');
+      sub.textContent=`${l.n} van ${l.max} spelers`+(open?'':' · kan niemand meer bij');nm.append(sub);
+      const ch=document.createElement('span');ch.className='chip'+(open?(full?'':' ok'):' play');ch.textContent=open?(full?'Vol':'Open'):'Bezig';
+      const b=document.createElement('button');b.type='button';b.textContent='Meedoen';b.disabled=!open||full||!room.open;
+      b.setAttribute('aria-label',`Meedoen met ${l.name}`);b.onclick=()=>{pickErr='';if(!room.join(l.id))pickErr='Er is nu geen verbinding met de server.';renderLobby();};
+      li.append(nm,ch,b);ul.append(li);}}
+  $('#newLobbyBtn').disabled=$('#lobbyName').disabled=!room.open;
+  const e=$('#pickErr');e.hidden=!pickErr;setText(e,pickErr);}
+$('#newLobby').onsubmit=ev=>{ev.preventDefault();if(!room)return;const inp=$('#lobbyName'),name=cleanMsg(inp.value).slice(0,24);pickErr='';
+  if(room.create(name))inp.value='';else pickErr='Er is nu geen verbinding met de server.';renderLobby();};
+$('#lobbyLeave').onclick=()=>{if(room&&myState==='lobby'){ready=false;room.leave();}};
+function renderLobby(){const picking=!!room&&!room.lobby;$('#pick').hidden=!picking;$('#lobbyPanel').hidden=picking;
+  $('#lobbyLeave').hidden=!inLobby();setText($('#lobbyTitle'),inLobby()?room.lobby.name:'Lobbychat');
+  if(picking){renderPick();return;}
+  const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array(SLOTS).fill(null);$('#chatIn').disabled=$('#chatSend').disabled=!room||!chatOn();$('#chatIn').placeholder=chatOn()?'Typ een bericht…':'De chat staat tijdelijk uit.';$('#lobbyDot').className='live'+(room&&room.open?'':' off');
   if(!room){paintRoster([{name:'Jij',chip:connAt===-1?'Solo':'Verbinden',cl:'',score:'',h:save.hero,df:save.diff,me:true}]);cells[0]={name:'Jij',st:'lobby',me:true,sub:'jouw vesting'};paintMap(cells);
     setText($('#lobbyNote'),connAt===-1?'solo':'verbinden…');
     setText(btn,'Start spel');btn.disabled=false;setText(help,connAt===-1?'De gezamenlijke lobby is hier niet bereikbaar. Je speelt met acht bots.':'');return;}
   const lp=lobbyPeers(),host=lp[0],me=lp.find(p=>own(p)),others=lp.filter(p=>!own(p)),all=peers.filter(p=>p.kind==='viewer'),list=[];
-  setText($('#lobbyNote'),room.open?`${all.length} speler${all.length===1?'':'s'} online`:'verbinding verbroken, opnieuw verbinden…');
+  setText($('#lobbyNote'),room.open?`${all.length} speler${all.length===1?'':'s'} in deze lobby`:'verbinding verbroken, opnieuw verbinden…');
   [...lp,...all.filter(p=>!lp.includes(p))].forEach(p=>{const pr=p.presence||{};let chip,cl='';
     if(pr.st==='lobby'){if(p===host){chip='Eerste speler';cl='host';}else if(pr.rd){chip='Klaar';cl='ok';}else chip='Wacht';}
     else if(pr.st==='playing'){chip='Ronde '+(+pr.r||1);cl='play';}else chip=pr.st==='done'?'Uitgespeeld':pr.st==='test'?'Test minigames':'Kijkt';
@@ -1704,7 +1734,7 @@ function renderLobby(){const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array
   else{setText(btn,ready?'Toch niet klaar':'Ik ben klaar');setText(help,'Het spel start als de eerste speler start, of als alle andere spelers klaar zijn. Daarna heeft iedereen '+prepTxt()+' om een weg te bouwen.');}}
 const myIdx=()=>Math.max(0,lobbyPeers().findIndex(p=>own(p)));
 function hostStart(){const go=Date.now(),i=myIdx();seenGo.add(go);if(room){room.presence({go}).catch(()=>{});setTimeout(()=>room.presence({go:null}).catch(()=>{}),6000);}beginGame(i,go,!lobbyPeers().some(p=>!own(p)));}
-$('#startBtn').onclick=()=>{if(!room){beginGame(0,Date.now(),true);return;}const lp=lobbyPeers(),others=lp.filter(p=>!own(p));
+$('#startBtn').onclick=()=>{if(!room){beginGame(0,Date.now(),true);return;}if(!room.lobby)return;const lp=lobbyPeers(),others=lp.filter(p=>!own(p));
   if(!others.length||(lp[0]&&own(lp[0]))){hostStart();return;}
   ready=!ready;room.presence({rd:ready}).catch(()=>{});renderLobby();};
 function onPeers(ch){netPeers=ch.peers;mergePeers();const now=performance.now();syncPeers();for(const p of ch.joined)rx.set(p.peer,now);for(const p of ch.updated)rx.set(p.peer,now);for(const p of ch.left)rx.delete(p.peer);
@@ -1834,7 +1864,7 @@ if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,pain
 if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
 // Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.
 myT=Date.now();
-const lobby=Net.connect({onPeers,onChat,onBoard,onSettings,
+const lobby=Net.connect({onPeers,onChat,onBoard,onSettings,onLobby,onDenied,
   onOpen(r){room=r;connAt=performance.now();renderChat();renderLobby();},
   onFail(){if(!room){connAt=-1;renderLobby();renderChat();}},
   onClose(){renderLobby();}});
