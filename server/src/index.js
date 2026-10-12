@@ -83,7 +83,7 @@ function createServer(overrides = {}) {
 if (require.main === module) {
   const s = createServer();
   s.server.listen(config.port, config.host, () => {
-    console.log(`Red Alert Towerdefense draait op http://localhost:${config.port}`);
+    console.log(`ErmeTD draait op http://localhost:${config.port}`);
     console.log(config.adminPassword.length >= 10 ? `Webadmin: http://localhost:${config.port}/admin` : 'Webadmin staat uit: zet ADMIN_PASSWORD (minstens 10 tekens) om hem aan te zetten.');
   });
   const stop = () => { s.close().then(() => process.exit(0)); setTimeout(() => process.exit(0), 3000).unref(); };

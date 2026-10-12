@@ -46,7 +46,7 @@ function peer(token, presence = {}, resume = null) {
 test('de frontend en de gezondheidscheck zijn bereikbaar', async () => {
   const page = await fetch(base + '/');
   assert.equal(page.status, 200);
-  assert.match(await page.text(), /Red Alert Towerdefense/);
+  assert.match(await page.text(), /ErmeTD/);
   assert.equal((await api('GET', '/health')).body.ok, true);
 });
 

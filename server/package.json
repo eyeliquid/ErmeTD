@@ -1,8 +1,8 @@
 {
-  "name": "red-alert-towerdefense-server",
+  "name": "ermetd-server",
   "version": "1.0.0",
   "private": true,
-  "description": "Backend van Red Alert Towerdefense: accounts, voortgang, leaderboard en de realtime lobby.",
+  "description": "Backend van ErmeTD: accounts, voortgang, leaderboard en de realtime lobby.",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
