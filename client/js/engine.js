@@ -52,7 +52,7 @@ const T={
  uplink:{n:'Commandopost',d:'Versterkt de schade van turrets in de buurt.',cost:220,range:1.6},
  // De top van de keten. max = aantal upgrades, up = schadegroei per niveau, rl = bereikgroei per niveau, uc = [basis, stap] van de upgradeprijs.
  geers:{n:'Geers Toren',d:'Zware granaten die door pantser slaan, tegen elke vijand even sterk. 13 keer te upgraden.',cost:1200,dmg:150,rate:1.5,range:3.8,splash:1.1,max:13,up:1.22,rl:.02,uc:[.25,.06]},
- sleeper:{n:'De Slapende Geers',d:'Beslaat 3 bij 3 vakken. Zijn gesnurk vertraagt elke vijand in een groot gebied en doet zware schade.',cost:5000,dmg:900,rate:1.25,range:5.5,slow:.65,size:3,max:0}
+ sleeper:{n:'De Slapende Geers',d:'Beslaat 3 bij 3 vakken. Zijn gesnurk vertraagt elke vijand in een groot gebied en doet zware schade.',cost:5000,dmg:1500,rate:1.25,range:5.5,slow:.65,size:3,max:0}
 };
 // Wakker maken: zo vaak drukken, dan is hij zo lang wakker met zoveel keer kracht en bereik. Dat kan één keer per Slapende Geers.
 const WAKE={pokes:10,time:10,mul:20
