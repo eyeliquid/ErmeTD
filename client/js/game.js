@@ -777,12 +777,11 @@ function updWorldUi(fs){if(!fs)return;const by=new Map(fs.map(f=>[f.slot,f]));
 let toastT=0;
 function toast(msg,ms){if(ACT)return;const t=$('#toast');t.textContent=msg+toastAdd;toastAdd='';t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,ms||2400);}
 function setText(el,v){if(el.textContent!==v)el.textContent=v;}
-function takenSlots(){const s=new Set();for(const p of peers){if(own(p))continue;const pr=p.presence||{};if(pr.st!=='playing'&&pr.st!=='done')continue;if(Number.isInteger(pr.sl))s.add(pr.sl);if(Array.isArray(pr.bs))for(const v of pr.bs)if(Number.isInteger(v))s.add(v);}return s;}
-function freeSlot(idx){const t=takenSlots(),free=[];for(let i=0;i<SLOTS;i++)if(!t.has(i))free.push(i);return free.length?free[(idx||0)%free.length]:0;}
+function takenSlots(matchIdValue=matchId){const s=new Set();for(const p of peers){if(own(p))continue;const pr=p.presence||{};if((pr.st!=='playing'&&pr.st!=='done')||Number(pr.mt)!==Number(matchIdValue))continue;if(Number.isInteger(pr.sl))s.add(pr.sl);if(Array.isArray(pr.bs))for(const v of pr.bs)if(Number.isInteger(v))s.add(v);}return s;}
+function freeSlot(idx,matchIdValue=matchId){const t=takenSlots(matchIdValue),free=[];for(let i=0;i<SLOTS;i++)if(!t.has(i))free.push(i);return free.length?free[(idx||0)%free.length]:0;}
 let waveTotal=1,nextRound=0;
 // solo: je begint alleen, dus acht bots doen mee
-function beginGame(idx,mid,solo){closePops();clearBots();mySlot=freeSlot(idx);E.tune(gameCfg);G=E.create(save.skills,save.diff);HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
-  matchId=mid||Date.now();myBm=0;myBh=0;msLast=null;finalMax=0;finalAt=0;built=false;nx=0;sentWave=0;arenaFor=0;roadMode=false;t0=performance.now();prepEnd=t0+E.PREP*1000;
+function beginGame(idx,mid,solo){closePops();clearBots();matchId=mid||Date.now();mySlot=freeSlot(idx,matchId);E.tune(gameCfg);G=E.create(save.skills,save.diff);HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
   {const[ox,oz]=slotO(mySlot);hero={x:ox+6.5,z:oz+5.5,a:-1.57,hp:0,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false};}armour=0;arena=null;camMode='hero';hero.hp=maxHp();hcam.yaw=0;hcam.pitch=.62;hcam.d=stage.clientWidth<760?13:10;myState='playing';ready=false;
   $('#home').hidden=true;$('#game').hidden=false;$('#result').hidden=true;
   document.querySelectorAll('#speed button').forEach(b=>b.classList.toggle('on',b.dataset.s==='1'));
@@ -1765,7 +1764,9 @@ function onPeers(ch){netPeers=ch.peers;mergePeers();const now=performance.now();
   const settled=now-connAt>3000;let start=0;
   for(const p of peers){const g=p.presence&&p.presence.go;if(typeof g==='number'&&!seenGo.has(g)){seenGo.add(g);if(!own(p)&&settled)start=g;}}
   const lp=lobbyPeers(),me=lp.find(p=>own(p));
+  const activeElsewhere = peers.some(p => !own(p) && p.kind==='viewer' && p.presence && (p.presence.st==='playing'||p.presence.st==='done') && Number(p.presence.mt) !== Number(matchId) && Number.isFinite(+p.presence.mt));
   if(myState==='lobby'&&me){if(start)beginGame(myIdx(),start);
+    else if(activeElsewhere && !own(lp[0])){beginGame(myIdx(),Date.now()+Math.floor(Math.random()*1000),!lobbyPeers().some(p=>!own(p)));}
     else if(settled&&own(lp[0])){const o=lp.filter(p=>!own(p));if(o.length&&o.every(p=>p.presence.rd))hostStart();}}
   if(myState==='playing'){const mine=peers.find(p=>own(p));
     if(mine&&peers.some(p=>!own(p)&&p.presence&&p.presence.st==='playing'&&p.presence.sl===mySlot&&p.peer<mine.peer)){const[ax,az]=slotO(mySlot);mySlot=freeSlot(0);const[bx2,bz2]=slotO(mySlot);if(!arena){hero.x+=bx2-ax;hero.z+=bz2-az;hero.tx=null;}orders=[];pushPresence(true);}}
