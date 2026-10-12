@@ -1,0 +1,53 @@
+# Zet het spel opnieuw neer op de laptop zodra er iets op main komt.
+# Draait op de self-hosted GitHub runner op de laptop; Docker Desktop moet daar aan staan.
+# Uitleg: zie "Automatisch uitrollen naar de laptop" in de README.
+name: Uitrollen naar laptop
+
+on:
+  push:
+    branches: [main]
+  # Ook met de hand te starten via het tabblad Actions.
+  workflow_dispatch:
+
+# Nooit twee uitrollen tegelijk; een nieuwe push wacht tot de vorige klaar is.
+concurrency:
+  group: uitrollen-laptop
+  cancel-in-progress: false
+
+jobs:
+  uitrollen:
+    runs-on: self-hosted
+    timeout-minutes: 20
+    env:
+      # Vaste projectnaam, zodat Docker steeds dezelfde containers en hetzelfde
+      # database-volume (ermetd_speldata) gebruikt, wat de map van de runner ook is.
+      COMPOSE_PROJECT_NAME: ermetd
+      # Welk compose-bestand. Standaard de online versie met Caddy en HTTPS.
+      # Wil je alleen http://localhost:3000? Zet de repo-variabele COMPOSE_FILE op docker-compose.yml.
+      COMPOSE_FILE: ${{ vars.COMPOSE_FILE || 'docker-compose.online.yml' }}
+      # Vervangen het .env-bestand: compose leest deze waarden uit de omgeving.
+      DOMAIN: ${{ vars.DOMAIN || 'ermetd.harrevelt.nl' }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+    steps:
+      - name: Code ophalen
+        uses: actions/checkout@v4
+
+      - name: Docker controleren
+        run: |
+          docker version
+          docker compose version
+
+      - name: Bouwen en (her)starten
+        run: docker compose up -d --build --remove-orphans --wait --wait-timeout 180
+
+      - name: Status
+        if: always()
+        run: docker compose ps
+
+      - name: Logs bij een fout
+        if: failure()
+        run: docker compose logs --tail 100
+
+      - name: Oude images opruimen
+        if: success()
+        run: docker image prune -f
