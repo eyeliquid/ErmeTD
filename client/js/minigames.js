@@ -3,7 +3,7 @@
 //
 // Elke minigame is een beschrijving:
 //   id, n      sleutel en naam
-//   isle       het eiland waarop hij gespeeld wordt: round (rond), square (vierkant), cross (kruis) of quad (vier eilandjes)
+//   isle       het eiland waarop hij gespeeld wordt: round (rond), square (vierkant), cross (kruis), quad (vier eilandjes) of casino
 //   tier       1 redelijk makkelijk, 2 gemiddeld, 3 uitdagend, 4 heel uitdagend
 //   T, goal    duur in seconden, en de score die je alleen spelend moet halen
 //   d, win     uitleg en doel voor de keuzelijst; go is de melding bij de start
@@ -617,7 +617,39 @@ const list = [
   upd(a, dt) { const L = Math.floor(a.age / 10); survive(a); if (L > a.lv) { a.lv = L; api.toast(`Golf ${L + 1} van 10: de horde wordt sterker`, 1800); } a.sp -= dt;
     if (a.sp <= 0 && alive(a) < 15) { a.sp = Math.max(.5, 2.1 * Math.pow(.86, L)); hunters(a, { hp: Math.pow(1.19, L), dmg: Math.pow(1.11, L), sp: 1 + .022 * L, big: L > 4 }); } },
   bot(a, m) { return brawl(a, m); },
-  sub: (a, sec) => `${left(sec)} · golf ${Math.min(10, a.lv + 1)} van 10` }
+  sub: (a, sec) => `${left(sec)} · golf ${Math.min(10, a.lv + 1)} van 10` },
+
+/* ============ het casino ============ */
+// Roulette op de levensgrote tafel. Vijf rondes: inzetten door op een vak te gaan staan, dan rolt de bal. Je speelt met je eigen credits.
+// Het nummer volgt uit het potje (a.rnd), zodat alle spelers dezelfde bal zien vallen. De score is je winst over de vijf rondes.
+{ id: 'roulette', isle: 'casino', n: 'Roulette', tier: 1, T: 130, goal: 1,
+  d: 'Een levensgrote roulettetafel. Kies met 1 tot 4 je inzet en ga op een vak staan. Een nummer betaalt 35 keer je inzet, een dozijn 2 keer, en rood, zwart, even, oneven, laag of hoog 1 keer. Sta je bij "Rien ne va plus" op geen enkel vak, dan zet je die ronde niets in. Je speelt met je eigen credits: wat je wint mag je houden, wat je verliest ben je kwijt.', win: 'Doel: na vijf rondes winst hebben.',
+  go: 'Roulette: kies je inzet met 1 tot 4 en ga op een vak van de tafel staan',
+  init(a) { const R = api.roul; a.block = (x, z) => hyp(x - CX - R.wx, z - CZ - R.wz) < R.wr + .35; a.rd = 0; a.ph = 'gap'; a.pt = 3; a.chip = 100; a.net = 0; a.bet = null; a.num = -1; a.wa = 0; a.at = null;
+    for (let i = 0; i < 6; i++) a.rnd(); api.place(CX + 3, CZ + 4.3, -Math.PI / 2); },
+  card: a => [25, 100, 250, 500].map((c, i) => ({ ic: 'sell', key: String(i + 1), n: 'Inzet ' + c, cost: c, poor: api.gold() < c, on: a.chip === c, d: `Zet ${c} credits in op het vak waar je staat als de ronde sluit. Heb je minder, dan zet je in wat je hebt.`, act: () => { a.chip = c; } })),
+  upd(a, dt) { const R = api.roul, h = H(), on = f => Math.abs(h.x - CX - f.x) <= f.w / 2 && Math.abs(h.z - CZ - f.z) <= f.d / 2, lit = (f, col, op) => rect(a, CX + f.x, CZ + f.z, f.w - .1, f.d - .1, col, op);
+    a.at = R.f.find(on) || null; a.pt -= dt; a.wa += dt * (a.ph === 'spin' ? 2.4 : .4); api.wheel(a.wa);
+    if (a.ph === 'gap' && a.pt <= 0) { if (a.rd >= 5) { a.pts = Math.max(0, a.net); a.fin = true; return; } a.rd++; a.ph = 'bet'; a.pt = 14; a.bet = null; a.num = -1; api.toast(`Ronde ${a.rd} van 5: plaats je inzet`, 2200); }
+    else if (a.ph === 'bet' && a.pt <= 0) { const st = Math.min(a.chip, api.gold());
+      if (a.at && st > 0) { a.bet = { f: a.at, st }; api.gold(-st); api.toast(`Rien ne va plus · ${st} credits op ${a.at.lb}`, 2500); } else api.toast('Rien ne va plus · je zet deze ronde niets in', 2500);
+      a.num = Math.floor(a.rnd() * 37); a.ph = 'spin'; a.pt = 5; }
+    else if (a.ph === 'spin' && a.pt <= 0) { const b = a.bet, nm = `${a.num} ${a.num === 0 ? 'groen' : R.red.has(a.num) ? 'rood' : 'zwart'}`; a.ph = 'show'; a.pt = 3.5;
+      if (!b) api.toast(`Het is ${nm}`, 3000);
+      else if (b.f.hit(a.num)) { const w = b.st * b.f.pay; api.gold(b.st + w); a.net += w; api.toast(`Het is ${nm}: je wint ${w} credits`, 3200); api.ring(h.x, h.z, '#ffd24a', 2.4, .6); }
+      else { a.net -= b.st; api.toast(`Het is ${nm}: je verliest ${b.st} credits`, 3200); }
+      a.pts = Math.max(0, a.net); }
+    else if (a.ph === 'show' && a.pt <= 0) { a.ph = 'gap'; a.pt = 1; }
+    if (a.ph === 'bet' && a.at) lit(a.at, '#35ff5a', .3 + .12 * Math.sin(a.age * 8));
+    if (a.bet && a.ph !== 'bet') { lit(a.bet.f, '#ffd24a', .4); orb(a, CX + a.bet.f.x, CZ + a.bet.f.z, 2.4, .2, '#ffd24a'); }
+    if (a.ph === 'show') for (const f of R.f) if (f.hit(a.num)) lit(f, '#ffffff', f.pay === 35 ? .55 + .2 * Math.sin(a.age * 12) : .16);
+    if (a.num >= 0 && a.ph !== 'bet') { const u = a.ph === 'spin' ? Math.max(0, a.pt / 5) : 0, an = a.wa + R.order.indexOf(a.num) / 37 * TAU - 16 * u * u, rad = R.wr - .55 + .45 * u; // de bal loopt uit en valt in het vak
+      orb(a, CX + R.wx + Math.cos(an) * rad, CZ + R.wz + Math.sin(an) * rad, .72, .15, '#ffffff'); } },
+  bot(a, m) { if (a.ph !== 'bet') return null; const R = api.roul; // een bot kiest elke ronde een vak: meestal een kleur, een dozijn of even en oneven, soms een los nummer
+    if (m.rd !== a.rd || !m.f) { m.rd = a.rd; const pick = rand() < .7 ? R.f.filter(f => f.pay < 35) : R.f.filter(f => f.pay === 35); m.f = pick[Math.floor(rand() * pick.length)]; m.t0 = a.age + 1 + rand() * 6; }
+    return a.age < m.t0 ? null : { x: CX + m.f.x, z: CZ + m.f.z }; },
+  sub: a => { const s = a.net ? ` · saldo ${a.net > 0 ? '+' : ''}${a.net}` : ''; if (a.ph === 'bet') return `Ronde ${a.rd} van 5 · inzet ${a.chip}` + (a.at ? ` op ${a.at.lb} (betaalt ${a.at.pay}×)` : ' · ga op een vak staan') + ` · nog ${Math.max(0, Math.ceil(a.pt))} s` + s;
+    return (a.ph === 'spin' ? `Ronde ${a.rd} van 5 · de bal rolt` : a.ph === 'show' ? `Ronde ${a.rd} van 5 · het is ${a.num}` : a.rd ? `Ronde ${a.rd} van 5 gespeeld` : 'De tafel gaat open') + s; } }
 ];
 list.center = (x, z, k) => { CX = x; CZ = z; ISLE = k; };
 return list;

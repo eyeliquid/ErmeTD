@@ -124,12 +124,22 @@ function bindAccount(){
 const stage=$('#stage');
 let renderer=null,scene,camera,sun,sea,ray,gl3=false,haloTex;
 const cam={tx:0,tz:0,d:25,yaw:0},PITCH=.86,AR=8.6;
-// Vier minigame-eilanden rond het speelveld: onder het ronde, boven het vierkante, links het kruis en rechts de vier eilandjes.
+// Vijf minigame-eilanden rond het speelveld: onder het ronde, boven het vierkante, links het kruis, rechts de vier eilandjes en links onderin het casino.
 // Elke minigame hoort bij één eiland (isle in KIND). ACX en ACZ zijn het midden van het eiland waar nu gespeeld wordt.
 const MIDX=(COLS-1)*FW/2+6.5,MIDZ=(ROWS-1)*FW/2+6.5,ARM=2.8,HUB=4,QD=5.2,QR=3.3;
-const ISLES={round:{x:MIDX,z:ROWS*FW+12,n:'Rond eiland'},square:{x:MIDX,z:-17,n:'Vierkant eiland'},cross:{x:-17,z:MIDZ,n:'Kruiseiland'},quad:{x:COLS*FW+11.5,z:MIDZ,n:'Vier eilandjes'}};
+// Het casino: een levensgrote roulettetafel. f zijn de vakken waarop je kunt staan, gezien vanuit het midden van het eiland:
+// lb het opschrift, col de kleur (r rood, b zwart, g groen), pay hoe vaak je inzet wordt uitbetaald, hit of het vak wint bij dit nummer.
+// wx, wz, wr: het wiel. order: de nummers in de volgorde van het wiel.
+const ROUL=(()=>{const C=1.4,X0=-4.25,red=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]),f=[],add=(lb,x,z,w,d,col,pay,hit)=>f.push({lb,x,z,w,d,col,pay,hit});
+  add('0',X0-C,-C,C,3*C,'g',35,n=>n===0);
+  for(let n=1;n<=36;n++)add(String(n),X0+Math.floor((n-1)/3)*C,-((n-1)%3)*C,C,C,red.has(n)?'r':'b',35,k=>k===n);
+  ['1 – 12','13 – 24','25 – 36'].forEach((lb,i)=>add(lb,X0+(i*4+1.5)*C,C,4*C,C,'g',2,n=>n>i*12&&n<=i*12+12));
+  [['1 – 18','g',n=>n>=1&&n<=18],['EVEN','g',n=>n>0&&n%2===0],['ROOD','r',n=>red.has(n)],['ZWART','b',n=>n>0&&!red.has(n)],['ONEVEN','g',n=>n%2===1],['19 – 36','g',n=>n>=19]].forEach((o,i)=>add(o[0],X0+(i*2+.5)*C,2*C,2*C,C,o[1],1,o[2]));
+  return{f,red,wx:X0-1.5*C-.5-2.7,wz:-C,wr:2.7,W:12.9,D:5.2,order:[0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26]};})();
+let wheelM=null;
+const ISLES={casino:{x:-15,z:ROWS*FW+10,n:'Casino'},round:{x:MIDX,z:ROWS*FW+12,n:'Rond eiland'},square:{x:MIDX,z:-17,n:'Vierkant eiland'},cross:{x:-17,z:MIDZ,n:'Kruiseiland'},quad:{x:COLS*FW+11.5,z:MIDZ,n:'Vier eilandjes'}};
 // Waar je kunt lopen, gezien vanuit het midden van het eiland. Het vierkant omvat de hele cirkel, dus wat op het ronde eiland past, past daar ook.
-const SHAPE={round:(x,z)=>Math.hypot(x,z)<=AR,square:(x,z)=>Math.abs(x)<=AR&&Math.abs(z)<=AR,
+const SHAPE={casino:(x,z)=>Math.abs(x)<=ROUL.W&&Math.abs(z)<=ROUL.D,round:(x,z)=>Math.hypot(x,z)<=AR,square:(x,z)=>Math.abs(x)<=AR&&Math.abs(z)<=AR,
   cross:(x,z)=>{x=Math.abs(x);z=Math.abs(z);return(x<=AR&&z<=ARM)||(z<=AR&&x<=ARM)||Math.hypot(x,z)<=HUB;},
   quad:(x,z)=>{x=Math.abs(x);z=Math.abs(z);return Math.hypot(x-QD,z-QD)<=QR||Math.hypot(x,z)<=1.9||(Math.abs(x-QD)<=.8&&z<=QD)||(Math.abs(z-QD)<=.8&&x<=QD)||(Math.abs(x-z)<=1.1&&Math.max(x,z)<=QD);}};
 let ACX=ISLES.round.x,ACZ=ISLES.round.z,ISLE='round';
@@ -418,7 +428,24 @@ function init3D(){if(!T3)return false;
         a.push(bx(1.9,.5,2*QD,sd,c*QD,-.26,sn*QD,-an),bx(1.62,.04,2*QD,fl,c*QD,.012,sn*QD,-an),bx(1,2,1,sd,c*QD,-1.4,sn*QD,-an));
         for(let i=-3;i<=3;i++){const t=Math.atan2(oz,ox)+i*.42,x=cx+Math.cos(t)*3.6,z=cz+Math.sin(t)*3.6;a.push(bx(.4,i%2?.5:.9,1.3,st,x,i%2?.25:.45,z,-t));}
         a.push(cy(.34,.2,.3,'#2a2d31',cx+ox*3.6,1.05,cz+oz*3.6,10));}
-      return a;},.5),4.2,-9.6,[[7.75,1.4,7.75],[-7.75,1.4,7.75],[7.75,1.4,-7.75],[-7.75,1.4,-7.75]]);}
+      return a;},.5),4.2,-9.6,[[7.75,1.4,7.75],[-7.75,1.4,7.75],[7.75,1.4,-7.75],[-7.75,1.4,-7.75]]);
+    // casino: een houten tafel met groen laken, de vakken van de roulette erop geschilderd en het wiel aan de linkerkant
+    {const I=ISLES.casino,R=ROUL,W=R.W,D=R.D,wood='#4d3422',cs=[[W+.3,D+.3],[-W-.3,D+.3],[W+.3,-D-.3],[-W-.3,-D-.3]];
+      put('casino',geo('isleCa',()=>{const a=[bx(2*W+1.8,1.7,2*D+1.8,sd,0,-.86,0),bx(2*W+3,.7,2*D+3,dk,0,-1.5,0),bx(2*W,.04,2*D,'#3a2a1c',0,.02,0),
+          bx(2*W+1.2,.5,.5,wood,0,.25,D+.35),bx(2*W+1.2,.5,.5,wood,0,.25,-D-.35),bx(.5,.5,2*D+1.2,wood,W+.35,.25,0),bx(.5,.5,2*D+1.2,wood,-W-.35,.25,0),
+          cy(R.wr+.3,R.wr+.5,.5,wood,R.wx,.25,R.wz,40),cy(.16,.5,.7,'#c79a2a',R.wx,.85,R.wz,14),bx(1.5,.07,.12,'#c79a2a',R.wx,1.15,R.wz),bx(.12,.07,1.5,'#c79a2a',R.wx,1.15,R.wz)];
+        for(const[x,z]of cs)a.push(cy(.3,.38,1.6,wood,x,.8,z,10),cy(.36,.22,.3,'#2a2d31',x,1.7,z,10));return a;},.5),3.6,-D-1,cs.map(([x,z])=>[x,2,z]));
+      const x0=R.f[0].x-.7,x1=R.f[36].x+.7,z0=-3*1.4+.7,z1=2*1.4+.7,k=112,cv=document.createElement('canvas'),g=cv.getContext('2d'),INK={r:'#a51f17',b:'#101114',g:'#0b4a2a'};
+      cv.width=Math.round((x1-x0)*k);cv.height=Math.round((z1-z0)*k);g.fillStyle='#0f5a32';g.fillRect(0,0,cv.width,cv.height);g.textAlign='center';g.textBaseline='middle';g.lineWidth=5;g.strokeStyle='#e6c04a';
+      for(const f of R.f){const x=(f.x-f.w/2-x0)*k,z=(f.z-f.d/2-z0)*k;g.fillStyle=INK[f.col];g.fillRect(x,z,f.w*k,f.d*k);g.strokeRect(x,z,f.w*k,f.d*k);
+        g.fillStyle='#fff';g.font=(f.pay===35?'400 78px ':'400 60px ')+'Marcellus,Georgia,serif';g.fillText(f.lb,x+f.w*k/2,z+f.d*k/2+4);}
+      const felt=new T3.Mesh(new T3.PlaneGeometry(x1-x0,z1-z0).rotateX(-Math.PI/2),new T3.MeshStandardMaterial({map:texFrom(cv),roughness:.95,metalness:0}));felt.position.set(I.x+(x0+x1)/2,.046,I.z+(z0+z1)/2);felt.receiveShadow=true;scene.add(felt);
+      // het wiel: vak i van R.order ligt op hoek i/37 van een hele draai
+      const S=512,[wc,w]=mkCanvas(S),n=R.order.length,st=6.2832/n;w.translate(S/2,S/2);w.fillStyle='#2a1a10';w.beginPath();w.arc(0,0,S/2,0,7);w.fill();
+      R.order.forEach((num,i)=>{w.fillStyle=num===0?'#0f7a3c':R.red.has(num)?'#a51f17':'#101114';w.beginPath();w.moveTo(0,0);w.arc(0,0,S/2-10,i*st-st/2,i*st+st/2);w.closePath();w.fill();w.strokeStyle='#e6c04a';w.lineWidth=1.5;w.stroke();
+        w.save();w.rotate(i*st);w.translate(S/2-38,0);w.rotate(Math.PI/2);w.fillStyle='#fff';w.font='700 22px Georgia,serif';w.textAlign='center';w.textBaseline='middle';w.fillText(String(num),0,0);w.restore();});
+      w.fillStyle='#5a3d1e';w.beginPath();w.arc(0,0,S*.3,0,7);w.fill();w.strokeStyle='#e6c04a';w.lineWidth=4;w.stroke();
+      wheelM=new T3.Mesh(new T3.CircleGeometry(R.wr,48).rotateX(-Math.PI/2),new T3.MeshStandardMaterial({map:texFrom(wc),roughness:.6,metalness:.2}));wheelM.position.set(I.x+R.wx,.52,I.z+R.wz);wheelM.receiveShadow=true;scene.add(wheelM);}}
   {const R=RUN,cg=geo('course',()=>{const a=[bx(R.L+1.6,1.7,R.W+1.6,sd,R.L/2,-.86,R.W/2),bx(R.L+2.4,.7,R.W+2.4,'#3a3f47',R.L/2,-1.5,R.W/2),bx(R.L,.04,R.W,'#8f7a58',R.L/2,.02,R.W/2),
         bx(R.L+1.2,.4,.3,st,R.L/2,.2,-.45),bx(R.L+1.2,.4,.3,st,R.L/2,.2,R.W+.45),bx(.3,.4,R.W+1.2,st,-.45,.2,R.W/2),bx(.3,.4,R.W+1.2,st,R.L+.45,.2,R.W/2),
         bx(.4,2,.4,st,R.L-2,1,.3),bx(.4,2,.4,st,R.L-2,1,R.W-.3),bx(.5,.3,R.W,st,R.L-2,2.1,R.W/2)];
@@ -707,7 +734,7 @@ function drawMini(fs){const cv=$('#mini'),g=cv.getContext('2d'),k=cv.width/MW,by
     if(f){g.fillStyle=col;for(const t of f.tw)g.fillRect(X(ox+t.x)-2.5,Z(oz+t.y)-2.5,5,5);g.fillStyle='#ff4034';for(const e of f.en)g.fillRect(X(ox+e.x)-1.5,Z(oz+e.y)-1.5,e.boss?6:3,e.boss?6:3);}}
   for(const id in ISLES){const I=ISLES[id],x=X(I.x),z=Z(I.z),box=(w,d)=>{g.fillRect(x-w*k,z-d*k,2*w*k,2*d*k);g.strokeRect(x-w*k,z-d*k,2*w*k,2*d*k);},disc=(dx,dz,r)=>{g.beginPath();g.arc(x+dx*k,z+dz*k,r*k,0,7);g.fill();g.stroke();};
     g.fillStyle='#3a3226';g.strokeStyle=arena&&ISLE===id&&arena.mode!=='run'?'#f6cf4d':'#7a6a48';g.lineWidth=2;
-    if(id==='round')disc(0,0,9.5);else if(id==='square')box(9.5,9.5);else if(id==='cross'){box(9.5,3.2);box(3.2,9.5);g.fillRect(x-9.5*k+1,z-3.2*k+1,19*k-2,6.4*k-2);}
+    if(id==='round')disc(0,0,9.5);else if(id==='casino'){box(ROUL.W+.6,ROUL.D+.6);g.fillStyle='#0f5a32';g.fillRect(x-ROUL.W*k+2,z-ROUL.D*k+2,2*ROUL.W*k-4,2*ROUL.D*k-4);}else if(id==='square')box(9.5,9.5);else if(id==='cross'){box(9.5,3.2);box(3.2,9.5);g.fillRect(x-9.5*k+1,z-3.2*k+1,19*k-2,6.4*k-2);}
     else{g.lineWidth=3;g.beginPath();for(const[p,q]of[[1,1],[1,-1]]){g.moveTo(x-QD*k,z-p*q*QD*k);g.lineTo(x+QD*k,z+p*q*QD*k);}g.rect(x-QD*k,z-QD*k,2*QD*k,2*QD*k);g.stroke();g.lineWidth=2;for(const[p,q]of[[1,1],[1,-1],[-1,1],[-1,-1]])disc(p*QD,q*QD,3.6);}}
   g.fillStyle='#3a3226';g.strokeStyle=arena&&arena.mode==='run'?'#f6cf4d':'#7a6a48';g.lineWidth=2;g.fillRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);g.strokeRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);
   for(const r of rheroes.values()){g.fillStyle='#'+TEAM[r.slot].getHexString();g.strokeStyle='#fff';g.lineWidth=1;g.beginPath();g.arc(X(r.x),Z(r.z),4,0,7);g.fill();g.stroke();}
@@ -871,7 +898,7 @@ const TAU=6.2832;
 function enterArena(kind,r){if(arena||!G||ended||!KIND[kind])return;const K=KIND[kind],mode=K.m;arSeq++;const an=Math.random()*6.28;hero.tx=null;orders=[];buildSel=null;sel=null;roadMode=false;hero.hp=maxHp();shieldT=0;shieldCd=0;sprintT=0;sprintCd=0;pushCd=0;msLast=null;
   setIsle(K.isle);
   if(mode==='run'){hero.x=RUN.x+1.5;hero.z=RUN.z+2+Math.random()*(RUN.W-4);hero.a=0;hcam.yaw=-Math.PI/2;}
-  else{const d=ISLE==='cross'||ISLE==='quad'?1.2:kind==='titan'?7.2:6.2; // op het kruis en de eilandjes begin je in het midden
+  else{const d=(ISLE!=='round'&&ISLE!=='square')?1.2:kind==='titan'?7.2:6.2; // op het kruis en de eilandjes begin je in het midden
     hero.x=ACX+Math.cos(an)*d;hero.z=ACZ+Math.sin(an)*d;hero.a=an+Math.PI;hcam.yaw=Math.PI/2-an;} // camera achter de held, met het midden van de arena in beeld
   arena={mode,kind,K,r:r||0,t:K.T,T:K.T,age:0,seq:arSeq,kills:0,g:null,score:0,rivals:false,ms:mode==='mini'||mode==='lab'||mode==='chairs'||kind==='duel'}; // ms: de score telt mee tegen die van de anderen
   if(mode==='boss')bossInit(arena);else if(mode==='run')runInit(arena);else if(mode==='chairs')chairsInit(arena);else if(mode==='lab')labInit(arena);else miniInit(arena);
@@ -1162,7 +1189,9 @@ const LABAPI={range:()=>HEROES[save.hero].range*HM.hRange,get ACX(){return ACX;}
   place:(x,z,a)=>{hero.x=x;hero.z=z;hero.tx=null;hero.vx=hero.vz=0;if(a!=null){hero.a=a;hcam.yaw=-Math.PI/2-a;}},
   tower:(type,x,z,sc)=>{if(!gl3||!arena)return null;const o=makeTower(type,SLOTS,0,null);o.scale.setScalar(sc||1.3);o.position.set(x,0,z);scene.add(o);(arena.objs||(arena.objs=[])).push(o);return o;},
   drop:o=>{if(o&&gl3)scene.remove(o);},
-  shield:{get on(){return shieldT>0;},slot:()=>shieldSlot()}};
+  shield:{get on(){return shieldT>0;},slot:()=>shieldSlot()},
+  // het casino: de vakken van de tafel, het wiel draaien, en credits erbij of eraf (geeft terug wat je hebt)
+  roul:ROUL,wheel:ang=>{if(wheelM)wheelM.rotation.y=-ang;},gold:d=>{if(G&&d)G.gold=Math.max(0,Math.round(G.gold+d));return G?G.gold:0;}};
 const LAB=typeof window.RATD_LAB==='function'?window.RATD_LAB(LABAPI):[];
 LAB.forEach((d,i)=>{d.nr=i+1;d.m='lab';KIND[d.id]=d;});
 const TIERS=['','Redelijk makkelijk','Gemiddeld','Uitdagend','Heel uitdagend'];
@@ -1787,7 +1816,7 @@ $('#miniBtn').onclick=openMini;$('#lAgain').onclick=()=>{if(lab)startLab(lab.kin
 loadLocal();loadAcct();bindAccount();buildHud();
 try{if(init3D()){bindCanvas();renderIcons();}}catch(err){gl3=false;console.error(err);}
 renderHome();renderLobby();renderChat();if(!acct)showGate('new');requestAnimationFrame(frame);
-if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>{enterArena(m,r);for(const b of bots)asBot(b,()=>enterArena(m,r));},bots:()=>bots,asBot,FIXED,miniFor,ISLES,isle:()=>ISLE,isleOn,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
+if(location.hash==='#dev')window.__ratd={E,g:()=>G,waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>{enterArena(m,r);for(const b of bots)asBot(b,()=>enterArena(m,r));},bots:()=>bots,asBot,FIXED,miniFor,ISLES,ROUL,isle:()=>ISLE,isleOn,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
 // Sessie controleren: klopt het token nog, dan komt de voortgang van de server binnen.
 if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
 // Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.
