@@ -2,7 +2,7 @@
 
 ErmeTD is een towerdefense game geïnspireerd door Red Alert 3: een 3D-wereld waar je in third-person doorheen loopt met een held, je eigen weg en torens bouwt, en samen met andere spelers 100 levels probeert te overleven.
 
-Het spel bestaat uit een frontend (de pagina in de browser) en een backend (een server met accounts, opgeslagen voortgang, het leaderboard en de gezamenlijke lobby).
+Het spel bestaat uit een frontend (de pagina in de browser) en een backend (een server met accounts, opgeslagen voortgang, het leaderboard en de lobby's).
 
 ## Starten
 
@@ -37,7 +37,7 @@ client/                 frontend: gewone bestanden, geen bouwstap
 server/                 backend: Node.js, Express, WebSocket, SQLite
   src/index.js          startpunt: API, lobby en de frontend
   src/api.js            HTTP-API onder /api
-  src/room.js           realtime lobby op /ws
+  src/room.js           realtime lobby's op /ws
   src/auth.js           wachtwoorden en sessies
   src/admin.js          beheer-API onder /api/admin
   src/settings.js       spelinstellingen uit de webadmin
@@ -98,7 +98,8 @@ In de lobby staat de knop **Minigames**. Daar kies je een minigame en speel je h
 - **Accounts.** Een roepnaam met een wachtwoord. Wachtwoorden worden met scrypt gehasht. Na inloggen krijgt de browser een sessietoken; in de database staat alleen de hash daarvan. Er is geen e-mailadres en dus ook geen wachtwoordherstel.
 - **Voortgang.** Skillpunten, skills, held, gekozen moeilijkheidsgraad en aantal potjes staan per account op de server en gaan mee naar elk apparaat. Een gast speelt alleen lokaal.
 - **Leaderboard.** De beste score per account. Een nieuwe score verschijnt direct bij iedereen die online is.
-- **Lobby en samen spelen.** Elke browser houdt een WebSocket open. De server houdt per speler een stukje toestand bij (lobbystatus, vesting, held, minigamescore) en stuurt wijzigingen 20 keer per seconde gebundeld door. Chatberichten gaan ook via de server; de laatste zestig blijven bewaard.
+- **Lobby's.** Na het openen kies je een lobby uit de lijst, of maak je er zelf een met een eigen naam. Een lobby heeft plek voor 25 spelers (de 25 vestingen van de wereld) en een eigen chat; spelers in andere lobby's zie en hoor je niet. Zodra een lobby start, gaat hij op slot: er kan niemand meer bij. Alleen wie tijdens het potje even de verbinding verliest, komt binnen twee minuten terug op zijn plek. Is niemand van de lobby meer aan het spelen, dan gaat hij weer open. Er is altijd minstens één open lobby; lege lobby's ruimt de server zelf op. Met **Andere lobby** ga je terug naar de lijst.
+- **Samen spelen.** Elke browser houdt een WebSocket open. De server houdt per speler een stukje toestand bij (lobbystatus, vesting, held, minigamescore) en stuurt wijzigingen 20 keer per seconde gebundeld door naar de spelers in dezelfde lobby. Chatberichten gaan ook via de server; per lobby blijven de laatste zestig bewaard zolang de lobby bestaat.
 - **Bots.** Wie alleen start krijgt acht bots erbij. Elke bot kiest een andere held dan de speler en heeft dezelfde talenten. Bots worden nagespeeld in de browser van die speler (`client/js/game.js`, onder "bots") en volgen dezelfde spelregels, omdat ze dezelfde code draaien: `asBot` wisselt alles wat bij één speler hoort even om naar de bot en laat dan de gewone spelcode lopen. Een bot krijgt dus dezelfde klappen, botsingen en afkoeltijden, loopt naar een vak voordat hij bouwt en speelt elke minigame echt mee. Alleen het beslissen is van de bot zelf (`botBrain`, en per lab-minigame een `bot(a, m, ai)` in `client/js/minigames.js`), met een reactietijd en een vaardigheid per bot, zodat ze niet allemaal even goed zijn. Andere spelers in de wereld zien ze niet, maar houden hun vestingen wel vrij. Start er een tweede mens mee, dan komen er geen bots.
 - **Haperende verbinding.** De browser verbindt vanzelf opnieuw en krijgt dezelfde plek terug. Wie echt weg is valt binnen een halve minuut af, zodat een potje niet op hem blijft wachten.
 

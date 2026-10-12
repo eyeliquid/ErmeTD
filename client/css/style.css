@@ -171,6 +171,20 @@ dialog.pop::backdrop{background:rgba(3,5,8,.8);backdrop-filter:blur(3px)}
 .rows li:nth-child(1) .rk{color:var(--gold);text-shadow:0 0 10px rgba(246,207,77,.6)} .rows li:nth-child(2) .rk{color:#d5dbe4} .rows li:nth-child(3) .rk{color:#cf8a45}
 .rows li:nth-child(1) .nm{font-family:var(--display);font-weight:400;font-size:18px}
 .empty{color:var(--muted);padding:10px 4px;margin:0}
+/* lobbykeuze */
+.pick-lead{margin:0;color:var(--muted)}
+.lobbies{max-height:clamp(220px,calc(100dvh - 520px),520px);padding:2px 10px}
+.lobbies li{grid-template-columns:minmax(0,1fr) auto auto;padding:10px 4px}
+.lobbies li:nth-child(1) .nm{font-family:var(--body);font-weight:700;font-size:inherit}
+.lobbies .nm small{display:block;font-weight:400;font-size:13px;color:var(--muted)}
+.lobbies .cur{background:linear-gradient(90deg,rgba(246,207,77,.1),transparent)}
+.lobbies li.shut .nm{color:var(--muted)}
+.lobbies button{padding:6px 14px}
+.newlobby{display:flex;gap:8px;align-items:flex-end}
+.newlobby .field{flex:1;min-width:0}
+.newlobby button{flex:none;padding:11px 16px}
+.pick-err{margin:0;padding:8px 12px;border:1px solid var(--blood);border-left-width:3px;color:#ff9a8f;background:rgba(201,41,31,.1)}
+#lobbyLeave{margin-left:0;font-size:13px}
 
 /* Talentbomen: links torens, rechts held. Elk een raster van 4 breed en 7 rijen diep; diepere rijen gaan open naarmate je punten in die boom zet. */
 .trees{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
