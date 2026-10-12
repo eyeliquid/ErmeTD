@@ -192,9 +192,11 @@ function makeTower(type,slot,lvl,spec){const g=new T3.Group(),head=new T3.Group(
         ...[[-1,-1],[1,-1],[-1,1],[1,1]].flatMap(([x,z])=>[cy(.15,.2,.56,'#4a515c',x*1.16,.5,z*1.16,8),bx(.2,.08,.2,th,x*1.16,.82,z*1.16)])])));
       const g1=mesh(geo('slg1',()=>gearParts(1.18,.16,14,'#c79a2a')));g1.position.y=.64;g.add(g1);
       const g2=mesh(geo('slg2',()=>gearParts(.82,.16,10,'#e6c04a')));g2.position.y=.86;g.add(g2);
-      const hdm=mesh(geo('slhead',()=>[sp(.62,'#8a6a1c',0,0,0,[1,.82,1]),bx(.24,.04,.06,'#15171a',-.23,.1,.55,.25),bx(.24,.04,.06,'#15171a',.23,.1,.55,-.25),sp(.09,'#6b4f14',0,-.06,.6),
+      const up=spec==='awake',hdm=mesh(geo(up?'slheadw':'slhead',()=>[sp(.62,'#8a6a1c',0,0,0,[1,.82,1]),...(up?[bx(.3,.05,.06,'#15171a',-.23,.24,.55,-.35),bx(.3,.05,.06,'#15171a',.23,.24,.55,.35),bx(.28,.08,.06,'#15171a',0,-.18,.58)]:[bx(.24,.04,.06,'#15171a',-.23,.1,.55,.25),bx(.24,.04,.06,'#15171a',.23,.1,.55,-.25)]),sp(.09,'#6b4f14',0,-.06,.6),
         P(new T3.ConeGeometry(.4,.8,12),'#6a3d8f',-.16,.66,-.08,0,0,.5),sp(.11,'#e9e3f2',-.5,.98,-.08),tor(.44,.07,'#e9e3f2',.36)]));hdm.position.y=1.42;g.add(hdm);
-      gl('slcore',()=>new T3.TorusGeometry(1,.05,6,32).rotateX(Math.PI/2),'#b58cff',0,.58,0,null,3.4);
+      gl('slcore',()=>new T3.TorusGeometry(1,.05,6,32).rotateX(Math.PI/2),up?'#ff4a2a':'#b58cff',0,.58,0,null,3.4);
+      if(up){const ey=[-.23,.23].map(x=>gl('sleye',()=>new T3.SphereGeometry(.08,10,8),'#ffdd55',x,1.5,.5,null,.7));
+        anims.push(t=>{g1.rotation.y=t*4;g2.rotation.y=-t*6;const s=1+.06*Math.sin(t*14);hdm.scale.set(s,s,s);hdm.rotation.z=.12*Math.sin(t*9);hdm.position.y=1.42+.05*Math.abs(Math.sin(t*7));for(const e of ey)e.scale.setScalar(1+.3*Math.sin(t*20));});break;}
       const zs=[0,1,2].map(i=>{const z=new T3.Mesh(geo('zzz',()=>[bx(.3,.07,.07,'#fff',0,.15,0),bx(.44,.07,.07,'#fff',0,0,0,0,.76),bx(.3,.07,.07,'#fff',0,-.15,0)]),glow('#d9c2ff'));g.add(z);return z;});
       anims.push(t=>{g1.rotation.y=t*.35;g2.rotation.y=-t*.55;const br=Math.sin(t*1.3+slot);hdm.scale.set(1+.03*br,1+.07*br,1+.03*br);hdm.rotation.z=.05*Math.sin(t*.65);
         zs.forEach((z,i)=>{const u=(t*.3+i/3)%1;z.position.set(.55+u*.9+.12*Math.sin(t*2+i),2.2+u*1.7,.2);z.scale.setScalar((.5+u*1.1)*(u>.85?(1-u)/.15:1));z.rotation.y=Math.sin(t+i)*.5;});});break;}
@@ -203,7 +205,7 @@ function makeTower(type,slot,lvl,spec){const g=new T3.Group(),head=new T3.Group(
   const size=(T[type]&&T[type].size)||1,tcol=spec==='turbo'?'#ff8a2a':spec==='ultra'?'#b56bff':th;
   const ring=new T3.Mesh(raw('tring',()=>new T3.RingGeometry(.5,.58,36).rotateX(-Math.PI/2)),glow(tcol));ring.position.y=.03;ring.scale.setScalar(size===1?1:size*.98);g.add(ring);
   // ultra: paarse cirkel en een zwevende kroon. Turbo: oranje, met een tweede cirkel en een dubbele kroon.
-  if(spec){const top=type==='uplink'||type==='prism'||type==='tesla'?1.95:1.3,mk=(y,r)=>{const c=new T3.Mesh(raw('crown',()=>new T3.TorusGeometry(.26,.025,6,24).rotateX(Math.PI/2)),glow(tcol));c.position.y=y;c.scale.setScalar(r);g.add(c);return c;};
+  if(spec==='ultra'||spec==='turbo'){const top=type==='uplink'||type==='prism'||type==='tesla'?1.95:1.3,mk=(y,r)=>{const c=new T3.Mesh(raw('crown',()=>new T3.TorusGeometry(.26,.025,6,24).rotateX(Math.PI/2)),glow(tcol));c.position.y=y;c.scale.setScalar(r);g.add(c);return c;};
     const c1=mk(top,1),c2=spec==='turbo'?mk(top+.12,.7):null;
     if(c2){const r2=new T3.Mesh(raw('tring'),glow('#ffd23a'));r2.position.y=.032;r2.scale.setScalar(1.2);g.add(r2);}
     const hl=halo(tcol,spec==='turbo'?1.5:1.1,.5);hl.position.y=top;g.add(hl);
@@ -442,6 +444,7 @@ function spawnFx(f,ox,oz){const A=h=>V(ox+f.a[0],h,oz+f.a[1]),B=f.b?V(ox+f.b[0],
     case'ice':fxBeam(A(1.1),B,'#bff3ff',.06,.16);fxRing(B,'#9fe8ff',f.r,.42);fxBall(B,'#bff3ff',.1,f.r*.6,.3,.45);break;
     case'geers':fxBeam(A(1.25),B,'#ffc14a',.07,.12);fxBall(B,'#ff7a2c',.15,f.r*.6,.26,.55);break;
     case'snore':fxRing(B,'#7a4fd0',f.r,.8,.3);break;
+    case'roar':fxRing(B,'#ff4a2a',f.r,.6,.55);fxBall(V(B.x,1.4,B.z),'#ffb060',.3,1.6,.3,.6);break;
     case'tox':fxBeam(A(1.04),B,'#8be85a',.05,.14);fxBall(B,'#5fc22e',.2,f.r*.9,.55,.5);break;
     case'bolt':{let p=V(ox+f.pts[0][0],1.46,oz+f.pts[0][1]);for(let i=1;i<f.pts.length;i++){const q=V(ox+f.pts[i][0],.38,oz+f.pts[i][1]);let a=p;
         for(let k=1;k<=3;k++){const u=k/3,j=k<3?.24:0,b=V(p.x+(q.x-p.x)*u+(Math.random()-.5)*j,p.y+(q.y-p.y)*u+(Math.random()-.5)*j,p.z+(q.z-p.z)*u+(Math.random()-.5)*j);fxBeam(a,b,'#cfefff',.06,.16);a=b;}
@@ -478,7 +481,7 @@ function fieldPath(s){if(typeof s!=='string'||!s)return{road:NOSET,trail:NOSET,p
   o={road,trail,path:s[0]==='L'&&cells.length?E.mkPath(cells,!trail.size):null};if(pcache.size>120)pcache.clear();pcache.set(s,o);return o;}
 function decode(p){const pr=p.presence||{},fp=fieldPath(pr.pa),tw=[],en=[],s=typeof pr.tw==='string'?pr.tw:'',q=typeof pr.en==='string'?pr.en:'';
   for(let i=0;i+5<=s.length&&tw.length<170;i+=5){const k=parseInt(s.slice(i,i+2),36),type=ALL[parseInt(s[i+2],36)];if(!(k>=0&&k<N*N)||!type)continue;
-    const x=k%N;tw.push({c:k,x:x+.5,y:(k-x)/N+.5,type,lvl:Math.min(E.maxLvl({type}),parseInt(s[i+3],36)||0),spec:{u:'ultra',t:'turbo'}[s[i+4]]||null,ang:null});}
+    const x=k%N;tw.push({c:k,x:x+.5,y:(k-x)/N+.5,type,lvl:Math.min(E.maxLvl({type}),parseInt(s[i+3],36)||0),spec:{u:'ultra',t:'turbo',a:'awake',s:'spent'}[s[i+4]]||null,ang:null});}
   const el=Math.min(1.2,(performance.now()-(rx.get(p.peer)||0))/1000)*(pr.st==='playing'?Math.min(3,+pr.sp||1):0);
   for(let i=0;fp.path&&i+5<=q.length&&en.length<150;i+=5){const type=EDEC[q[i]];if(!type)continue;const fl=q[i+4];
     const d=parseInt(q.slice(i+1,i+3),36)/10+(fl==='f'?0:EN[type].sp*el*.85);if(!(d<fp.path.len))continue;const pp=E.posAt(fp.path,d);
@@ -607,7 +610,7 @@ function render3D(time,dt){if(!gl3)return;
   hoverM.visible=rangeM.visible=selM.visible=gateIn.visible=gateOut.visible=false;let gi=0,li=0;
   if(G&&!ended){const[ox,oz]=slotO(mySlot);
     if(G.phase==='prep'){const sc=1.9+.35*Math.sin(time*4);gateIn.visible=gateOut.visible=true;gateIn.position.set(ox+.5,.05,oz+E.MID+.5);gateOut.position.set(ox+N-.5,.05,oz+E.MID+.5);gateIn.scale.setScalar(sc);gateOut.scale.setScalar(sc);}
-    const showRange=(x,y,rg)=>{rangeM.visible=selM.visible=true;rangeM.position.set(ox+x,.06,oz+y);rangeM.scale.setScalar(rg);selM.position.set(ox+x,.05,oz+y);selM.scale.setScalar(rg);};
+    const showRange=(x,y,rg)=>{rg=Math.min(rg,9.5);rangeM.visible=selM.visible=true;rangeM.position.set(ox+x,.06,oz+y);rangeM.scale.setScalar(rg);selM.position.set(ox+x,.05,oz+y);selM.scale.setScalar(rg);};
     if(sel&&sel.s)showRange(sel.x,sel.y,sel.s.range);
     if(hover>=0){const x=hover%N,y=(hover-x)/N,tool=roadMode||!!buildSel,ok=roadMode?E.canRoad(G,hover):!!buildSel&&E.canBuild(G,hover,buildSel);hoverM.visible=true;hoverM.position.set(ox+x+.5,.04,oz+y+.5);hoverM.scale.setScalar(buildSel&&!roadMode?T[buildSel].size||1:1);
       hoverM.material.color.set(tool?(ok?'#35cf4a':'#e8372a'):'#ffffff');hoverM.material.opacity=tool?.5:.16;
@@ -635,6 +638,7 @@ function iconDraw(cv,ic){const g=cv.getContext('2d'),W=cv.width,H=cv.height;g.cl
     else if(ic==='shield'){g.beginPath();g.moveTo(0,-22);g.lineTo(18,-14);g.lineTo(16,6);g.quadraticCurveTo(10,18,0,23);g.quadraticCurveTo(-10,18,-16,6);g.lineTo(-18,-14);g.closePath();g.fillStyle='#1f6f94';g.fill();g.strokeStyle='#9fe8ff';g.lineWidth=3;g.stroke();g.beginPath();g.moveTo(0,-13);g.lineTo(0,14);g.moveTo(-10,-3);g.lineTo(10,-3);g.lineWidth=2;g.stroke();}
     else if(ic==='road'){g.beginPath();g.moveTo(-27,13);g.bezierCurveTo(-4,13,-8,-12,10,-12);g.lineTo(27,-12);g.strokeStyle='#15100c';g.lineWidth=18;g.stroke();g.strokeStyle='#8a5a44';g.lineWidth=13;g.stroke();g.strokeStyle='#f6cf4d';g.lineWidth=2;g.setLineDash([5,5]);g.stroke();g.setLineDash([]);}
     else if(ic==='ultra'){g.fillStyle='#b56bff';g.strokeStyle='#f1e2ff';g.lineWidth=1.5;g.beginPath();for(let i=0;i<10;i++){const an=-Math.PI/2+i*Math.PI/5,r=i%2?9:22;g.lineTo(Math.cos(an)*r,Math.sin(an)*r);}g.closePath();g.fill();g.stroke();}
+    else if(ic==='wake'){g.fillStyle='#ffd23a';g.beginPath();g.moveTo(-6,-20);g.quadraticCurveTo(-14,-20,-14,-4);g.lineTo(-14,6);g.lineTo(-19,12);g.lineTo(19,12);g.lineTo(14,6);g.lineTo(14,-4);g.quadraticCurveTo(14,-20,6,-20);g.closePath();g.fill();g.beginPath();g.arc(0,16,4,0,7);g.fill();g.strokeStyle='#fff3c4';g.lineWidth=3;for(const sx of[-1,1]){g.beginPath();g.arc(0,-2,25,sx<0?Math.PI+.35:-.35,sx<0?Math.PI-.35:.35,sx>0);g.stroke();}}
     else if(ic==='push'){g.strokeStyle='#ffe9a8';g.lineWidth=5;g.beginPath();g.arc(-14,0,7,0,7);g.stroke();for(const y of[-12,0,12]){g.beginPath();g.moveTo(0,y*.6);g.lineTo(18,y);g.moveTo(11,y-5+y*.1);g.lineTo(19,y);g.lineTo(11,y+5+y*.1);g.stroke();}}
     else if(ic==='sprint'){g.strokeStyle='#ffd23a';g.lineWidth=6;for(const x of[-14,-1,12]){g.beginPath();g.moveTo(x-6,-14);g.lineTo(x+7,0);g.lineTo(x-6,14);g.stroke();}}
     else if(ic==='link'){g.strokeStyle='#59c8f2';g.lineWidth=6;g.beginPath();g.ellipse(-8,0,12,9,0,0,7);g.stroke();g.beginPath();g.ellipse(8,0,12,9,0,0,7);g.stroke();}
@@ -701,6 +705,7 @@ function toLobby(){if(arena)labClear(arena);arena=null;if(lab){lab=null;$('#labE
 function events(){const[ox,oz]=slotO(mySlot);for(const e of G.ev){
     if(e.k==='clear'){award(E.pointsFor(e.r));toast(`Ronde ${e.r} afgeslagen · +${fmt(e.bonus)} credits`);}
     else if(e.k==='wave'&&e.r%10===0)toast('Een luchtschip nadert de vesting');
+    else if(e.k==='wake')toast(e.on?`De Slapende Geers is wakker! ${E.WAKE.time} seconden lang ${E.WAKE.mul}× zo sterk.`:'De Slapende Geers valt weer in slaap. Voorgoed.',3500);
     else if(e.k==='leak'){stage.classList.add('leak');setTimeout(()=>stage.classList.remove('leak'),300);}}
   G.ev.length=0;if(gl3&&!document.hidden)for(const f of G.fx)spawnFx(f,ox,oz);G.fx.length=0;}
 /* --- samen spelen: bouwfase, snelheid en rondes lopen gelijk --- */
@@ -1152,6 +1157,12 @@ function cardSlots(){const a=[];if(!G)return a;
   if(arena){let c=a;if(arena.mode==='run')a[0]=shieldSlot();else if(arena.K.card)c=arena.K.card(arena)||a;c[9]=pushSlot();c[10]=sprintSlot();return c;}
   if(sel){const t=sel;
     const mx=E.maxLvl(t),pay=fn=>()=>{if(!fn())toast('Te weinig credits');};
+    if(t.type==='sleeper'){const W=E.WAKE,n=t.pokes||0;
+      a[0]={ic:'wake',key:'P',n:'Wek poppetje Geers',tag:t.spec==='awake'?Math.ceil(t.awakeT)+' s':t.spec?'':n+'/'+W.pokes,on:t.spec==='awake',poor:t.spec==='spent',
+        d:t.spec==='awake'?`Hij is wakker! Nog ${Math.ceil(t.awakeT)} seconden ${W.mul}× zo veel kracht en bereik.`:t.spec==='spent'?'Hij is al een keer wakker geweest en slaapt nu voorgoed. De knop werkt niet meer.':`Druk ${W.pokes} keer om hem te wekken. Dan is hij ${W.time} seconden wakker met ${W.mul}× zo veel kracht en bereik. Dat kan maar één keer. Nu ${n} van ${W.pokes}.`,
+        act:()=>{if(t.spec==='spent'){toast('De Slapende Geers is al een keer wakker geweest');return;}if(!E.poke(G,t))return;
+          if(gl3){const[ox,oz]=slotO(mySlot);fxBall(V(ox+t.x,1.6,oz+t.y),'#e6d8ff',.1,.5+.08*(t.pokes||0),.25,.7);}
+          if(t.spec!=='awake'&&t.pokes>=W.pokes-3)toast(`Hij beweegt… nog ${W.pokes-t.pokes}`,900);}};}
     if(t.lvl<mx)a[0]={ic:'up',key:'U',n:'Upgrade naar niveau '+(t.lvl+1),cost:E.upCost(G,t),d:t.type==='geers'?'22% meer schade, en iets meer bereik en vuursnelheid.':'40% meer schade, en iets meer bereik en vuursnelheid.',act:pay(()=>E.upgrade(G,t))};
     else if(E.hasTiers(t.type)){
       if(!t.spec)a[0]={ic:'ultra',key:'U',n:'Ultra '+T[t.type].n,cost:E.specCost(G,t,'ultra'),d:(t.type==='uplink'?'De ultra versie: groter bereik en een sterkere versterking.':'De ultra versie: flink meer schade, 15% sneller en 10% meer bereik.')+' Daarna kan hij turbo worden.',act:pay(()=>E.spec(G,t,'ultra'))};
@@ -1185,7 +1196,7 @@ function paintVs(p,type){const k=E.VS[type]?type:'';if(p.dataset.v===k)return;p.
 function refresh(){if(!G)return;if(sel&&!G.tw.includes(sel))sel=null;cur=cardSlots();const card=$('#card');
   for(let i=0;i<12;i++){const b=card.children[i],s=cur[i];b.classList.toggle('empty',!s);if(!s){b.tabIndex=-1;continue;}b.tabIndex=0;
     if(b.dataset.ic!==s.ic){b.dataset.ic=s.ic;iconDraw(b.firstChild,s.ic);}
-    setText(b.children[1],s.key);setText(b.children[2],s.wait?s.wait+' s':s.free?'gratis':s.cost!=null?String(s.cost):s.gain!=null?'+'+s.gain:'');
+    setText(b.children[1],s.key);setText(b.children[2],s.tag!=null?s.tag:s.wait?s.wait+' s':s.free?'gratis':s.cost!=null?String(s.cost):s.gain!=null?'+'+s.gain:'');
     b.classList.toggle('on',!!s.on);b.classList.toggle('good',s.fit>1.12);b.classList.toggle('bad',s.fit<.88);b.classList.toggle('poor',(s.poor!=null?s.poor:s.cost!=null&&G.gold<s.cost)||(!!s.wait&&!s.on));b.setAttribute('aria-label',s.n+(s.cost!=null?', '+s.cost+' credits':'')+(s.fit>1.12?', sterk tegen de komende golf':s.fit<.88?', zwak tegen de komende golf':''));}
   const tip=$('#tip'),ts=cur[tipIdx];tip.hidden=!ts;
   if(ts){setText($('#tipN'),ts.n+' ('+ts.key+')');const c=$('#tipC'),txt=ts.free?'gratis':ts.cost!=null?String(ts.cost):ts.gain!=null?'+'+ts.gain:'';c.hidden=!txt;if(c.dataset.v!==txt){c.dataset.v=txt;c.textContent='';const i=document.createElement('i');i.className='coin';c.append(i,document.createTextNode(txt));}setText($('#tipD'),ts.d);paintVs($('#tipVs'),ts.vs);}
@@ -1195,9 +1206,9 @@ function refresh(){if(!G)return;if(sel&&!G.tw.includes(sel))sel=null;cur=cardSlo
   const face=sel?sel.type:roadMode?'road':buildSel||'hero'+save.hero;if(pc.dataset.ic!==face){pc.dataset.ic=face;iconDraw(pc,face);}
   if(sel){const t=sel,b=T[t.type];setText($('#iName'),b.n);
     const mx=E.maxLvl(t),tiers=E.hasTiers(t.type),step=t.lvl+E.tierOf(t),steps=mx+(tiers?2:0);
-    setText($('#iSub'),t.type==='sleeper'?'3 bij 3 vakken':`Niveau ${t.lvl}${t.spec==='turbo'?' · turbo':t.spec==='ultra'?' · ultra':''}`);show(t.s,t.type);
+    setText($('#iSub'),t.type==='sleeper'?(t.spec==='awake'?'Wakker!':'3 bij 3 vakken'):`Niveau ${t.lvl}${t.spec==='turbo'?' · turbo':t.spec==='ultra'?' · ultra':''}`);show(t.s,t.type);
     setText($('#iDesc'),t.type==='sleeper'?`Vertraagt alles binnen bereik met ${Math.round(t.s.slow*100)}%. ${b.d}`:t.spec==='turbo'?'Turbo: de hoogste trap van deze toren. '+b.d:t.spec==='ultra'?(E.canTurbo(G,t)?'Ultra: klaar voor turbo. ':'Ultra: voor turbo moet er nog een andere ultra toren staan. ')+b.d:b.d);
-    $('#pBar').style.width=(steps?step/steps*100:100)+'%';setText($('#pBarT'),t.type==='sleeper'?'Ontwaakt nooit':t.spec?(t.spec==='turbo'?'Turbo':'Ultra'):`Niveau ${t.lvl}/${mx}`);}
+    $('#pBar').style.width=(t.type==='sleeper'?(t.spec==='awake'?t.awakeT/E.WAKE.time*100:t.spec?0:(t.pokes||0)/E.WAKE.pokes*100):steps?step/steps*100:100)+'%';setText($('#pBarT'),t.type==='sleeper'?(t.spec==='awake'?`Wakker · nog ${Math.ceil(t.awakeT)} s`:t.spec==='spent'?'Slaapt voorgoed':`Wekken ${t.pokes||0}/${E.WAKE.pokes}`):t.spec?(t.spec==='turbo'?'Turbo':'Ultra'):`Niveau ${t.lvl}/${mx}`);}
   else if(roadMode){const pv=E.preview(G);setText($('#iName'),'Weg');setText($('#iSub'),'Gratis · alleen in de bouwfase');st.hidden=true;
     setText($('#iDesc'),'Sleep over je vesting om weg te leggen. De vijand komt binnen bij de rode poort links en loopt naar de blauwe poort rechts.');$('#pBar').style.width=(pv.road?100:0)+'%';setText($('#pBarT'),pv.road?'Weg loopt door':G.road.size+' vakken gelegd');}
   else if(buildSel){const b=T[buildSel];setText($('#iName'),b.n);setText($('#iSub'),`Bouwen · ${E.buildCost(G,buildSel)} credits`);show(E.stats(G,{type:buildSel,lvl:0,spec:null,aura:0}),buildSel);
@@ -1266,7 +1277,9 @@ function botFields(fs,used){for(const b of bots){if(used.has(b.slot))continue;us
 /* --- een bot in zijn vesting: bouwen, upgraden en meevechten --- */
 // Eén besluit per keer: een toren erbij zolang de vesting daar ruimte voor heeft, en anders de goedkoopste stap in de keten:
 // upgrade, ultra, turbo. Staat van elke soort een turbo, dan bouwt hij Geers Torens en daarna De Slapende Geers.
-function botThink(b){const g=b.G;if(b.order)return;
+function botThink(b){const g=b.G;
+  if(g.phase==='wave'&&g.en.some(e=>e.boss))for(const t of g.tw)if(E.canWake(t))while(E.canWake(t))E.poke(g,t); // een bot wekt hem als er een baas loopt
+  if(b.order)return;
   if(g.tw.length<Math.min(b.cells.length,5+Math.floor(g.round*.7))){const type=BSEQ[b.seq%BSEQ.length],c=b.cells.find(k=>E.canBuild(g,k));
     if(c!==undefined&&g.gold>=E.buildCost(g,type)){b.order={c,type};b.seq++;return;}}
   if(E.sleeperReady(g)){if(g.gold>=E.buildCost(g,'sleeper')){for(let c=0;c<N*N;c++)if(E.canBuild(g,c,'sleeper')){b.order={c,type:'sleeper'};return;}}}

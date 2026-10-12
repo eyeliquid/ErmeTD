@@ -70,6 +70,8 @@ Elke toren doorloopt dezelfde keten, en die leidt naar De Slapende Geers.
 4. **Geers Toren.** Staat er van elk van de tien torensoorten een turbo, dan kun je Geers Torens bouwen (toets G, na de bouwfase). Een Geers Toren kun je 13 keer upgraden.
 5. **De Slapende Geers.** Bij 4 Geers Torens komt hij vrij (toets Z): een toren van 3 bij 3 vakken die alles binnen zijn bereik vertraagt en zware schade doet. Er kan er één staan.
 
+**Wek poppetje Geers.** Selecteer De Slapende Geers en druk 10 keer op de knop (toets P). Dan wordt hij wakker: 10 seconden lang heeft hij 20 keer zo veel kracht en bereik. Daarna slaapt hij voorgoed en werkt de knop niet meer. Bots wekken hem zodra er een baas over hun veld loopt. De getallen staan in `WAKE` in `client/js/engine.js`.
+
 De voorwaarden worden gecontroleerd op het moment dat je bouwt of upgradet. Prijzen, schade en de bonussen van ultra en turbo staan in `T`, `stats` en `specCost` in `client/js/engine.js`.
 
 ## Duwen en sprinten
