@@ -124,7 +124,7 @@ function bindAccount(){
 const stage=$('#stage');
 let renderer=null,scene,camera,sun,sea,ray,gl3=false,haloTex;
 const cam={tx:0,tz:0,d:25,yaw:0},PITCH=.86,AR=8.6;
-// Vijf minigame-eilanden rond het speelveld: onder het ronde, boven het vierkante, links het kruis, rechts de vier eilandjes en links onderin het casino.
+// Zes minigame-eilanden rond het speelveld: onder het ronde, boven het vierkante, links het kruis, rechts de vier eilandjes, links onderin het casino en linksboven het racecircuit.
 // Elke minigame hoort bij één eiland (isle in KIND). ACX en ACZ zijn het midden van het eiland waar nu gespeeld wordt.
 const MIDX=(COLS-1)*FW/2+6.5,MIDZ=(ROWS-1)*FW/2+6.5,ARM=2.8,HUB=4,QD=5.2,QR=3.3;
 // Het casino: een levensgrote roulettetafel. f zijn de vakken waarop je kunt staan, gezien vanuit het midden van het eiland:
@@ -137,9 +137,10 @@ const ROUL=(()=>{const C=1.4,X0=-4.25,red=new Set([1,3,5,7,9,12,14,16,18,19,21,2
   [['1 – 18','g',n=>n>=1&&n<=18],['EVEN','g',n=>n>0&&n%2===0],['ROOD','r',n=>red.has(n)],['ZWART','b',n=>n>0&&!red.has(n)],['ONEVEN','g',n=>n%2===1],['19 – 36','g',n=>n>=19]].forEach((o,i)=>add(o[0],X0+(i*2+.5)*C,2*C,2*C,C,o[1],1,o[2]));
   return{f,red,wx:X0-1.5*C-.5-2.7,wz:-C,wr:2.7,W:12.9,D:5.2,order:[0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26]};})();
 let wheelM=null;
-const ISLES={casino:{x:-15,z:ROWS*FW+10,n:'Casino'},round:{x:MIDX,z:ROWS*FW+12,n:'Rond eiland'},square:{x:MIDX,z:-17,n:'Vierkant eiland'},cross:{x:-17,z:MIDZ,n:'Kruiseiland'},quad:{x:COLS*FW+11.5,z:MIDZ,n:'Vier eilandjes'}};
+const TRK=11.5; // het racecircuit: een vierkant van 23 bij 23
+const ISLES={track:{x:-18,z:-18,n:'Racecircuit'},casino:{x:-15,z:ROWS*FW+10,n:'Casino'},round:{x:MIDX,z:ROWS*FW+12,n:'Rond eiland'},square:{x:MIDX,z:-17,n:'Vierkant eiland'},cross:{x:-17,z:MIDZ,n:'Kruiseiland'},quad:{x:COLS*FW+11.5,z:MIDZ,n:'Vier eilandjes'}};
 // Waar je kunt lopen, gezien vanuit het midden van het eiland. Het vierkant omvat de hele cirkel, dus wat op het ronde eiland past, past daar ook.
-const SHAPE={casino:(x,z)=>Math.abs(x)<=ROUL.W&&Math.abs(z)<=ROUL.D,round:(x,z)=>Math.hypot(x,z)<=AR,square:(x,z)=>Math.abs(x)<=AR&&Math.abs(z)<=AR,
+const SHAPE={track:(x,z)=>Math.abs(x)<=TRK&&Math.abs(z)<=TRK,casino:(x,z)=>Math.abs(x)<=ROUL.W&&Math.abs(z)<=ROUL.D,round:(x,z)=>Math.hypot(x,z)<=AR,square:(x,z)=>Math.abs(x)<=AR&&Math.abs(z)<=AR,
   cross:(x,z)=>{x=Math.abs(x);z=Math.abs(z);return(x<=AR&&z<=ARM)||(z<=AR&&x<=ARM)||Math.hypot(x,z)<=HUB;},
   quad:(x,z)=>{x=Math.abs(x);z=Math.abs(z);return Math.hypot(x-QD,z-QD)<=QR||Math.hypot(x,z)<=1.9||(Math.abs(x-QD)<=.8&&z<=QD)||(Math.abs(z-QD)<=.8&&x<=QD)||(Math.abs(x-z)<=1.1&&Math.max(x,z)<=QD);}};
 let ACX=ISLES.round.x,ACZ=ISLES.round.z,ISLE='round';
@@ -463,7 +464,13 @@ function init3D(){if(!T3)return false;
       R.order.forEach((num,i)=>{w.fillStyle=num===0?'#0f7a3c':R.red.has(num)?'#a51f17':'#101114';w.beginPath();w.moveTo(0,0);w.arc(0,0,S/2-10,i*st-st/2,i*st+st/2);w.closePath();w.fill();w.strokeStyle='#e6c04a';w.lineWidth=1.5;w.stroke();
         w.save();w.rotate(i*st);w.translate(S/2-38,0);w.rotate(Math.PI/2);w.fillStyle='#fff';w.font='700 22px Georgia,serif';w.textAlign='center';w.textBaseline='middle';w.fillText(String(num),0,0);w.restore();});
       w.fillStyle='#5a3d1e';w.beginPath();w.arc(0,0,S*.3,0,7);w.fill();w.strokeStyle='#e6c04a';w.lineWidth=4;w.stroke();
-      wheelM=new T3.Mesh(new T3.CircleGeometry(R.wr,48).rotateX(-Math.PI/2),new T3.MeshStandardMaterial({map:texFrom(wc),roughness:.6,metalness:.2}));wheelM.position.set(I.x+R.wx,.52,I.z+R.wz);wheelM.receiveShadow=true;scene.add(wheelM);}}
+      wheelM=new T3.Mesh(new T3.CircleGeometry(R.wr,48).rotateX(-Math.PI/2),new T3.MeshStandardMaterial({map:texFrom(wc),roughness:.6,metalness:.2}));wheelM.position.set(I.x+R.wx,.52,I.z+R.wz);wheelM.receiveShadow=true;scene.add(wheelM);}
+    // racecircuit: een groot grasveld met bandenstapels in de hoeken; de baan zelf legt de minigame elke keer opnieuw
+    {const T=TRK,cs=[[T,T],[-T,T],[T,-T],[-T,-T]];
+      put('track',geo('isleTr',()=>{const a=[bx(2*T+1.8,1.7,2*T+1.8,sd,0,-.86,0),bx(2*T+3,.7,2*T+3,dk,0,-1.5,0),bx(2*T,.04,2*T,'#3d4a2e',0,.02,0),
+          bx(2*T+1.2,.4,.4,'#c8281e',0,.2,T+.4),bx(2*T+1.2,.4,.4,'#c8281e',0,.2,-T-.4),bx(.4,.4,2*T+1.2,'#e8e8e8',T+.4,.2,0),bx(.4,.4,2*T+1.2,'#e8e8e8',-T-.4,.2,0)];
+        for(const[x,z]of cs)for(let i=0;i<3;i++)a.push(P(new T3.TorusGeometry(.42,.17,8,18),'#15171a',x-Math.sign(x)*.6,.17+i*.3,z-Math.sign(z)*.6,Math.PI/2));
+        return a;},.5),3.6,-T-1,cs.map(([x,z])=>[x+Math.sign(x)*.4,1.4,z+Math.sign(z)*.4]));}}
   {const R=RUN,cg=geo('course',()=>{const a=[bx(R.L+1.6,1.7,R.W+1.6,sd,R.L/2,-.86,R.W/2),bx(R.L+2.4,.7,R.W+2.4,'#3a3f47',R.L/2,-1.5,R.W/2),bx(R.L,.04,R.W,'#8f7a58',R.L/2,.02,R.W/2),
         bx(R.L+1.2,.4,.3,st,R.L/2,.2,-.45),bx(R.L+1.2,.4,.3,st,R.L/2,.2,R.W+.45),bx(.3,.4,R.W+1.2,st,-.45,.2,R.W/2),bx(.3,.4,R.W+1.2,st,R.L+.45,.2,R.W/2),
         bx(.4,2,.4,st,R.L-2,1,.3),bx(.4,2,.4,st,R.L-2,1,R.W-.3),bx(.5,.3,R.W,st,R.L-2,2.1,R.W/2)];
@@ -603,15 +610,25 @@ function heroShotFx(k,x,z,a,range){const A=V(x,.8,z),L=Math.min(range,6),B=V(x+M
   else if(k==='bolt')fxBeam(A,B,'#cfefff',.07,.16);else if(k==='flame'){for(let i=1;i<=3;i++)fxBall(V(x+Math.cos(a)*L*i/3,.6,z+Math.sin(a)*L*i/3),'#ff8a2c',.1,.35+i*.12,.3,.7);}
   else if(k==='slam'){fxRing(V(x,0,z),'#ffcf8a',1.9,.35);fxBall(V(x+Math.cos(a)*.8,.2,z+Math.sin(a)*.8),'#ffb060',.1,.7,.25,.7);}
   else fxRing(V(x+Math.cos(a)*.7,0,z+Math.sin(a)*.7),'#e6f0ff',.8,.18);}
+// Een raceauto in de kleur van de vesting. In een minigame met a.car rijden alle helden erin.
+function makeCar(slot){const g=new T3.Group(),th='#'+TEAM[slot].getHexString();
+  g.add(mesh(geo('car'+slot,()=>[bx(1.3,.28,.66,th,0,.32,0),bx(.6,.26,.56,'#1a1d22',-.1,.55,0),bx(.2,.06,.8,th,-.62,.5,0),bx(.12,.2,.08,'#1a1d22',-.6,.36,.3),bx(.12,.2,.08,'#1a1d22',-.6,.36,-.3),
+    ...[[.42,.36],[.42,-.36],[-.4,.36],[-.4,-.36]].map(([x,z])=>P(new T3.CylinderGeometry(.17,.17,.14,12),'#101114',x,.17,z,Math.PI/2)),bx(.06,.08,.5,'#ffe9a8',.66,.36,0)]),MATE));
+  g.scale.setScalar(1.25);return g;}
+const carOf=o=>{if(!o.car){o.car=makeCar(o.slot==null?mySlot:o.slot);scene.add(o.car);}return o.car;};
+const ownCar={slot:null,car:null};
 function drawHeroes(time,dt,hp){
   if(G){const sig=save.hero+'_'+mySlot;if(heroSig!==sig){if(heroObj)scene.remove(heroObj);heroObj=makeHero(save.hero,mySlot);scene.add(heroObj);heroSig=sig;}
-    heroObj.visible=true;heroObj.position.set(hero.x,0,hero.z);heroObj.rotation.y=-hero.a;animHero(heroObj,hero.walk,hero.atk);
+    const inCar=!!(arena&&arena.car);if(ownCar.car&&ownCar.slot!==mySlot){scene.remove(ownCar.car);ownCar.car=null;}ownCar.slot=mySlot;
+    if(inCar){const c=carOf(ownCar);c.visible=true;c.position.set(hero.x,0,hero.z);c.rotation.y=-hero.a;}else if(ownCar.car)ownCar.car.visible=false;
+    heroObj.visible=!inCar;heroObj.position.set(hero.x,0,hero.z);heroObj.rotation.y=-hero.a;animHero(heroObj,hero.walk,hero.atk);
     if((arena||hero.hp<maxHp()-.5)&&hp<900)bar(hp++,hero.x,1.5,hero.z,.9,.1,Math.max(0,hero.hp/maxHp()));}
   else if(heroObj)heroObj.visible=false;
   for(const r of rheroes.values()){const sig=r.idx+'_'+r.slot+'_'+r.name;
     if(r.sig!==sig){if(r.obj)scene.remove(r.obj);if(r.lab)scene.remove(r.lab);r.obj=makeHero(r.idx,r.slot);scene.add(r.obj);r.lab=nameSprite(r.name,'#'+TEAM[r.slot].getHexString());scene.add(r.lab);r.sig=sig;}
     const dx=r.tx-r.x,dz=r.tz-r.z,d=Math.hypot(dx,dz),k=Math.min(1,dt*9);r.x+=dx*k;r.z+=dz*k;if(d>.06)r.walk+=dt*10;else r.walk*=.8;r.a=r.ta;r.atk=Math.max(0,r.atk-dt*4);
     r.obj.position.set(r.x,0,r.z);r.obj.rotation.y=-r.a;animHero(r.obj,r.walk,r.atk);r.lab.position.set(r.x,1.75,r.z);
+    {const rc=!!(arena&&arena.car&&r.ar>0);r.obj.visible=!rc;if(rc){const c=carOf(r);c.visible=true;c.position.set(r.x,0,r.z);c.rotation.y=-r.a;}else if(r.car)r.car.visible=false;}
     if(r.shoot){r.shoot=false;heroShotFx(HEROES[r.idx].k,r.x,r.z,r.a,HEROES[r.idx].range);}
     if(r.ar>0&&hp<900)bar(hp++,r.x,1.5,r.z,.9,.1,Math.max(0,Math.min(1,r.hp/(r.mh||100))));}
   if(arena&&arena.g&&arena.g.hp>0&&arena.g.obj){const g=arena.g;g.obj.position.set(g.x,0,g.z);g.obj.rotation.y=-g.a;animHero(g.obj,g.walk,g.atk);if(hp<900)bar(hp++,g.x,g.by||2.1,g.z,g.bw||1.4,.12,Math.max(0,g.hp/g.max));}
@@ -762,7 +779,7 @@ function drawMini(fs){const cv=$('#mini'),g=cv.getContext('2d'),k=cv.width/MW,by
     if(f){g.fillStyle=col;for(const t of f.tw)g.fillRect(X(ox+t.x)-2.5,Z(oz+t.y)-2.5,5,5);g.fillStyle='#ff4034';for(const e of f.en)g.fillRect(X(ox+e.x)-1.5,Z(oz+e.y)-1.5,e.boss?6:3,e.boss?6:3);}}
   for(const id in ISLES){const I=ISLES[id],x=X(I.x),z=Z(I.z),box=(w,d)=>{g.fillRect(x-w*k,z-d*k,2*w*k,2*d*k);g.strokeRect(x-w*k,z-d*k,2*w*k,2*d*k);},disc=(dx,dz,r)=>{g.beginPath();g.arc(x+dx*k,z+dz*k,r*k,0,7);g.fill();g.stroke();};
     g.fillStyle='#3a3226';g.strokeStyle=arena&&ISLE===id&&arena.mode!=='run'?'#f6cf4d':'#7a6a48';g.lineWidth=2;
-    if(id==='round')disc(0,0,9.5);else if(id==='casino'){box(ROUL.W+.6,ROUL.D+.6);g.fillStyle='#0f5a32';g.fillRect(x-ROUL.W*k+2,z-ROUL.D*k+2,2*ROUL.W*k-4,2*ROUL.D*k-4);}else if(id==='square')box(9.5,9.5);else if(id==='cross'){box(9.5,3.2);box(3.2,9.5);g.fillRect(x-9.5*k+1,z-3.2*k+1,19*k-2,6.4*k-2);}
+    if(id==='round')disc(0,0,9.5);else if(id==='casino'){box(ROUL.W+.6,ROUL.D+.6);g.fillStyle='#0f5a32';g.fillRect(x-ROUL.W*k+2,z-ROUL.D*k+2,2*ROUL.W*k-4,2*ROUL.D*k-4);}else if(id==='square')box(9.5,9.5);else if(id==='track'){g.fillStyle='#2f3a24';box(TRK+.5,TRK+.5);}else if(id==='cross'){box(9.5,3.2);box(3.2,9.5);g.fillRect(x-9.5*k+1,z-3.2*k+1,19*k-2,6.4*k-2);}
     else{g.lineWidth=3;g.beginPath();for(const[p,q]of[[1,1],[1,-1]]){g.moveTo(x-QD*k,z-p*q*QD*k);g.lineTo(x+QD*k,z+p*q*QD*k);}g.rect(x-QD*k,z-QD*k,2*QD*k,2*QD*k);g.stroke();g.lineWidth=2;for(const[p,q]of[[1,1],[1,-1],[-1,1],[-1,-1]])disc(p*QD,q*QD,3.6);}}
   g.fillStyle='#3a3226';g.strokeStyle=arena&&arena.mode==='run'?'#f6cf4d':'#7a6a48';g.lineWidth=2;g.fillRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);g.strokeRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);
   for(const r of rheroes.values()){g.fillStyle='#'+TEAM[r.slot].getHexString();g.strokeStyle='#fff';g.lineWidth=1;g.beginPath();g.arc(X(r.x),Z(r.z),4,0,7);g.fill();g.stroke();}
@@ -1221,7 +1238,21 @@ const LABAPI={range:()=>HEROES[save.hero].range*HM.hRange,get ACX(){return ACX;}
   drop:o=>{if(o&&gl3)scene.remove(o);},
   shield:{get on(){return shieldT>0;},slot:()=>shieldSlot()},
   // het casino: de vakken van de tafel, het wiel draaien, en credits erbij of eraf (geeft terug wat je hebt)
-  roul:ROUL,wheel:ang=>{if(wheelM)wheelM.rotation.y=-ang;},gold:d=>{if(G&&d)G.gold=Math.max(0,Math.round(G.gold+d));return G?G.gold:0;}};
+  roul:ROUL,wheel:ang=>{if(wheelM)wheelM.rotation.y=-ang;},gold:d=>{if(G&&d)G.gold=Math.max(0,Math.round(G.gold+d));return G?G.gold:0;},
+  // speelt er nu een bot (dan rekent deze code voor hem), en wie ben ik
+  bot:()=>!!ACT,get me(){return ACT?ACT.peer:(myPeer||'ik');},get myName(){return ACT?ACT.name:(acct&&acct.name)||'Jij';},
+  // de andere spelers in deze minigame, met wat ze via a.lp laten zien: [{id, name, lp}]
+  peers:a=>{const o=[];for(const p of mates()){const lp=p.presence.lp;if(Array.isArray(lp)&&lp[0]===a.r&&lp[1]===a.kind)o.push({id:String(p.peer),name:nameOf(p),lp:lp[2]});}return o;},
+  // levens, een stuk harnas, en een toren een niveau omhoog of omlaag (geeft de naam terug, of null als het niet kon)
+  lives:d=>{if(G&&d)G.lives=Math.max(1,G.lives+d);return G?G.lives:0;},
+  armourUp:()=>{if(!G||armour>=4)return null;armour++;applyArmour(armour);return ARMOUR[armour-1].n;},
+  upgrade:d=>{if(!G)return null;const ts=G.tw.filter(t=>d>0?t.lvl<E.maxLvl(t):t.lvl>0);if(!ts.length)return null;const t=ts[Math.floor(Math.random()*ts.length)];t.lvl+=d>0?1:-1;E.recalc(G);return T[t.type].n;},
+  // een plat rad met vakken, op de grond van het eiland: labels en kleuren per vak, straal r, middelpunt (x, z)
+  disc:(labels,cols,r,x,z)=>{if(!gl3||!arena)return null;const S=1024,[cv,w]=mkCanvas(S),n=labels.length,st=6.2832/n;w.translate(S/2,S/2);w.fillStyle='#2a1a10';w.beginPath();w.arc(0,0,S/2,0,7);w.fill();
+    labels.forEach((lb,i)=>{w.fillStyle=cols[i];w.beginPath();w.moveTo(0,0);w.arc(0,0,S/2-14,i*st-st/2,i*st+st/2);w.closePath();w.fill();w.strokeStyle='#e6c04a';w.lineWidth=4;w.stroke();
+      w.save();w.rotate(i*st);w.translate(S*.33,0);w.fillStyle='#fff';w.font='400 40px Marcellus,Georgia,serif';w.textAlign='center';w.textBaseline='middle';const ps=String(lb).split('\n');ps.forEach((t,j)=>w.fillText(t,0,(j-(ps.length-1)/2)*44));w.restore();});
+    w.fillStyle='#5a3d1e';w.beginPath();w.arc(0,0,S*.1,0,7);w.fill();w.strokeStyle='#e6c04a';w.lineWidth=6;w.stroke();
+    const m=new T3.Mesh(new T3.CircleGeometry(r,64).rotateX(-Math.PI/2),new T3.MeshStandardMaterial({map:texFrom(cv),roughness:.7,metalness:.1}));m.position.set(x,.06,z);m.receiveShadow=true;scene.add(m);(arena.objs||(arena.objs=[])).push(m);return m;}};
 const LAB=typeof window.RATD_LAB==='function'?window.RATD_LAB(LABAPI):[];
 LAB.forEach((d,i)=>{d.nr=i+1;d.m='lab';KIND[d.id]=d;});
 const TIERS=['','Redelijk makkelijk','Gemiddeld','Uitdagend','Heel uitdagend'];
@@ -1782,7 +1813,7 @@ function myPresence(lite){const p={st:myState,rd:ready};if(lite)p.t=myT;
   return p;}
 function pushPresence(force){if(!room||lab||ACT)return;const now=performance.now();if(!force&&now-lastPush<320)return;lastPush=now;room.presence(myPresence()).catch(()=>{});}
 const rd1=v=>Math.round(v*10)/10;
-function heroPatch(){return{h:save.hero,df:G.diff,p:[rd1(hero.x),rd1(hero.z),rd1(hero.a)],hp:Math.max(0,Math.round(hero.hp)),mh:Math.round(maxHp()),ar:arena?arena.seq:0,ak:akCount,am:arena?arena.r:0,bm:myBm,bh:Math.round(myBh),ms:arena&&arena.ms?[arena.r,Math.floor(arena.score||0),0]:msLast,mg:arena&&arena.claim?arena.claim.slice(-16):null,pu:arena?pushOut:null,...chairsPatch(),...bossPatch()};}
+function heroPatch(){return{h:save.hero,df:G.diff,p:[rd1(hero.x),rd1(hero.z),rd1(hero.a)],hp:Math.max(0,Math.round(hero.hp)),mh:Math.round(maxHp()),ar:arena?arena.seq:0,ak:akCount,am:arena?arena.r:0,bm:myBm,bh:Math.round(myBh),ms:arena&&arena.ms?[arena.r,Math.floor(arena.score||0),0]:msLast,mg:arena&&arena.claim?arena.claim.slice(-16):null,lp:arena&&arena.lp!=null?[arena.r,arena.kind,arena.lp]:null,pu:arena?pushOut:null,...chairsPatch(),...bossPatch()};}
 function bossPatch(){const a=arena;if(!a||a.mode!=='boss'||missionLead(a))return{bp:null,ba:null};return{bp:[rd1(a.g.x),rd1(a.g.z),rd1(a.g.a)],ba:a.g.last};}
 let lastHero=0;
 function pushHero(force){if(!room||!G||lab||ACT)return;const now=performance.now();if(!force&&now-lastHero<100)return;lastHero=now;room.presence(heroPatch()).catch(()=>{});}
