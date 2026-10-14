@@ -165,25 +165,6 @@ Krijg je de poorten niet open (komt je IP-adres in de router niet overeen met wh
 
 Het spel is alleen bereikbaar zolang je computer aanstaat en niet slaapt. Zet het startgoud in de webadmin op 260 voordat anderen meespelen.
 
-### Automatisch uitrollen naar de laptop
-
-[`.github/workflows/deploy-laptop.yml`](.github/workflows/deploy-laptop.yml) draait bij elke push naar `main` op de self-hosted runner van de laptop. Hij haalt de nieuwe code op, bouwt de image opnieuw en herstart de containers met `docker compose up -d --build`. De database staat in het volume `ermetd_speldata` en blijft bewaard. Met de hand starten kan ook: tabblad **Actions** → **Uitrollen naar laptop** → **Run workflow**.
-
-Eenmalig instellen op GitHub (**Settings → Secrets and variables → Actions**):
-
-| Soort | Naam | Waarde |
-|---|---|---|
-| Secret | `ADMIN_PASSWORD` | wachtwoord van de webadmin (minstens 10 tekens) |
-| Variable (optioneel) | `DOMAIN` | standaard `ermetd.harrevelt.nl` |
-| Variable (optioneel) | `COMPOSE_FILE` | standaard `docker-compose.online.yml`; zet op `docker-compose.yml` voor alleen http://localhost:3000 |
-
-Het `.env`-bestand is hiervoor niet nodig: de workflow geeft de waarden zelf door.
-
-Op de laptop:
-
-- Docker Desktop moet draaien, met de runner onder dezelfde gebruiker. Draait de runner op Windows als service, zet die service dan op je eigen account (of start de runner met `run.cmd`); anders kan hij niet bij Docker. Op Windows moet die gebruiker ook in de groep `docker-users` zitten.
-- Draaide het spel al met de hand vanuit een andere map? Stop die eerst (`docker compose -f docker-compose.online.yml down`), anders zitten poort 80 en 443 al bezet. De containers heten na de eerste uitrol `ermetd-spel-1` en `ermetd-caddy-1`. Heette die map niet `ermetd`, dan staat de oude database in een ander volume (zie `docker volume ls`).
-
 ## Ontwikkelen
 
 ```bash
