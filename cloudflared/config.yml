@@ -1,7 +1,7 @@
 # Instellingen van de Cloudflare Tunnel. Wordt gelezen door docker-compose.cloudflare.yml.
-# De tunnel heet "ermetd". De sleutel (credentials.json) zet je zelf in deze map; die komt niet in git.
+# De tunnel staat hieronder met zijn ID. De sleutel (credentials.json) zet je zelf in deze map; die komt niet in git.
 # Hoe je die aanmaakt staat in de README onder "Via een Cloudflare Tunnel".
-tunnel: ermetd
+tunnel: 0d1f68e1-7d00-4a37-a7f6-d39c4bb9cc20
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
