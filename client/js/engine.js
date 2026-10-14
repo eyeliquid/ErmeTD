@@ -16,29 +16,63 @@ const DIFF=[{id:'geers',n:'Geers',d:'De gewone strijd.',score:1,hp:1,sp:1,hurt:1
  {id:'only',n:'Alleen voor Geers',d:'Vijanden hebben 85% meer levens en lopen 12% sneller. Je held krijgt 50% meer schade.',score:1.75,hp:1.85,sp:1.12,hurt:1.5}];
 const diffIdx=v=>Math.max(0,Math.min(DIFF.length-1,Math.floor(+v||0)));
 const ROCK=new Set(); // geen bomen of rotsen meer: het hele veld is vrij
-// Er is geen vast pad. Vijanden komen links in het midden binnen en gaan rechts in het midden weg.
-// search zoekt de kortste route over de vakken die `pass` toelaat.
-function search(pass){const n=N*N,dist=new Float64Array(n).fill(Infinity),prev=new Int16Array(n).fill(-1),done=new Uint8Array(n);
-  if(!pass(C_IN)||!pass(C_OUT))return null;dist[C_IN]=0;
+// ---------- maps ----------
+// Een map bepaalt hoe de vijand door een vesting loopt. Alle vestingen in een potje spelen dezelfde map.
+//  in, out  het vak aan de rand waar de vijand binnenkomt en weggaat (out -1: er is geen uitgang)
+//  roads    je legt in de bouwfase zelf een weg (anders loopt de vijand over het gras, om je torens heen)
+//  maze     je bouwt het doolhof met je torens: ook tijdens het spel, de vijand zoekt meteen een nieuwe weg
+//  loop     vaste ring: de vijand blijft rondjes lopen tot hij dood is, elk rondje kost levens
+//  pass     wat erdoor komt loopt door naar de volgende vesting: 'row' naar rechts, 'col' naar beneden
+//  pool     alle vestingen delen één levenspot (de spellaag telt hem op en beslist over verlies)
+//  mini     de minigames na elke tiende golf doen mee
+const cellAt=(x,y)=>y*N+x,GATE=8; // GATE: de kolom van de opening in de boven- en ondermuur van een vesting
+// De ring van Groene Cirkel: de rand van het vierkant van (2,2) tot (10,10). De vijand komt links binnen en stapt bij (2,6) op de ring.
+const RING=(()=>{const c=[cellAt(0,MID),cellAt(1,MID)],L=2,R=N-3;
+  for(let y=MID;y>=L;y--)c.push(cellAt(L,y));for(let x=L+1;x<=R;x++)c.push(cellAt(x,L));
+  for(let y=L+1;y<=R;y++)c.push(cellAt(R,y));for(let x=R-1;x>=L;x--)c.push(cellAt(x,R));for(let y=R-1;y>MID;y--)c.push(cellAt(L,y));
+  return c;})();
+const MAPS={
+ classic:{id:'classic',n:'Klassiek',k:'Je eigen weg',d:'Zoals je gewend bent: de vijand komt links binnen en gaat rechts weg. In de bouwfase leg je zelf de weg. Met minigames na elke tiende golf.',in:C_IN,out:C_OUT,roads:true,mini:true},
+ relay:{id:'relay',n:'Estafette',k:'Doorlopen',d:'Wat jij doorlaat, loopt verder door de vesting rechts van je. Alleen de laatste vesting op de rij verliest er levens door. Hoe verder rechts, hoe zwaarder het wordt.',in:C_IN,out:C_OUT,roads:true,pass:'row'},
+ wintermaul:{id:'wintermaul',n:'Wintermaul',k:'Samenwerken',d:'De vijand komt boven binnen en zakt van vesting naar vesting naar beneden. Er is geen weg: je bouwt het doolhof met je torens. Iedereen deelt één levenspot; is die leeg, dan verliest het hele team.',in:GATE,out:(N-1)*N+GATE,maze:true,pass:'col',pool:true},
+ circle:{id:'circle',n:'Groene Cirkel',k:'Rondje',d:'De vijand stapt op een vaste ring en blijft rondjes lopen tot hij dood is. Er is geen uitgang: elk rondje dat een vijand afmaakt kost levens. Bouw binnen en buiten de ring.',in:C_IN,out:-1,loop:{cells:RING,at:2}},
+ maze:{id:'maze',n:'Doolhofbouwer',k:'Vrij bouwen',d:'Geen weg en geen vaste route. De vijand komt links binnen en wil onder weg. Je torens zijn je muren: maak zijn weg zo lang mogelijk, ook tijdens een golf.',in:C_IN,out:(N-1)*N+GATE,maze:true}
+};
+const MAP_IDS=Object.keys(MAPS),mapOf=id=>MAPS[id]||MAPS.classic;
+// Het punt net buiten de rand naast vak c: daar komt de vijand vandaan of loopt hij heen.
+function edgePt(c){const x=c%N,y=(c-x)/N;return x===0?[-.5,y+.5]:x===N-1?[N+.5,y+.5]:y===0?[x+.5,-.5]:[x+.5,N+.5];}
+// search zoekt de kortste route over de vakken die `pass` toelaat, van de ingang naar de uitgang van map M.
+function search(pass,M){M=M||MAPS.classic;const A=M.in,Z=M.out,n=N*N,dist=new Float64Array(n).fill(Infinity),prev=new Int16Array(n).fill(-1),done=new Uint8Array(n);
+  if(Z<0||!pass(A)||!pass(Z))return null;dist[A]=0;
   for(;;){let u=-1,bd=Infinity;for(let i=0;i<n;i++)if(!done[i]&&dist[i]<bd){bd=dist[i];u=i;}
-    if(u<0)return null;if(u===C_OUT)break;done[u]=1;const x=u%N,y=(u-x)/N;
+    if(u<0)return null;if(u===Z)break;done[u]=1;const x=u%N,y=(u-x)/N;
     for(const[dx,dy]of DIRS){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=N||ny>=N)continue;const v=ny*N+nx;
       if(!done[v]&&pass(v)&&bd+1<dist[v]){dist[v]=bd+1;prev[v]=u;}}}
-  const cells=[];for(let c=C_OUT;c>=0;c=prev[c])cells.push(c);return cells.reverse();}
+  const cells=[];for(let c=Z;c>=0;c=prev[c])cells.push(c);return cells.reverse();}
 // Eerst alleen over de gelegde weg. Ligt er geen doorlopende weg, dan recht over het gras, om turrets en rotsen heen.
-function route(road,taken){const free=c=>!ROCK.has(c)&&!taken(c),via=search(c=>road.has(c)&&free(c));
-  if(via)return{cells:via,road:true};const g=search(free);if(g)return{cells:g,road:false};
-  const row=[];for(let x=0;x<N;x++)row.push(MID*N+x);return{cells:row,road:false};}
-function mkPath(cells,road){const pts=[[-.5,MID+.5]];for(const c of cells){const x=c%N;pts.push([x+.5,(c-x)/N+.5]);}pts.push([N+.5,MID+.5]);
-  return{cells,set:new Set(cells),pts,len:pts.length-1,road:!!road};}
+// Op een ringmap ligt de route altijd vast.
+function route(road,taken,M){M=M||MAPS.classic;if(M.loop)return{cells:M.loop.cells.slice(),road:false};
+  const free=c=>!ROCK.has(c)&&!taken(c),via=M.roads?search(c=>road.has(c)&&free(c),M):null;
+  if(via)return{cells:via,road:true};const g=search(free,M);if(g)return{cells:g,road:false};
+  const row=[],x0=M.in%N,y0=(M.in-x0)/N;if(x0===0)for(let x=0;x<N;x++)row.push(cellAt(x,y0));else for(let y=0;y<N;y++)row.push(cellAt(x0,y));return{cells:row,road:false};}
+// pts: de punten waar de vijand langs loopt. Op een ringmap eindigt de lijn weer op het eerste ringvak; loopFrom is dat punt.
+function mkPath(cells,road,M){M=M||MAPS.classic;const pts=[edgePt(M.in)];for(const c of cells){const x=c%N;pts.push([x+.5,(c-x)/N+.5]);}
+  let loopFrom=null;if(M.loop){loopFrom=M.loop.at+1;pts.push(pts[loopFrom].slice());}else pts.push(edgePt(M.out));
+  return{cells,set:new Set(cells),pts,len:pts.length-1,road:!!road,loopFrom};}
 function posAt(P,d){d=Math.max(0,Math.min(P.len,d));const i=Math.min(P.len-1,Math.floor(d)),a=P.pts[i],b=P.pts[i+1],f=d-i;
   return[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,b[0]-a[0],b[1]-a[1]];}
+// Hoe ver langs pad P het punt (x,y) ligt: de dichtstbijzijnde plek op de lijn.
+function nearD(P,x,y){let best=0,bd=Infinity;for(let i=0;i<P.len;i++){const a=P.pts[i],b=P.pts[i+1],vx=b[0]-a[0],vy=b[1]-a[1],L=vx*vx+vy*vy||1,
+    t=Math.max(0,Math.min(1,((x-a[0])*vx+(y-a[1])*vy)/L)),dx=a[0]+vx*t-x,dy=a[1]+vy*t-y,d=dx*dx+dy*dy;if(d<bd-1e-9){bd=d;best=i+t;}}return best;}
 // De route zoals die nu zou worden: voor de voorvertoning tijdens de bouwfase.
-function preview(G){if(G.pvk!==G.rv){G.pv=route(G.road,c=>!!G.map[c]);G.pvk=G.rv;}return G.pv;}
-const canRoad=(G,c)=>G.phase==='prep'&&c>=0&&c<N*N&&!ROCK.has(c)&&!G.map[c];
+function preview(G){if(G.pvk!==G.rv){G.pv=route(G.road,c=>!!G.map[c],G.mp);G.pvk=G.rv;}return G.pv;}
+const canRoad=(G,c)=>G.mp.roads&&G.phase==='prep'&&c>=0&&c<N*N&&!ROCK.has(c)&&!G.map[c];
 function setRoad(G,c,on){if(!canRoad(G,c)||on===G.road.has(c))return false;if(on)G.road.add(c);else G.road.delete(c);G.rv++;return true;}
+// Doolhofmaps: na elke nieuwe of verkochte toren zoekt de vijand meteen een nieuwe weg. Wie al loopt, gaat verder vanaf waar hij staat.
+function repath(G){if(!G.path||!G.mp.maze)return;const r=route(G.road,c=>!!G.map[c],G.mp),P=mkPath(r.cells,r.road,G.mp);
+  for(const e of G.en)if(!e.dead)e.d=nearD(P,e.x,e.y);G.path=P;G.trail=new Set(r.cells);G.rv++;}
 // Einde bouwfase: de route ligt vast. Weg die niet op de route ligt verdwijnt, zodat je daar weer kunt bouwen.
-function lock(G){if(G.phase!=='prep')return;const r=route(G.road,c=>!!G.map[c]);G.path=mkPath(r.cells,r.road);
+function lock(G){if(G.phase!=='prep')return;const r=route(G.road,c=>!!G.map[c],G.mp);G.path=mkPath(r.cells,r.road,G.mp);
   G.trail=new Set(r.cells.filter(c=>!G.road.has(c)));G.road=new Set(r.cells.filter(c=>G.road.has(c)));G.rv++;G.phase='build';G.timer=10;}
 // Volgende ronde: pas als iedereen klaar is (dat bepaalt de spellaag).
 function next(G){if(G.phase==='wait'&&!G.final){G.phase='build';G.timer=8;}}
@@ -161,9 +195,11 @@ function skillState(sk,s){const rank=sk[s.id]|0,q=s.req&&SKILLS.find(x=>x.id===s
 const pointsFor=r=>(r%20===0?1:0)+(r%10===0?1:0)+(r===99?3:0);
 const hpMul=r=>B.hpX*B.hp0*(1+B.lin*r)*Math.pow(B.g,r)*(r>B.late?Math.pow(B.g2,r-B.late):1)*tough(r);
 
-function create(skills,diff){const m=mods(skills),di=diffIdx(diff);
-  return{m,diff:di,D:DIFF[di],gold:B.startGold+m.start,lives:B.lives+m.lives,round:1,cleared:0,phase:'prep',timer:PREP,wt:0,q:[],road:new Set(),trail:new Set(),path:null,rv:0,pv:null,pvk:-1,
-    tw:[],map:{},en:[],fx:[],ev:[],fxOn:false,score:0,kills:0,time:0,nid:1};}
+function create(skills,diff,mapId){const m=mods(skills),di=diffIdx(diff),mp=mapOf(mapId);
+  const G={m,mp,diff:di,D:DIFF[di],gold:B.startGold+m.start,lives:B.lives+m.lives,round:1,cleared:0,phase:'prep',timer:PREP,wt:0,q:[],road:new Set(),trail:new Set(),path:null,rv:0,pv:null,pvk:-1,
+    tw:[],map:{},en:[],fx:[],ev:[],fxOn:false,score:0,kills:0,time:0,nid:1,pass:null};
+  if(mp.loop){const r=route(G.road,()=>false,mp);G.path=mkPath(r.cells,false,mp);G.trail=new Set(r.cells);} // de ring ligt er vanaf het begin
+  return G;}
 
 function makeWave(r){const q=[];let t=0;const n=8+Math.floor(r*.4),R=Math.round;
   const add=(type,cnt,gap,hm)=>{for(let i=0;i<cnt;i++){q.push({t,type,hm:hm||1});t+=gap;}t+=1.2;};
@@ -185,6 +221,9 @@ function spawn(G,s){const d=EN[s.type],r=G.round,hp=d.hp*hpMul(r)*s.hm*G.D.hp,p=
   G.en.push({id:G.nid++,type:s.type,hp,max:hp,d:0,sp:d.sp*G.D.sp,arm:d.arm||0,regen:d.regen||0,immune:!!d.immune,boss:!!d.boss,
     big:s.hm>1,leak:d.leak||1,b:Math.max(1,Math.round(B.gold0*B.goldX*d.b*s.hm*(1+B.goldLin*r)*G.m.gold)),sc:Math.round(d.b*s.hm*r*5*G.D.score),
     x:p[0],y:p[1],dx:p[2],dy:p[3],fz:0,fi:0,sT:0,sl:0,pT:0,pD:0});}
+// Een vijand die uit een andere vesting doorloopt (pass-maps): hij komt bij jou binnen met hetzelfde deel van zijn levens dat hij nog had.
+function inject(G,type,frac){if(!G.path||!EN[type]||G.phase==='over'||G.phase==='won')return null;spawn(G,{type,hm:1});const e=G.en[G.en.length-1];
+  e.hp=Math.max(1,e.max*Math.max(.05,Math.min(1,+frac||1)));e.passed=true;return e;}
 function kill(G,e){if(e.dead)return;e.dead=true;G.gold+=e.b;G.score+=e.sc;G.kills++;if(G.fxOn)G.fx.push({k:'die',b:[e.x,e.y],boss:e.boss});}
 function hit(G,e,dmg,pierce,src){if(e.dead)return;const arm=e.arm*(1-G.m.ap)*(1-(pierce||0));
   e.hp-=dmg*(1-arm)*(e.boss?G.m.boss:1)*(src?vs(src,e.type):1);if(e.hp<=0)kill(G,e);}
@@ -219,19 +258,23 @@ function cellsOf(c,type){const sz=(T[type]&&T[type].size)||1;if(sz===1)return[c]
   if(x-h<0||y-h<0||x+h>=N||y+h>=N)return null;
   for(let dy=-h;dy<=h;dy++)for(let dx=-h;dx<=h;dx++)a.push((y+dy)*N+x+dx);return a;}
 function canBuild(G,c,type){if(!(c>=0&&c<N*N))return false;const cs=cellsOf(c,type);if(!cs)return false;
-  for(const k of cs)if(ROCK.has(k)||G.map[k]||k===C_IN||k===C_OUT)return false;
+  const M=G.mp;for(const k of cs)if(ROCK.has(k)||G.map[k]||k===M.in||k===M.out)return false;
+  if(M.loop)return cs.every(k=>!G.path.set.has(k)); // de ring ligt vast
+  // Doolhof: overal bouwen, behalve onder een vijand, zolang er een weg van de ingang naar de uitgang overblijft.
+  if(M.maze){for(const e of G.en){if(e.dead)continue;for(const k of cs){const x=k%N,y=(k-x)/N;if(Math.abs(e.x-x-.5)<.95&&Math.abs(e.y-y-.5)<.95)return false;}}
+    const bl=new Set(cs);return!!search(k=>!bl.has(k)&&!ROCK.has(k)&&!G.map[k],M);}
   if(G.path)return cs.every(k=>!G.path.set.has(k));if(cs.some(k=>G.road.has(k)))return false;
-  const bl=new Set(cs);return!!search(k=>!bl.has(k)&&!ROCK.has(k)&&!G.map[k]);} // een toren mag de doorgang nooit helemaal afsluiten
+  const bl=new Set(cs);return!!search(k=>!bl.has(k)&&!ROCK.has(k)&&!G.map[k],M);} // een toren mag de doorgang nooit helemaal afsluiten
 const buildCost=(G,type)=>Math.round(T[type].cost*G.m.build);
 const upCost=(G,t)=>{const u=T[t.type].uc||[.5,.25];return Math.round(T[t.type].cost*(u[0]+u[1]*t.lvl)*G.m.up);};
 const specCost=(G,t,k)=>Math.round(T[t.type].cost*(k==='turbo'?3*G.m.turbo:2));
 const sellValue=(G,t)=>Math.round(t.spent*G.m.sell);
 function build(G,c,type){if(!T[type]||!unlocked(G,type)||!canBuild(G,c,type))return null;const cost=buildCost(G,type);if(G.gold<cost)return null;
   G.gold-=cost;const x=c%N,cells=cellsOf(c,type),t={id:G.nid++,c,cells,size:T[type].size||1,x:x+.5,y:(c-x)/N+.5,type,lvl:0,spec:null,cd:0,ang:.8,ramp:1,tg:0,spent:cost,aura:0};
-  G.tw.push(t);for(const k of cells)G.map[k]=t;G.rv++;recalc(G);return t;}
+  G.tw.push(t);for(const k of cells)G.map[k]=t;G.rv++;recalc(G);repath(G);return t;}
 function upgrade(G,t){if(t.lvl>=maxLvl(t))return false;const c=upCost(G,t);if(G.gold<c)return false;
   G.gold-=c;t.spent+=c;t.lvl++;recalc(G);return true;}
-function remove(G,t){G.tw.splice(G.tw.indexOf(t),1);for(const k of t.cells||[t.c])delete G.map[k];G.rv++;}
+function remove(G,t){G.tw.splice(G.tw.indexOf(t),1);for(const k of t.cells||[t.c])delete G.map[k];G.rv++;repath(G);}
 function sell(G,t){G.gold+=sellValue(G,t);remove(G,t);recalc(G);}
 // De wekknop van De Slapende Geers. spec: null = slaapt, 'awake' = wakker, 'spent' = is al een keer wakker geweest.
 const canWake=t=>t.type==='sleeper'&&!t.spec;
@@ -281,7 +324,11 @@ function step(G,dt){
     let sp=e.sp;
     if(e.fz>0){e.fz-=dt;sp=0;}else if(e.sT>0){e.sT-=dt;sp*=1-e.sl;}
     e.d+=sp*dt;
-    if(e.d>=G.path.len){e.dead=true;G.lives-=e.leak;G.ev.push({k:'leak',n:e.leak});continue;}
+    if(e.d>=G.path.len){
+      // ringmap: een rondje erop zit, het kost levens en hij loopt gewoon door
+      if(G.path.loopFrom!=null){e.d=G.path.loopFrom+(e.d-G.path.len);G.lives-=e.leak;G.ev.push({k:'leak',n:e.leak,lap:true});}
+      // pass-map: de spellaag stuurt hem door naar de volgende vesting; is er geen, dan kost hij levens zoals altijd
+      else{e.dead=true;if(G.pass&&G.pass(G,e))G.ev.push({k:'pass',n:e.leak});else{G.lives-=e.leak;G.ev.push({k:'leak',n:e.leak});}continue;}}
     const p=posAt(G.path,e.d);e.x=p[0];e.y=p[1];e.dx=p[2];e.dy=p[3];}
   for(const t of G.tw)if(t.spec==='awake'){t.awakeT-=dt;if(t.awakeT<=0){t.awakeT=0;t.spec='spent';G.rv++;t.s=stats(G,t);G.ev.push({k:'wake',on:false});}}
   for(const t of G.tw){if(t.type==='uplink')continue;
@@ -296,7 +343,7 @@ function step(G,dt){
     t.cd=Math.max(t.cd,-dt)+1/s.rate;t.ang=Math.atan2(best.y-t.y,best.x-t.x);
     fire(G,t,best,s);}
   let w=0;for(let i=0;i<G.en.length;i++)if(!G.en[i].dead)G.en[w++]=G.en[i];G.en.length=w;
-  if(G.lives<=0){G.lives=0;G.phase='over';return;}
+  if(G.lives<=0&&!G.mp.pool){G.lives=0;G.phase='over';return;} // bij een gedeelde levenspot beslist de spellaag
   if(G.phase==='wave'&&!G.q.length&&!G.en.length){const r=G.round,bonus=Math.round((B.bonA+B.bonB*r)*G.m.bonus),
       int=Math.min(100,Math.floor(G.gold*G.m.interest));
     G.gold+=bonus+int;G.score+=Math.round(50*r*G.D.score);G.cleared=r;if(r%10===0)G.lives+=G.m.repair;
@@ -310,7 +357,7 @@ function lose(G){if(G.phase==='won'||G.phase==='over')return;G.phase='over';}
 function tune(s){if(!s||typeof s!=='object')return;const n=(v,lo,hi,d)=>{v=+v;return Number.isFinite(v)?Math.max(lo,Math.min(hi,v)):d;};
   B.startGold=Math.round(n(s.startGold,0,100000,B.startGold));B.lives=Math.round(n(s.lives,1,999,B.lives));
   B.hpX=n(s.enemyHp,.25,5,B.hpX);B.goldX=n(s.goldMul,.25,5,B.goldX);PREP=API.PREP=Math.round(n(s.prepSeconds,10,1800,PREP));}
-const API={WAKE,canWake,poke,MOVES,N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,tune,B,DIFF,diffIdx,T,TYPES,ALL,GEERS_NEED,maxLvl,hasTiers,tierOf,canTurbo,missingTurbo,geersReady,geersCount,sleeperReady,unlocked,cellsOf,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
+const API={MAPS,MAP_IDS,mapOf,RING,edgePt,repath,inject,nearD,WAKE,canWake,poke,MOVES,N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,tune,B,DIFF,diffIdx,T,TYPES,ALL,GEERS_NEED,maxLvl,hasTiers,tierOf,canTurbo,missingTurbo,geersReady,geersCount,sleeperReady,unlocked,cellsOf,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
   buildCost,upCost,specCost,sellValue,stats,mods,skillTotal,skillSpent,skillState,SKILL_MAX,TIER,pointsFor,hpMul,makeWave,hit,recalc,win,lose,VS,vs,strongVs,weakVs,counters,waveMix,waveFit};
 return API;
 })();

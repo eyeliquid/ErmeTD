@@ -57,6 +57,25 @@ Voor de start kiest elke speler zelf een moeilijkheidsgraad; die geldt alleen vo
 
 De waarden staan in `DIFF` bovenin `client/js/engine.js`.
 
+## Maps
+
+Speler 1 kiest in de lobby de map (knop **Map**, boven de moeilijkheidsgraad). Iedereen in het potje speelt dezelfde map; wie alleen start, kiest zelf en de bots spelen mee. De keuze gaat mee in het startsein (`go` en `mp` in de presence).
+
+| Map | Soort | Hoe het werkt |
+| --- | --- | --- |
+| Klassiek | je eigen weg | Zoals altijd: links naar rechts, zelf een weg leggen, minigames na elke tiende golf. |
+| Estafette | doorlopen | Wat je doorlaat loopt verder door de vesting rechts van je op dezelfde rij. Alleen de laatste vesting op de rij verliest er levens door. |
+| Wintermaul | samenwerken | Van boven naar beneden, zonder weg: je bouwt het doolhof met je torens. Wat je doorlaat zakt naar de vesting eronder. Alle vestingen delen één levenspot; is die leeg, dan verliest iedereen. |
+| Groene Cirkel | rondje | Een vaste ring zonder uitgang. De vijand blijft rondjes lopen tot hij dood is; elk rondje kost levens (een luchtschip 10). |
+| Doolhofbouwer | vrij bouwen | Geen weg: de vijand komt links binnen en wil onder weg. Je torens zijn je muren, ook tijdens een golf. |
+
+Op alle maps behalve Klassiek zijn er voorlopig geen minigames: na golf 100 heb je gewonnen.
+
+- **Waar het staat.** `MAPS` bovenin `client/js/engine.js` (ingang `in`, uitgang `out`, `roads`, `maze`, `loop`, `pass`, `pool`, `mini`). De voorbeeldplaatjes in de lobby staan in `MAP_DEMO` in `client/js/game.js`.
+- **Doolhof.** Op Wintermaul en Doolhofbouwer kun je overal bouwen, behalve onder een vijand, zolang er een weg van de ingang naar de uitgang overblijft. Na elke nieuwe of verkochte toren zoekt de vijand meteen een nieuwe weg (`repath`); wie al loopt, gaat verder vanaf waar hij staat.
+- **Doorgeven.** Loopt een vijand je vesting uit, dan vraagt `E.step` via `G.pass` aan de spellaag of hij door kan. `passOn` in `client/js/game.js` zoekt de volgende vesting. Draait die in dezelfde browser (jij of een bot), dan komt de vijand er direct binnen (`E.inject`), met hetzelfde deel van zijn levens. Bij een andere speler gaat het via de presence `pz`: het totaal en de laatste 60 doorgegeven vijanden.
+- **Levenspot.** Op Wintermaul telt elke vesting zijn eigen levens; de pot is de som van alle vestingen in het potje (`teamLives`). De poorten boven en onder liggen in kolom 8, bij de openingen in de muur.
+
 ### Hoe zwaar de levels worden
 
 De levens van de vijanden groeien elk level. Daarbovenop komt een extra zwaarte:
