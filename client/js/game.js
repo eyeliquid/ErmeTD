@@ -801,6 +801,7 @@ function freeSlot(idx,matchIdValue=matchId){const t=takenSlots(matchIdValue),fre
 let waveTotal=1,nextRound=0;
 // solo: je begint alleen, dus acht bots doen mee
 function beginGame(idx,mid,solo){closePops();clearBots();matchId=mid||Date.now();mySlot=freeSlot(idx,matchId);E.tune(gameCfg);G=E.create(save.skills,save.diff);HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
+  myBm=0;myBh=0;msLast=null;finalMax=0;finalAt=0;built=false;nx=0;sentWave=0;arenaFor=0;roadMode=false;t0=performance.now();prepEnd=t0+E.PREP*1000; // E.PREP: na E.tune, dus met de bouwtijd uit de webadmin
   {const[ox,oz]=slotO(mySlot);hero={x:ox+6.5,z:oz+5.5,a:-1.57,hp:0,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false};}armour=0;arena=null;camMode='hero';hero.hp=maxHp();hcam.yaw=0;hcam.pitch=.62;hcam.d=stage.clientWidth<760?13:10;myState='playing';ready=false;
   $('#home').hidden=true;$('#game').hidden=false;$('#result').hidden=true;
   document.querySelectorAll('#speed button').forEach(b=>b.classList.toggle('on',b.dataset.s==='1'));
