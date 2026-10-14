@@ -1,0 +1,31 @@
+# Online zetten via een Cloudflare Tunnel, op https://ermetd.terpstack.dev.
+# Geen poorten in je router nodig: cloudflared belt zelf uit naar Cloudflare.
+# Starten:  docker compose -f docker-compose.cloudflare.yml up -d --build
+# Daarvoor: zet cloudflared/credentials.json klaar en kopieer .env.example naar .env. Zie "Via een Cloudflare Tunnel" in de README.
+#
+# Gebruikt dezelfde database als docker-compose.yml (volume speldata), dus accounts en scores blijven.
+services:
+  spel:
+    build: .
+    restart: unless-stopped
+    # Geen poort naar buiten: alleen cloudflared praat met het spel.
+    expose:
+      - "3000"
+    environment:
+      # cloudflared staat ervoor, dus 1 proxy. Cloudflare zet het IP-adres van de speler in X-Forwarded-For.
+      TRUST_PROXY: "1"
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      - speldata:/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - spel
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+
+volumes:
+  speldata:
