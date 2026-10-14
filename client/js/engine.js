@@ -1,43 +1,18 @@
 const Engine=(()=>{
-const N=13,ROUNDS=100,MID=6,C_IN=MID*N,C_OUT=MID*N+N-1,DIRS=[[1,0],[0,-1],[0,1],[-1,0]];
-let PREP=300; // bouwtijd in seconden; instelbaar via de webadmin (zie tune)
-// Balans: alles wat de moeilijkheid bepaalt staat hier. startGold, lives, hpX en goldX zijn instelbaar via de webadmin (zie tune).
-// Honderd rondes: de curve van vijftig is uitgerekt. Ronde 2r is nu ongeveer zo zwaar als ronde r was, en twee rondes leveren samen op wat één ronde opleverde.
-const B={hp0:14,lin:.06,g:1.063,g2:1.0296,late:80,gold0:2.5,goldLin:.035,startGold:260,lives:20,hpX:1,goldX:1,
-  bonA:12,bonB:4,
-  // Extra zwaarte bovenop de curve: level 1-10 ongewijzigd, daarna loopt het op tot midX op level 20 (tot en met 30 gelijk),
-  // en vanaf level 31 komt er elk level ramp bij (samengesteld).
-  midX:1.15,rampFrom:30,ramp:.015};
+// De spelregels: hoe het spel rekent. De getallen en lijsten (balans, torens, vijanden, golven, talenten, maps) staan in client/js/data/.
+// In de browser zet elk databestand zijn deel op window.ERME; op de server (Node) halen we ze hier zelf op.
+const D=typeof module!=='undefined'&&module.exports&&typeof require==='function'
+  ?Object.assign({},...['balance','towers','enemies','skills','maps'].map(f=>require('./data/'+f+'.js')))
+  :window.ERME;
+const {N,MID,C_IN,C_OUT,GATE,ROUNDS,B,DIFF,MOVES,WAKE,T,TYPES,GEERS_NEED,VS,EN,WAVES,SKILLS,MAPS,RING}=D;
+const DIRS=[[1,0],[0,-1],[0,1],[-1,0]];
+let PREP=D.PREP; // bouwtijd in seconden; instelbaar via de webadmin (zie tune)
 const tough=r=>r<=10?1:r<20?1+(B.midX-1)*(r-10)/10:B.midX*(r>B.rampFrom?Math.pow(1+B.ramp,r-B.rampFrom):1);
-// Moeilijkheidsgraden: elke speler kiest er zelf een voor het potje begint. hp en sp maken de vijanden in jouw vesting taaier en sneller,
-// hurt is de extra schade die je held in minigames krijgt, score de vermenigvuldiger op alles wat je scoort.
-const DIFF=[{id:'geers',n:'Geers',d:'De gewone strijd.',score:1,hp:1,sp:1,hurt:1},
- {id:'super',n:'Super Geers',d:'Vijanden hebben 35% meer levens en lopen 6% sneller. Je held krijgt 20% meer schade.',score:1.25,hp:1.35,sp:1.06,hurt:1.2},
- {id:'only',n:'Alleen voor Geers',d:'Vijanden hebben 85% meer levens en lopen 12% sneller. Je held krijgt 50% meer schade.',score:1.75,hp:1.85,sp:1.12,hurt:1.5}];
+
 const diffIdx=v=>Math.max(0,Math.min(DIFF.length-1,Math.floor(+v||0)));
 const ROCK=new Set(); // geen bomen of rotsen meer: het hele veld is vrij
-// ---------- maps ----------
-// Een map bepaalt hoe de vijand door een vesting loopt. Alle vestingen in een potje spelen dezelfde map.
-//  in, out  het vak aan de rand waar de vijand binnenkomt en weggaat (out -1: er is geen uitgang)
-//  roads    je legt in de bouwfase zelf een weg (anders loopt de vijand over het gras, om je torens heen)
-//  maze     je bouwt het doolhof met je torens: ook tijdens het spel, de vijand zoekt meteen een nieuwe weg
-//  loop     vaste ring: de vijand blijft rondjes lopen tot hij dood is, elk rondje kost levens
-//  pass     wat erdoor komt loopt door naar de volgende vesting: 'row' naar rechts, 'col' naar beneden
-//  pool     alle vestingen delen één levenspot (de spellaag telt hem op en beslist over verlies)
-//  mini     de minigames na elke tiende golf doen mee
-const cellAt=(x,y)=>y*N+x,GATE=8; // GATE: de kolom van de opening in de boven- en ondermuur van een vesting
-// De ring van Groene Cirkel: de rand van het vierkant van (2,2) tot (10,10). De vijand komt links binnen en stapt bij (2,6) op de ring.
-const RING=(()=>{const c=[cellAt(0,MID),cellAt(1,MID)],L=2,R=N-3;
-  for(let y=MID;y>=L;y--)c.push(cellAt(L,y));for(let x=L+1;x<=R;x++)c.push(cellAt(x,L));
-  for(let y=L+1;y<=R;y++)c.push(cellAt(R,y));for(let x=R-1;x>=L;x--)c.push(cellAt(x,R));for(let y=R-1;y>MID;y--)c.push(cellAt(L,y));
-  return c;})();
-const MAPS={
- classic:{id:'classic',n:'Klassiek',k:'Je eigen weg',d:'Zoals je gewend bent: de vijand komt links binnen en gaat rechts weg. In de bouwfase leg je zelf de weg. Met minigames na elke tiende golf.',in:C_IN,out:C_OUT,roads:true,mini:true},
- relay:{id:'relay',n:'Estafette',k:'Doorlopen',d:'Wat jij doorlaat, loopt verder door de vesting rechts van je. Alleen de laatste vesting op de rij verliest er levens door. Hoe verder rechts, hoe zwaarder het wordt.',in:C_IN,out:C_OUT,roads:true,pass:'row'},
- wintermaul:{id:'wintermaul',n:'Wintermaul',k:'Samenwerken',d:'De vijand komt boven binnen en zakt van vesting naar vesting naar beneden. Er is geen weg: je bouwt het doolhof met je torens. Iedereen deelt één levenspot; is die leeg, dan verliest het hele team.',in:GATE,out:(N-1)*N+GATE,maze:true,pass:'col',pool:true},
- circle:{id:'circle',n:'Groene Cirkel',k:'Rondje',d:'De vijand stapt op een vaste ring en blijft rondjes lopen tot hij dood is. Er is geen uitgang: elk rondje dat een vijand afmaakt kost levens. Bouw binnen en buiten de ring.',in:C_IN,out:-1,loop:{cells:RING,at:2}},
- maze:{id:'maze',n:'Doolhofbouwer',k:'Vrij bouwen',d:'Geen weg en geen vaste route. De vijand komt links binnen en wil onder weg. Je torens zijn je muren: maak zijn weg zo lang mogelijk, ook tijdens een golf.',in:C_IN,out:(N-1)*N+GATE,maze:true}
-};
+// ---------- maps (zie data/maps.js) ----------
+const cellAt=(x,y)=>y*N+x;
 const MAP_IDS=Object.keys(MAPS),mapOf=id=>MAPS[id]||MAPS.classic;
 // Het punt net buiten de rand naast vak c: daar komt de vijand vandaan of loopt hij heen.
 function edgePt(c){const x=c%N,y=(c-x)/N;return x===0?[-.5,y+.5]:x===N-1?[N+.5,y+.5]:y===0?[x+.5,-.5]:[x+.5,N+.5];}
@@ -77,105 +52,12 @@ function lock(G){if(G.phase!=='prep')return;const r=route(G.road,c=>!!G.map[c],G
 // Volgende ronde: pas als iedereen klaar is (dat bepaalt de spellaag).
 function next(G){if(G.phase==='wait'&&!G.final){G.phase='build';G.timer=8;}}
 
-const T={
- sentry:{n:'Sentry Gun',d:'Snel en goedkoop. Zwak tegen pantser.',cost:60,dmg:9,rate:3,range:2.6},
- flak:{n:'Flak Kanon',d:'Explosieve schade in een gebied.',cost:110,dmg:20,rate:1,range:2.8,splash:1},
- cryo:{n:'Cryo Toren',d:'Bevriest vijanden: ze staan even stil.',cost:130,dmg:5,rate:.7,range:2.3,splash:1.1,fz:.9},
- toxin:{n:'Toxine Sproeier',d:'Gif vertraagt vijanden en vreet levens weg.',cost:120,dmg:4,rate:1.1,range:2.5,splash:.8,pd:10,slow:.3},
- tesla:{n:'Tesla Spoel',d:'Bliksem springt over naar 3 vijanden.',cost:200,dmg:32,rate:.9,range:2.6,chain:3},
- prism:{n:'Prisma Toren',d:'Straal wordt sterker op hetzelfde doel.',cost:240,dmg:5.5,rate:8,range:3.2},
- rocket:{n:'Raketbatterij',d:'Groot bereik en een grote klap.',cost:260,dmg:75,rate:.4,range:4.6,splash:1.4,minr:1.2},
- rail:{n:'Railgun',d:'Enorme schade, dwars door pantser.',cost:300,dmg:230,rate:.35,range:5},
- wave:{n:'Golfkanon',d:'Schiet door een hele rij vijanden heen.',cost:340,dmg:95,rate:.5,range:3.6},
- uplink:{n:'Commandopost',d:'Versterkt de schade van turrets in de buurt.',cost:220,range:1.6},
- // De top van de keten. max = aantal upgrades, up = schadegroei per niveau, rl = bereikgroei per niveau, uc = [basis, stap] van de upgradeprijs.
- geers:{n:'Geers Toren',d:'Zware granaten die door pantser slaan, tegen elke vijand even sterk. 13 keer te upgraden.',cost:1200,dmg:150,rate:1.5,range:3.8,splash:1.1,max:13,up:1.22,rl:.02,uc:[.25,.06]},
- sleeper:{n:'De Slapende Geers',d:'Beslaat 3 bij 3 vakken. Zijn gesnurk vertraagt elke vijand in een groot gebied en doet zware schade.',cost:5000,dmg:1500,rate:1.25,range:5.5,slow:.65,size:3,max:0}
-};
-// Wakker maken: zo vaak drukken, dan is hij zo lang wakker met zoveel keer kracht en bereik. Dat kan één keer per Slapende Geers.
-const WAKE={pokes:10,time:10,mul:20
-};
-// TYPES zijn de tien gewone torens. ALL bevat ook de twee Geers-torens die je pas later vrijspeelt.
-const TYPES=['sentry','flak','cryo','toxin','tesla','prism','rocket','rail','wave','uplink'],ALL=[...TYPES,'geers','sleeper'],GEERS_NEED=4;
-const EN={
- inf:{n:'Conscript',hp:1,sp:1.25,b:1},
- dog:{n:'Aanvalshond',hp:.55,sp:2.2,b:.8},
- tank:{n:'Hammer Tank',hp:3.2,sp:.8,arm:.35,b:2.6},
- drone:{n:'Terror Drone',hp:.32,sp:1.6,b:.4},
- mech:{n:'Veldmech',hp:1.8,sp:1,regen:.025,b:1.8},
- haz:{n:'Hazmat-trooper',hp:2.2,sp:1.05,immune:true,b:2.2},
- boss:{n:'Luchtschip',hp:28,sp:.55,arm:.25,b:25,leak:10,boss:true}
-};
-// Matchups: wat een toren tegen een vijand doet. 1.5 = sterk, .5 = zwak, niet genoemd = gewoon.
-// Het getal telt voor de schade per schot, voor het gif per seconde en voor hoe lang een vijand bevroren blijft.
-const VS={
- sentry:{inf:1.5,dog:1.5,tank:.5,boss:.5},
- flak:{drone:1.5,boss:1.5,tank:.5,mech:.5},
- cryo:{dog:1.5,mech:1.5,haz:.5,boss:.5},
- toxin:{inf:1.5,dog:1.5,haz:.5,drone:.5,tank:.5},
- tesla:{drone:1.5,mech:1.5,haz:.5,boss:.5},
- prism:{tank:1.5,mech:1.5,boss:1.5,drone:.5,dog:.5},
- rocket:{tank:1.5,haz:1.5,dog:.5,drone:.5},
- rail:{tank:1.5,haz:1.5,boss:1.5,inf:.5,dog:.5,drone:.5},
- wave:{inf:1.5,dog:1.5,tank:.5,boss:.5}
-};
+const ALL=[...TYPES,'geers','sleeper']; // ALL: ook de twee Geers-torens die je pas later vrijspeelt
 const vs=(tw,en)=>(VS[tw]&&VS[tw][en])||1;
 const ENEMIES=Object.keys(EN);
 // Voor de uitleg in beeld: tegen welke vijanden een toren sterk of zwak is, en welke torens goed zijn tegen een vijand.
 const strongVs=tw=>ENEMIES.filter(e=>vs(tw,e)>1),weakVs=tw=>ENEMIES.filter(e=>vs(tw,e)<1);
 const counters=en=>Object.keys(VS).filter(tw=>vs(tw,en)>1);
-// Talenten: tree T = torens, H = held. t = rij (0-6, gaat open bij 5*t punten in die boom), c = kolom (0-3), max = aantal rangen,
-// v = waarde per rang die in de tekst op {v} komt, req = talent recht erboven dat eerst vol moet zijn.
-const SKILLS=[
- {id:'dmg',tree:'T',t:0,c:0,max:5,ic:'blast',n:'Holle punten',d:'+{v}% schade voor alle torens',v:3},
- {id:'bulk',tree:'T',t:0,c:1,max:5,ic:'crate',n:'Massaproductie',d:'Torens bouwen {v}% goedkoper',v:2.5},
- {id:'chest',tree:'T',t:0,c:2,max:3,ic:'coin',n:'Oorlogskas',d:'+{v} startcredits',v:50},
- {id:'rate',tree:'T',t:1,c:0,max:5,ic:'clock',n:'Overklok',d:'+{v}% vuursnelheid',v:2.5},
- {id:'bounty',tree:'T',t:1,c:1,max:5,ic:'coin',n:'Oorlogsbuit',d:'+{v}% credits per kill',v:4},
- {id:'fort',tree:'T',t:1,c:3,max:4,ic:'shield',n:'Versterkte basis',d:'+{v} levens',v:2},
- {id:'range',tree:'T',t:2,c:0,max:5,ic:'cross',n:'Lange optiek',d:'+{v}% bereik',v:2},
- {id:'engineer',tree:'T',t:2,c:1,max:3,ic:'wrench',n:'Ingenieurskorps',d:'Upgrades {v}% goedkoper',v:5},
- {id:'freeze',tree:'T',t:2,c:2,max:3,ic:'snow',n:'Diepvries',d:'Bevriezing duurt {v}% langer',v:12},
- {id:'toxin',tree:'T',t:2,c:3,max:3,ic:'drop',n:'Neurotoxine',d:'Gif doet {v}% meer schade en vertraagt sterker',v:14},
- {id:'ap',tree:'T',t:3,c:0,max:5,ic:'sword',n:'Pantserbrekers',d:'Negeert {v}% van vijandelijk pantser',v:10},
- {id:'bonus',tree:'T',t:3,c:1,max:4,ic:'up',n:'Frontpremie',d:'+{v}% rondebonus',v:10},
- {id:'splash',tree:'T',t:3,c:2,max:4,ic:'blast',n:'Brede lading',d:'Explosies {v}% groter',v:5},
- {id:'salvage',tree:'T',t:3,c:3,max:2,ic:'wrench',n:'Sloopdienst',d:'Verkopen levert {v}% meer op',v:10},
- {id:'link',tree:'T',t:4,c:0,max:5,ic:'link',n:'Ultra-versterker',d:'De ultra-bonus is {v}% sterker',v:10},
- {id:'interest',tree:'T',t:4,c:1,max:5,ic:'coin',n:'Oorlogsobligaties',d:'{v}% rente op je credits na elke ronde (max 100)',v:1},
- {id:'turbo',tree:'T',t:4,c:2,max:5,ic:'bolt',n:'Turbo-injectie',d:'Turbo {v}% goedkoper',v:5},
- {id:'repair',tree:'T',t:4,c:3,max:2,ic:'plus',n:'Reparatieploeg',d:'+{v} leven na elke 10 rondes',v:1},
- {id:'boss',tree:'T',t:5,c:1,max:5,ic:'skull',n:'Bazenjager',d:'Torens doen +{v}% schade tegen bazen',v:6},
- {id:'overdrive',tree:'T',t:5,c:2,max:5,ic:'star',n:'Turbo-overdrive',d:'Turbo torens doen {v}% meer schade',v:7,req:'turbo'},
- {id:'war',tree:'T',t:6,c:1,max:1,ic:'trophy',n:'Totale oorlog',d:'Alle torens: +10% schade en +10% vuursnelheid',v:0,req:'boss'},
- {id:'hdmg',tree:'H',t:0,c:0,max:5,ic:'sword',n:'Wapentraining',d:'Je held doet +{v}% schade',v:4},
- {id:'hhp',tree:'H',t:0,c:1,max:5,ic:'heart',n:'Taai',d:'+{v}% levenspunten voor je held',v:5},
- {id:'hspd',tree:'H',t:0,c:2,max:5,ic:'boot',n:'Snelle voeten',d:'Je held loopt {v}% sneller',v:2},
- {id:'pushr',tree:'H',t:0,c:3,max:3,ic:'dodge',n:'Brede schouders',d:'Duwen duwt andere spelers {v}% verder weg',v:15},
- {id:'hrate',tree:'H',t:1,c:0,max:5,ic:'clock',n:'Vuurdiscipline',d:'Je held valt {v}% sneller aan',v:3},
- {id:'harm',tree:'H',t:1,c:1,max:5,ic:'shield',n:'Dikke huid',d:'Je held krijgt {v}% minder schade',v:3},
- {id:'sprint',tree:'H',t:1,c:2,max:3,ic:'boot',n:'Lange adem',d:'Sprint duurt {v} seconde langer',v:.5},
- {id:'hrange',tree:'H',t:1,c:3,max:3,ic:'cross',n:'Verrekijker',d:'+{v}% bereik voor je held',v:4},
- {id:'hap',tree:'H',t:2,c:0,max:3,ic:'bolt',n:'Pantserdoorn',d:'Aanvallen van je held negeren {v}% pantser',v:15},
- {id:'hregen',tree:'H',t:2,c:1,max:3,ic:'plus',n:'Tweede adem',d:'In missies en de arena herstelt je held {v}% levenspunten per seconde',v:.5},
- {id:'hgold',tree:'H',t:2,c:2,max:3,ic:'coin',n:'Premiejager',d:'Kills door je held leveren {v}% extra credits op',v:10},
- {id:'hboss',tree:'H',t:2,c:3,max:5,ic:'skull',n:'Bazenbreker',d:'Je held doet +{v}% schade tegen bazen en de Kolos',v:5},
- {id:'hcrit',tree:'H',t:3,c:0,max:5,ic:'blast',n:'Zwakke plek',d:'{v}% kans op een kritieke treffer met dubbele schade',v:4},
- {id:'hdodge',tree:'H',t:3,c:1,max:3,ic:'dodge',n:'Scherpe reflexen',d:'{v}% kans om een treffer te ontwijken',v:5},
- {id:'shdur',tree:'H',t:3,c:2,max:3,ic:'shield',n:'Schildgenerator',d:'Je schild op het parcours houdt {v} seconde langer stand',v:.5},
- {id:'hpvp',tree:'H',t:3,c:3,max:5,ic:'sword',n:'Arenavechter',d:'+{v}% schade tegen monsters en torens in minigames',v:4},
- {id:'hcritd',tree:'H',t:4,c:0,max:3,ic:'star',n:'Dodelijke precisie',d:'Kritieke treffers doen nog eens {v}% extra schade',v:25,req:'hcrit'},
- {id:'sprintcd',tree:'H',t:4,c:1,max:3,ic:'clock',n:'Snel op adem',d:'Sprint laadt {v} seconde sneller op',v:1},
- {id:'shcd',tree:'H',t:4,c:2,max:3,ic:'clock',n:'Snelle lader',d:'Je schild laadt {v} seconde sneller op',v:1,req:'shdur'},
- {id:'mission',tree:'H',t:4,c:3,max:3,ic:'up',n:'Missiepremie',d:'+{v} credits als je een missie of de arena wint',v:150},
- {id:'leech',tree:'H',t:5,c:0,max:3,ic:'drop',n:'Bloeddorst',d:'Zolang je held aanvalt herstelt hij {v}% levenspunten per seconde',v:1},
- {id:'second',tree:'H',t:5,c:1,max:1,ic:'heart',n:'Tweede kans',d:'Eén keer per missie staat je held na een dodelijke klap weer op met 30% levenspunten. Werkt niet tegen de ultra-aanval van de Kolos.',v:0},
- {id:'pushcd',tree:'H',t:5,c:2,max:2,ic:'clock',n:'Elleboogwerk',d:'Duwen laadt {v} seconde sneller op',v:1},
- {id:'sprintspd',tree:'H',t:5,c:3,max:3,ic:'bolt',n:'Naverbrander',d:'Sprint geeft nog eens {v}% extra snelheid',v:10},
- {id:'legend',tree:'H',t:6,c:1,max:1,ic:'trophy',n:'Legende',d:'Je held: +15% schade, +15% levenspunten en +10% snelheid',v:0,req:'second'}
-];
-// Duwen en sprinten in minigames. Skills schuiven deze waarden op (zie mods: pushDist, pushCd, sprDur, sprCd, sprSpd).
-const MOVES={pushCd:6,pushRange:2.4,pushDist:1.6,sprDur:3,sprCd:10,sprSpd:.6};
 const SKILL_MAX=SKILLS.reduce((a,s)=>a+s.max,0),TIER=5;
 function mods(sk){sk=sk&&!Array.isArray(sk)?sk:{};const r=id=>sk[id]|0,war=r('war')?1.1:1,lg=r('legend');return{
   gold:1+.04*r('bounty'),up:1-.05*r('engineer'),start:50*r('chest'),build:1-.025*r('bulk'),lives:2*r('fort'),
@@ -201,15 +83,10 @@ function create(skills,diff,mapId){const m=mods(skills),di=diffIdx(diff),mp=mapO
   if(mp.loop){const r=route(G.road,()=>false,mp);G.path=mkPath(r.cells,false,mp);G.trail=new Set(r.cells);} // de ring ligt er vanaf het begin
   return G;}
 
-function makeWave(r){const q=[];let t=0;const n=8+Math.floor(r*.4),R=Math.round;
-  const add=(type,cnt,gap,hm)=>{for(let i=0;i<cnt;i++){q.push({t,type,hm:hm||1});t+=gap;}t+=1.2;};
-  if(r%10===0){add('inf',R(n*.5),.55);add('tank',R(n*.3),.9);add('boss',1+Math.floor(r/40),4);if(r===ROUNDS)add('boss',1,1,3);}
-  else switch(r%5){
-    case 1:add('inf',n,.55);break;
-    case 2:add('inf',R(n*.6),.55);add('dog',R(n*.6),.4);break;
-    case 3:add('drone',R(n*1.8),.25);break;
-    case 4:add('tank',R(n*.4),.9);add(r>=14?'mech':'inf',R(n*.35),.7);break;
-    default:add(r>=18?'haz':'inf',R(n*.4),.7);add('dog',R(n*.5),.4);add('tank',R(n*.25),.9);}
+// De golf van ronde r, in de volgorde waarin ze binnenkomen. Wat erin zit staat in WAVES (data/enemies.js).
+function makeWave(r){const q=[];let t=0;
+  const add=(type,cnt,gap,hm)=>{if(!EN[type])return;for(let i=0;i<cnt;i++){q.push({t,type,hm:hm||1});t+=gap;}t+=1.2;};
+  WAVES(r,{add,n:8+Math.floor(r*.4),last:r===ROUNDS});
   return q.reverse();}
 // Wat er in ronde r aankomt: per soort het aantal en het aandeel in de totale levenspunten van de golf.
 function waveMix(r){const m={};let tot=0;for(const s of makeWave(r)){const o=m[s.type]||(m[s.type]={type:s.type,n:0,hp:0}),h=EN[s.type].hp*s.hm;o.n++;o.hp+=h;tot+=h;}
@@ -357,7 +234,7 @@ function lose(G){if(G.phase==='won'||G.phase==='over')return;G.phase='over';}
 function tune(s){if(!s||typeof s!=='object')return;const n=(v,lo,hi,d)=>{v=+v;return Number.isFinite(v)?Math.max(lo,Math.min(hi,v)):d;};
   B.startGold=Math.round(n(s.startGold,0,100000,B.startGold));B.lives=Math.round(n(s.lives,1,999,B.lives));
   B.hpX=n(s.enemyHp,.25,5,B.hpX);B.goldX=n(s.goldMul,.25,5,B.goldX);PREP=API.PREP=Math.round(n(s.prepSeconds,10,1800,PREP));}
-const API={MAPS,MAP_IDS,mapOf,RING,edgePt,repath,inject,nearD,WAKE,canWake,poke,MOVES,N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,tune,B,DIFF,diffIdx,T,TYPES,ALL,GEERS_NEED,maxLvl,hasTiers,tierOf,canTurbo,missingTurbo,geersReady,geersCount,sleeperReady,unlocked,cellsOf,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
+const API={D,MAPS,MAP_IDS,mapOf,RING,edgePt,repath,inject,nearD,WAKE,canWake,poke,MOVES,N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,tune,B,DIFF,diffIdx,T,TYPES,ALL,GEERS_NEED,maxLvl,hasTiers,tierOf,canTurbo,missingTurbo,geersReady,geersCount,sleeperReady,unlocked,cellsOf,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
   buildCost,upCost,specCost,sellValue,stats,mods,skillTotal,skillSpent,skillState,SKILL_MAX,TIER,pointsFor,hpMul,makeWave,hit,recalc,win,lose,VS,vs,strongVs,weakVs,counters,waveMix,waveFit};
 return API;
 })();

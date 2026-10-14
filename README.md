@@ -24,11 +24,21 @@ client/                 frontend: gewone bestanden, geen bouwstap
   index.html            de pagina
   admin.html            de webadmin (met css/admin.css en js/admin.js)
   css/style.css         opmaak
-  js/config.js          adres van de backend (leeg = dezelfde server)
-  js/engine.js          spelregels: torens, vijanden, golven, skills
+  js/data/              ALLE GETALLEN EN LIJSTEN: hier pas je het spel aan zonder code te lezen
+    balance.js          levels, bouwtijd, levenscurve, moeilijkheidsgraden, duwen/sprinten, wekken
+    towers.js           torens: prijs, schade, bereik; sterk en zwak (VS)
+    enemies.js          vijanden: getallen, model en netwerkletter; de golven (WAVES)
+    skills.js           de twee talentbomen
+    heroes.js           de zes helden en het harnas
+    maps.js             maps: ingang, uitgang, weg, doolhof, ring, doorgeven
+    themes.js           hoe elke map eruitziet en klinkt: licht, grond, decor, vijanden, muziek
+  js/engine.js          spelregels: rekent met de data (draait ook op de server)
+  js/textures.js        alle texturen, procedureel getekend
+  js/music.js           de muziek, met een stijl per thema
   js/net.js             alle communicatie met de backend
-  js/minigames.js       de 30 genummerde minigames
-  js/game.js            3D-wereld, bediening, lobby, minigames
+  js/minigames.js       de genummerde minigames
+  js/game.js            3D-wereld, bediening, lobby, bots, minigames
+  js/config.js          adres van de backend (leeg = dezelfde server)
   vendor/three.min.js   three.js r128
 server/                 backend: Node.js, Express, WebSocket, SQLite
   src/index.js          startpunt: API, lobby en de frontend
@@ -39,11 +49,14 @@ server/                 backend: Node.js, Express, WebSocket, SQLite
   src/settings.js       spelinstellingen uit de webadmin
   src/db.js             database en migraties
   src/validate.js       controle van wat spelers insturen
-  test/                 tests van de API en de lobby
+  test/                 tests: API, lobby, maps, en een controle van alle databestanden
+docs/aanpassen.md       stap voor stap: een vijand, toren, map of thema aanpassen of toevoegen
 docs/game-design.md     het oorspronkelijke game design document
 ```
 
-De server serveert ook de frontend, dus één adres is genoeg. `engine.js` wordt door beide kanten gebruikt: de browser speelt ermee, de server controleert er opgeslagen voortgang mee.
+De server serveert ook de frontend, dus één adres is genoeg. `engine.js` en de data worden door beide kanten gebruikt: de browser speelt ermee, de server controleert er opgeslagen voortgang mee.
+
+**Iets aanpassen?** Kijk eerst in `client/js/data/`. Elk bestand begint met een uitleg van zijn velden. Draai daarna `npm test`: `server/test/data.test.js` controleert alle databestanden en zegt in gewone woorden wat er niet klopt. Zie [docs/aanpassen.md](docs/aanpassen.md) voor de stappen.
 
 ## Moeilijkheidsgraden
 
@@ -55,7 +68,7 @@ Voor de start kiest elke speler zelf een moeilijkheidsgraad; die geldt alleen vo
 | Super Geers | 35% meer levens, 6% sneller | +20% | ×1,25 |
 | Alleen voor Geers | 85% meer levens, 12% sneller | +50% | ×1,75 |
 
-De waarden staan in `DIFF` bovenin `client/js/engine.js`.
+De waarden staan in `DIFF` in `client/js/data/balance.js`.
 
 ## Maps
 
@@ -71,7 +84,19 @@ Speler 1 kiest in de lobby de map (knop **Map**, boven de moeilijkheidsgraad). I
 
 Op alle maps behalve Klassiek zijn er voorlopig geen minigames: na golf 100 heb je gewonnen.
 
-- **Waar het staat.** `MAPS` bovenin `client/js/engine.js` (ingang `in`, uitgang `out`, `roads`, `maze`, `loop`, `pass`, `pool`, `mini`). De voorbeeldplaatjes in de lobby staan in `MAP_DEMO` in `client/js/game.js`.
+### Thema's: elke map zijn eigen look and feel
+
+| Map | Thema | Wat je ziet en hoort |
+| --- | --- | --- |
+| Klassiek | Rood Alarm | De oorspronkelijke schemering: blauw licht, stenen wegen, vuren. |
+| Estafette | Grand Prix | Zon, gemaaid gras in banen, asfalt met rood-witte stoepranden, bandenstapels, lichtmasten en startlichten. De vijanden rijden: karts, racemotoren, opleggers, monstertrucks, tankwagens en een reclamezeppelin. Snelle, stuwende muziek. |
+| Wintermaul | Bevroren Noorden | Sneeuw op de grond en de muren, ijspegels, een bevroren zee en vallende sneeuw. Sneeuwsoldaten, husky's, sneeuwrupsen, ijskristallen en een yeti. Trage muziek met klokjes. |
+| Groene Cirkel | Neon Nexus | Een ruimtestation: metalen vloer met een lichtgevend raster, een groene ring van licht, neonstrips, zwevende lichtjes en een zee van niets. Droids, zweeftanks en een moederschip. Elektronische muziek met een arpeggio. |
+| Doolhofbouwer | Koningsdoolhof | Een warme avond: bloemenweide, keien, zandsteen, banieren, schilden en een poort met een valhek, opstijgende vonken. Voetknechten, wolven, een stormram, raven en een draak. Getokkelde muziek met een bourdon. |
+
+Een thema verandert niets aan de spelregels: een Kart is een Conscript met een ander jasje. Kleuren, licht, grond, weg, zee, decor, de namen en modellen van de vijanden, de muziekstijl en de accentkleur van de knoppen staan per thema in `client/js/data/themes.js`. `applyTheme` in `client/js/game.js` zet ze bij de start van een potje. Het decor staat op de muren en de pieren, nooit op het speelveld.
+
+- **Waar het staat.** De spelregels van een map in `client/js/data/maps.js` (ingang `in`, uitgang `out`, `roads`, `maze`, `loop`, `pass`, `pool`, `mini`), het uiterlijk in `client/js/data/themes.js`. De voorbeeldplaatjes in de lobby staan in `MAP_DEMO` in `client/js/game.js`.
 - **Doolhof.** Op Wintermaul en Doolhofbouwer kun je overal bouwen, behalve onder een vijand, zolang er een weg van de ingang naar de uitgang overblijft. Na elke nieuwe of verkochte toren zoekt de vijand meteen een nieuwe weg (`repath`); wie al loopt, gaat verder vanaf waar hij staat.
 - **Doorgeven.** Loopt een vijand je vesting uit, dan vraagt `E.step` via `G.pass` aan de spellaag of hij door kan. `passOn` in `client/js/game.js` zoekt de volgende vesting. Draait die in dezelfde browser (jij of een bot), dan komt de vijand er direct binnen (`E.inject`), met hetzelfde deel van zijn levens. Bij een andere speler gaat het via de presence `pz`: het totaal en de laatste 60 doorgegeven vijanden.
 - **Levenspot.** Op Wintermaul telt elke vesting zijn eigen levens; de pot is de som van alle vestingen in het potje (`teamLives`). De poorten boven en onder liggen in kolom 8, bij de openingen in de muur.
@@ -87,7 +112,7 @@ De levens van de vijanden groeien elk level. Daarbovenop komt een extra zwaarte:
 | 20 tot 30 | 15% |
 | vanaf 31 | elk level 1,5% erbij (level 40 +33%, level 50 +55%, level 70 ×2,1, level 100 ×3,3) |
 
-Dit staat in `B` bovenin `client/js/engine.js`: `midX` (de 15%), `rampFrom` (level 30) en `ramp` (de 1,5% per level). Het geldt voor elke moeilijkheidsgraad en komt bovenop de levens-instelling in de webadmin.
+Dit staat in `B` in `client/js/data/balance.js`: `midX` (de 15%), `rampFrom` (level 30) en `ramp` (de 1,5% per level). Het geldt voor elke moeilijkheidsgraad en komt bovenop de levens-instelling in de webadmin.
 ## Torens: de keten
 
 Elke toren doorloopt dezelfde keten, en die leidt naar De Slapende Geers.
@@ -98,9 +123,9 @@ Elke toren doorloopt dezelfde keten, en die leidt naar De Slapende Geers.
 4. **Geers Toren.** Staat er van elk van de tien torensoorten een turbo, dan kun je Geers Torens bouwen (toets G, na de bouwfase). Een Geers Toren kun je 13 keer upgraden.
 5. **De Slapende Geers.** Bij 4 Geers Torens komt hij vrij (toets Z): een toren van 3 bij 3 vakken die alles binnen zijn bereik vertraagt en zware schade doet. Er kan er één staan.
 
-**Wek poppetje Geers.** Selecteer De Slapende Geers en druk 10 keer op de knop (toets P). Dan wordt hij wakker: 10 seconden lang heeft hij 20 keer zo veel kracht en bereik. Daarna slaapt hij voorgoed en werkt de knop niet meer. Bots wekken hem zodra er een baas over hun veld loopt. De getallen staan in `WAKE` in `client/js/engine.js`.
+**Wek poppetje Geers.** Selecteer De Slapende Geers en druk 10 keer op de knop (toets P). Dan wordt hij wakker: 10 seconden lang heeft hij 20 keer zo veel kracht en bereik. Daarna slaapt hij voorgoed en werkt de knop niet meer. Bots wekken hem zodra er een baas over hun veld loopt. De getallen staan in `WAKE` in `client/js/data/balance.js`.
 
-De voorwaarden worden gecontroleerd op het moment dat je bouwt of upgradet. Prijzen, schade en de bonussen van ultra en turbo staan in `T`, `stats` en `specCost` in `client/js/engine.js`.
+De voorwaarden worden gecontroleerd op het moment dat je bouwt of upgradet. Prijzen en schade staan in `T` in `client/js/data/towers.js`; de bonussen van ultra en turbo in `stats` en `specCost` in `client/js/engine.js`.
 
 ## Duwen en sprinten
 
@@ -109,7 +134,7 @@ In elke minigame heeft de held twee extra's, rechtsonder op de commandokaart.
 - **Duwen (C).** Duwt andere spelers binnen 2,4 meter een klein stukje van je af. 6 seconden cooldown. Het doet geen schade.
 - **Sprint (Shift).** 3 seconden lang 60% sneller. 10 seconden cooldown.
 
-Vijf talenten in de boom Veldheer maken ze sterker: Brede schouders (verder duwen), Elleboogwerk (duwen laadt sneller), Lange adem (langer sprinten), Snel op adem (sprint laadt sneller) en Naverbrander (sneller sprinten). De vaste waarden staan in `MOVES` in `client/js/engine.js`.
+Vijf talenten in de boom Veldheer maken ze sterker: Brede schouders (verder duwen), Elleboogwerk (duwen laadt sneller), Lange adem (langer sprinten), Snel op adem (sprint laadt sneller) en Naverbrander (sneller sprinten). De vaste waarden staan in `MOVES` in `client/js/data/balance.js`.
 
 ## Minigames en eilanden
 
@@ -208,7 +233,7 @@ Het spel is alleen bereikbaar zolang de computer aanstaat en niet slaapt. Zet he
 
 ```bash
 npm run dev     # server die herstart na elke wijziging
-npm test        # tests van de API en de lobby
+npm test        # tests van de API, de lobby, de maps en de databestanden
 ```
 
 Open de pagina met `#dev` achter het adres om de testhulpmiddelen in `window.__ratd` beschikbaar te maken.
@@ -217,7 +242,7 @@ In de spelregels is het startgoud 260. De server stuurt zijn eigen instelling me
 
 ## Sterk en zwak
 
-Elke toren doet 150% schade tegen de vijanden waar hij sterk tegen is en 50% tegen de vijanden waar hij zwak tegen is. De tabel staat als `VS` in `client/js/engine.js`; daar pas je een matchup aan. Het getal telt ook voor het gif per seconde van de Toxine Sproeier en voor hoe lang de Cryo Toren een vijand bevriest. Een bevroren Veldmech herstelt niet.
+Elke toren doet 150% schade tegen de vijanden waar hij sterk tegen is en 50% tegen de vijanden waar hij zwak tegen is. De tabel staat als `VS` in `client/js/data/towers.js`; daar pas je een matchup aan. Het getal telt ook voor het gif per seconde van de Toxine Sproeier en voor hoe lang de Cryo Toren een vijand bevriest. Een bevroren Veldmech herstelt niet.
 
 | Toren | Sterk tegen | Zwak tegen |
 |---|---|---|
