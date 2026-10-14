@@ -1,16 +1,31 @@
-# Starten: docker compose up -d --build   ·   het spel staat dan op http://localhost:3000
+# Starten: docker compose up -d --build
+# Het spel staat dan online op https://ermetd.terpstack.dev (via de Cloudflare Tunnel) en op deze computer op http://localhost:3000.
+# Daarvoor: kopieer .env.example naar .env en vul TUNNEL_TOKEN in. Zie "Online zetten met een Cloudflare Tunnel" in de README.
 services:
   spel:
     build: .
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # Alleen vanaf deze computer. Van buitenaf kom je binnen via de tunnel.
+      - "127.0.0.1:3000:3000"
     environment:
-      # Staat er een proxy (bijvoorbeeld nginx of een hostingplatform) voor? Zet dit dan op 1.
-      TRUST_PROXY: "0"
+      # cloudflared staat ervoor, dus 1 proxy. Cloudflare zet het IP-adres van de speler in X-Forwarded-For.
+      TRUST_PROXY: "1"
       # Wachtwoord van de webadmin op /admin (minstens 10 tekens). Leeg = webadmin uit.
-      ADMIN_PASSWORD: ""
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     volumes:
       - speldata:/data
+
+  # De Cloudflare Tunnel. Belt zelf uit naar Cloudflare, dus er hoeven geen poorten open in je router.
+  # Welk adres naar het spel gaat, stel je in het Cloudflare-dashboard in (Public Hostname: ermetd.terpstack.dev naar http://spel:3000).
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - spel
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Zet TUNNEL_TOKEN in .env. Zie de README onder Online zetten met een Cloudflare Tunnel.}
+
 volumes:
   speldata:
