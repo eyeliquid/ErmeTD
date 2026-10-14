@@ -936,9 +936,10 @@ const KIND={
  duel:{m:'boss',T:150,n:'Kolosjacht',go:'Kolosjacht: de Kolos is terug. Wie hem de meeste schade toebrengt wint'},
  titan:{m:'boss',T:300,n:'De Titaan',go:'De Titaan is ontwaakt. Bij elke 10% levens die hij verliest volgt een speciale aanval'}};
 // th: levensdrempels waarop een speciale aanval volgt, mv: de aanvallen die dan om de beurt komen
+// own: de klap alleen onder je eigen held tonen, gap: zoveel seconden rust tussen klap en regen, rg: tempo onder 30% levens (standaard 1.3), warn: waarschuwingstijd van de klap (standaard 1.1)
 // regen van inslagen: rb + rn per speler + xk cirkels (standaard 4 + 1 per speler), rr = straal van een cirkel (standaard 2.3)
 const BOSS={
- boss:{N:'De Kolos',hp:1900,sc:2.6,by:3.3,bw:3,big:1.3,th:[.75,.5],mv:['safe'],z0:32,z1:26,xk:0,rb:2,rn:.6,rr:2,ct:15,cr:1.5,stop:2.4,sp:2.5,cd:3.2,cd2:10},
+ boss:{N:'De Kolos',hp:1900,sc:2.6,by:3.3,bw:3,big:1.3,th:[.75,.5],mv:['safe'],z0:32,z1:26,xk:0,rb:2,rn:.6,rr:2,ct:15,cr:1.5,stop:2.4,sp:2.5,cd:3.2,cd2:10,own:1,gap:2.2,rg:1.15,warn:1.4},
  duel:{N:'De Kolos',hp:3400,sc:2.9,by:3.7,bw:3.2,big:1.4,th:[.7,.4],mv:['safe'],z0:44,z1:34,xk:2,ct:18,cr:1.6,stop:2.5,sp:2.9,cd:2.2,cd2:7},
  titan:{N:'De Titaan',hp:7000,sc:4.6,by:5.7,bw:5,big:2.3,th:[.9,.8,.7,.6,.5,.4,.3,.2,.1],mv:['safe','rings','beams'],z0:48,z1:38,xk:4,ct:22,cr:2.6,stop:3.3,sp:2.7,cd:2,cd2:6}};
 const TAU=6.2832;
@@ -988,7 +989,7 @@ function missionLead(a){let b=null;const rk=p=>+p.presence.t||0;for(const p of m
   if(!b)return null;return rk(b)<myT||(rk(b)===myT&&(!myPeer||b.peer<myPeer))?b:null;}
 // aanval: [volgnummer, soort, zaad]. Soort 0 is een klap onder de voeten van elke held, soort 1 een regen van inslagen over de hele arena.
 function bossAttack(a,ev){const seq=+ev[0],kind=+ev[1],B=a.B;if(!(seq>a.seen))return;a.seen=seq;a.g.atk=1;
-  if(kind===0){a.zones.push({x:hero.x,z:hero.z,r:3,t:1.1,T:1.1,dmg:B.z0});for(const o of rheroes.values())if(o.ar>0&&o.hp>0)a.zones.push({x:o.x,z:o.z,r:3,t:1.1,T:1.1,dmg:B.z0});}
+  if(kind===0){const w=B.warn||1.1;a.zones.push({x:hero.x,z:hero.z,r:3,t:w,T:w,dmg:B.z0});if(!B.own)for(const o of rheroes.values())if(o.ar>0&&o.hp>0)a.zones.push({x:o.x,z:o.z,r:3,t:w,T:w,dmg:B.z0});}
   else{const rnd=lcg(Math.max(1,Math.min(2147483646,ev[2]|0))),k=Math.min(18,(B.rb??4)+Math.ceil(a.n*(B.rn??1))+B.xk),rr=B.rr||2.3;for(let i=0;i<k;i++){const an=rnd()*6.283,d=Math.sqrt(rnd())*7.6,T=1.3+i*.13;a.zones.push({x:ACX+Math.cos(an)*d,z:ACZ+Math.sin(an)*d,r:rr,t:T,T,dmg:B.z1});}}}
 // Speciale aanvallen. De Kolos kent alleen de ultra-aanval; de Titaan wisselt er drie af, steeds een tikje zwaarder.
 //  safe  ultra-aanval: alleen op een groene plek overleef je de klap
@@ -1024,7 +1025,7 @@ function updBoss(a,dt){const g=a.g,h=hero,B=a.B,L=missionLead(a);let sum=myBh;fo
       if(u.kind==='safe'){if(gl3){fxBall(V(ACX,.6,ACZ),'#ff5a20',.6,9.2,.6,.9);fxRing(V(ACX,0,ACZ),'#ffd9a0',9.2,.5);}
         if(!u.safe.some(o=>Math.hypot(h.x-o.x,h.z-o.z)<=o.r)){h.hp=0;a.sc=true;}}} // a.sc: hiertegen helpt Tweede kans niet
     return;}
-  const rage=g.hp<a.max*.3?1.3:1; // onder de 30% wordt hij sneller
+  const rage=g.hp<a.max*.3?B.rg||1.3:1; // onder de 30% wordt hij sneller
   if(L){const bp=L.presence.bp;if(Array.isArray(bp)&&isFinite(+bp[0])&&isFinite(+bp[1])){g.tx=+bp[0];g.tz=+bp[1];g.a=+bp[2]||0;}
     const k=Math.min(1,dt*8),dx=g.tx-g.x,dz=g.tz-g.z;if(Math.hypot(dx,dz)>.05)g.walk+=dt*6;g.x+=dx*k;g.z+=dz*k;
     const ba=L.presence.ba;if(Array.isArray(ba))bossAttack(a,ba);}
@@ -1032,8 +1033,8 @@ function updBoss(a,dt){const g=a.g,h=hero,B=a.B,L=missionLead(a);let sum=myBh;fo
     let tg=hs[0],bd=1e9;for(const o of hs){const d=Math.hypot(o.x-g.x,o.z-g.z);if(d<bd){bd=d;tg=o;}}
     g.a=Math.atan2(tg.z-g.z,tg.x-g.x); // de baas blijft in het midden staan en draait alleen naar de dichtstbijzijnde held
     g.cd-=dt*rage;g.cd2-=dt*rage;
-    if(g.cd<=0){g.cd=B.cd;g.last=[a.seen+1,0,0];bossAttack(a,g.last);}
-    else if(g.cd2<=0){g.cd2=B.cd2/(1+.12*(a.n-1));g.last=[a.seen+1,1,1+Math.floor(Math.random()*1e9)];bossAttack(a,g.last);}}
+    if(g.cd<=0){g.cd=B.cd;g.last=[a.seen+1,0,0];bossAttack(a,g.last);if(B.gap)g.cd2=Math.max(g.cd2,B.gap);}
+    else if(g.cd2<=0){g.cd2=B.cd2/(1+.12*(a.n-1));g.last=[a.seen+1,1,1+Math.floor(Math.random()*1e9)];bossAttack(a,g.last);if(B.gap)g.cd=Math.max(g.cd,B.gap+1.4);}} // gap: klap en regen nooit door elkaar
   stepZones(a,dt);
   g.ct-=dt;if(g.ct<=0&&Math.hypot(h.x-g.x,h.z-g.z)<B.cr){g.ct=.9;hurt(B.ct);if(gl3)fxRing(V(h.x,0,h.z),'#ff6a4e',1,.25);}}
 function stepZones(a,dt){const h=hero;for(let i=a.zones.length-1;i>=0;i--){const z=a.zones[i];z.t-=dt;if(z.t>0)continue;a.zones.splice(i,1);
@@ -1519,7 +1520,7 @@ function fightSpot(m,keep){const h=hero,R=reachNow(),d=Math.hypot(h.x-m.x,h.z-m.
 // loopt een groepje al een stuk om de baas heen, zodat de cirkels achter hen vallen en ze binnen bereik blijven. De traagste van het groepje
 // bepaalt waar het heen gaat, de rest loopt mee. Komt de klap toch onverwacht, dan rest alleen wegrennen (fleeZones).
 // PACK is wat de bots van elkaar weten: wie bij welk groepje hoort, waar elk groepje staat (an) en wanneer de volgende klap komt (pred).
-function goalBoss(ai){const a=arena,h=hero,g=a.g,B=a.B,u=a.ult,hx=h.x-ACX,hz=h.z-ACZ,hd=Math.hypot(hx,hz),m=ai.m,rage=g.hp<a.max*.3?1.3:1;
+function goalBoss(ai){const a=arena,h=hero,g=a.g,B=a.B,u=a.ult,hx=h.x-ACX,hz=h.z-ACZ,hd=Math.hypot(hx,hz),m=ai.m,rage=g.hp<a.max*.3?B.rg||1.3:1;
   if(PACK.a!==a.r+a.kind){const an=Math.random()*TAU;PACK={a:a.r+a.kind,dir:1,pred:3,cyc:0,slam:-9,of:new Map(),g:[{an,until:0},{an:an+Math.PI,until:0}]}; // de eerste klap komt na drie seconden
     bots.forEach((b,i)=>PACK.of.set(b.peer,i%2));}
   if(u){const el=u.T-u.t;if(m.u!==u){m.u=u;m.ud=ai.react+.15+Math.random()*.6;}
