@@ -167,20 +167,19 @@ Het spel is alleen bereikbaar zolang je computer aanstaat en niet slaapt. Zet he
 
 ### Via een Cloudflare Tunnel, op ermetd.terpstack.dev
 
-`docker-compose.cloudflare.yml` zet `cloudflared` naast het spel. Die maakt zelf een verbinding naar Cloudflare, dus je hoeft geen poorten in je router open te zetten en je IP-adres maakt niet uit. Cloudflare regelt HTTPS en stuurt ook de lobby-WebSocket door. De instellingen staan in [`cloudflared/config.yml`](cloudflared/config.yml): de tunnel heet `ermetd` en `ermetd.terpstack.dev` gaat naar het spel.
+`docker-compose.cloudflare.yml` zet `cloudflared` naast het spel. Die maakt zelf een verbinding naar Cloudflare, dus je hoeft geen poorten in je router open te zetten en je IP-adres maakt niet uit. Cloudflare regelt HTTPS en stuurt ook de lobby-WebSocket door. De instellingen staan in [`cloudflared/config.yml`](cloudflared/config.yml): de tunnel `0d1f68e1-7d00-4a37-a7f6-d39c4bb9cc20` stuurt `ermetd.terpstack.dev` naar het spel.
 
 Voorwaarde: het domein `terpstack.dev` staat in je Cloudflare-account.
 
-1. **cloudflared installeren** (eenmalig, om de tunnel aan te maken). Op Windows: `winget install --id Cloudflare.cloudflared`. Open daarna een nieuw terminalvenster.
-2. **Tunnel aanmaken.**
+1. **cloudflared installeren** (eenmalig, om de tunnel te koppelen). Op Windows: `winget install --id Cloudflare.cloudflared`. Open daarna een nieuw terminalvenster.
+2. **Tunnel koppelen.**
 
    ```bash
-   cloudflared tunnel login                                  # kies terpstack.dev in de browser
-   cloudflared tunnel create ermetd                          # maakt de sleutel <tunnel-id>.json
-   cloudflared tunnel route dns ermetd ermetd.terpstack.dev  # zet het DNS-record bij Cloudflare
+   cloudflared tunnel login                                    # kies terpstack.dev in de browser
+   cloudflared tunnel route dns 0d1f68e1-7d00-4a37-a7f6-d39c4bb9cc20 ermetd.terpstack.dev
    ```
 
-   De sleutel staat daarna in `%USERPROFILE%\.cloudflared\` (Windows) of `~/.cloudflared/` (Mac, Linux). Kopieer `<tunnel-id>.json` naar de map `cloudflared/` van dit project en noem hem `credentials.json`. Hij komt niet in git.
+   De tunnel bestaat al (ID `0d1f68e1-7d00-4a37-a7f6-d39c4bb9cc20`). De tweede regel zet het DNS-record bij Cloudflare; staat dat er al, dan kun je hem overslaan. De sleutel van de tunnel staat in `%USERPROFILE%\.cloudflared\0d1f68e1-7d00-4a37-a7f6-d39c4bb9cc20.json` (Windows) of `~/.cloudflared/` (Mac, Linux). Kopieer dat bestand naar de map `cloudflared/` van dit project en noem het `credentials.json`. Het komt niet in git. Maak je ooit een nieuwe tunnel (`cloudflared tunnel create`), zet dan zijn ID in `cloudflared/config.yml`.
 3. **Instellingen.** `cp .env.example .env` en vul `ADMIN_PASSWORD` in. `DOMAIN` is hier niet nodig.
 4. **Starten.** Stop eerst een andere versie die draait (`docker compose down` of `docker compose -f docker-compose.online.yml down`; de database blijft bewaard) en start dan:
 
