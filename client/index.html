@@ -79,6 +79,11 @@
         <form id="chatForm" autocomplete="off"><input id="chatIn" type="text" maxlength="160" placeholder="Typ een bericht…" aria-label="Bericht aan de lobby" enterkeyhint="send"><button id="chatSend" type="submit">Stuur</button></form>
       </div>
       <div class="deploy">
+        <div class="mappick">
+          <span class="label" id="mapL">Map</span>
+          <button type="button" class="mapnow" id="mapBtn" aria-haspopup="dialog" aria-labelledby="mapL mapName"><canvas id="mapCv" width="104" height="104" aria-hidden="true"></canvas><span class="mt"><b id="mapName">Klassiek</b><small id="mapKind"></small></span><em id="mapAct">Kiezen</em></button>
+          <p id="mapNote"></p>
+        </div>
         <div class="diffpick">
           <span class="label" id="diffL">Moeilijkheidsgraad</span>
           <div class="diff" id="diff" role="group" aria-labelledby="diffL"></div>
@@ -133,6 +138,18 @@
       </div>
     </dialog>
 
+    <dialog class="pop" id="popMap" aria-labelledby="popMapT">
+      <div class="pop-in plate">
+        <div class="pop-head"><h2 id="popMapT">Kies een map</h2><button class="pop-x" type="button" aria-label="Sluiten">×</button></div>
+        <div class="pop-body">
+          <div class="tab">
+            <p class="lead" id="mapLead"></p>
+            <ul class="maplist" id="mapList"></ul>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
     <dialog class="pop" id="popMini" aria-labelledby="popMiniT">
       <div class="pop-in plate">
         <div class="pop-head"><h2 id="popMiniT">Minigames uitproberen</h2><button class="pop-x" type="button" aria-label="Sluiten">×</button></div>
@@ -162,6 +179,7 @@
           <div><h3>Lopen</h3><p>Je bestuurt je held in third-person. WASD loopt, slepen met de muis draait de camera, scrollen zoomt. Op een telefoon stuur je met de duimknuppel links. Via de bruggen loop je naar andere vestingen.</p></div>
           <div><h3>Vechten</h3><p>Je held valt automatisch de dichtstbijzijnde vijand binnen bereik aan. Hoe dat gaat hangt af van de held: van katana en hamer tot scherpschuttersgeweer.</p></div>
           <div><h3>Weg</h3><p>Elk potje begint met een bouwfase van <span id="prepTxt">5 minuten</span>. Kies Weg op de commandokaart en sleep een pad van de linkerpoort naar de rechterpoort. Weg is gratis. Ligt er geen doorlopende weg, dan steekt de vijand recht het gras over.</p></div>
+          <div><h3>Maps</h3><p>Speler 1 kiest in de lobby de map; iedereen in het potje speelt dezelfde. Klassiek is het spel zoals altijd, met minigames. Op Estafette loopt wat jij doorlaat verder door de vesting rechts van je. Op Wintermaul zakt de vijand van boven naar beneden door alle vestingen in een kolom en delen jullie één levenspot. Op Groene Cirkel blijft de vijand rondjes lopen tot hij dood is. Op Doolhofbouwer bouw je het doolhof zelf met je torens. Op de andere maps dan Klassiek zijn er voorlopig geen minigames.</p></div>
           <div><h3>Samen</h3><p>Na de bouwfase begint het spel voor iedereen tegelijk. Speler 1 kiest de snelheid voor het hele potje. Een nieuwe ronde begint pas als iedereen de vorige heeft afgeslagen.</p></div>
           <div><h3>Moeilijkheid</h3><p>Voor de start kies je zelf uit drie moeilijkheidsgraden; de keuze geldt alleen voor jou. Geers is de gewone strijd. Op Super Geers zijn de vijanden taaier en sneller en telt alles wat je scoort ×1,25. Op Alleen voor Geers is het nog zwaarder en telt je score ×1,75.</p></div>
           <div><h3>Bots</h3><p>Start je alleen, dan doen acht bots mee. Elke bot kiest een andere held dan jij en heeft dezelfde talenten als jij. Ze volgen dezelfde spelregels als jij: ze leggen hun eigen weg, lopen naar een vak om te bouwen, krijgen dezelfde klappen en spelen elke minigame echt mee, samen tegen de bazen en tegen jou in de wedstrijden. De ene bot is beter dan de andere, en ze maken fouten. Jij blijft speler 1. Doet er een tweede mens mee, dan zijn er geen bots.</p></div>
