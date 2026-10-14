@@ -56,6 +56,19 @@ Voor de start kiest elke speler zelf een moeilijkheidsgraad; die geldt alleen vo
 | Alleen voor Geers | 85% meer levens, 12% sneller | +50% | ×1,75 |
 
 De waarden staan in `DIFF` bovenin `client/js/engine.js`.
+
+### Hoe zwaar de levels worden
+
+De levens van de vijanden groeien elk level. Daarbovenop komt een extra zwaarte:
+
+| Level | Extra levens bij de vijanden |
+| --- | --- |
+| 1 tot 10 | geen |
+| 11 tot 19 | loopt op van 0 naar 15% |
+| 20 tot 30 | 15% |
+| vanaf 31 | elk level 1,5% erbij (level 40 +33%, level 50 +55%, level 70 ×2,1, level 100 ×3,3) |
+
+Dit staat in `B` bovenin `client/js/engine.js`: `midX` (de 15%), `rampFrom` (level 30) en `ramp` (de 1,5% per level). Het geldt voor elke moeilijkheidsgraad en komt bovenop de levens-instelling in de webadmin.
 ## Torens: de keten
 
 Elke toren doorloopt dezelfde keten, en die leidt naar De Slapende Geers.

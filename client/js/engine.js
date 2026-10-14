@@ -4,7 +4,11 @@ let PREP=300; // bouwtijd in seconden; instelbaar via de webadmin (zie tune)
 // Balans: alles wat de moeilijkheid bepaalt staat hier. startGold, lives, hpX en goldX zijn instelbaar via de webadmin (zie tune).
 // Honderd rondes: de curve van vijftig is uitgerekt. Ronde 2r is nu ongeveer zo zwaar als ronde r was, en twee rondes leveren samen op wat één ronde opleverde.
 const B={hp0:14,lin:.06,g:1.063,g2:1.0296,late:80,gold0:2.5,goldLin:.035,startGold:260,lives:20,hpX:1,goldX:1,
-  bonA:12,bonB:4};
+  bonA:12,bonB:4,
+  // Extra zwaarte bovenop de curve: level 1-10 ongewijzigd, daarna loopt het op tot midX op level 20 (tot en met 30 gelijk),
+  // en vanaf level 31 komt er elk level ramp bij (samengesteld).
+  midX:1.15,rampFrom:30,ramp:.015};
+const tough=r=>r<=10?1:r<20?1+(B.midX-1)*(r-10)/10:B.midX*(r>B.rampFrom?Math.pow(1+B.ramp,r-B.rampFrom):1);
 // Moeilijkheidsgraden: elke speler kiest er zelf een voor het potje begint. hp en sp maken de vijanden in jouw vesting taaier en sneller,
 // hurt is de extra schade die je held in minigames krijgt, score de vermenigvuldiger op alles wat je scoort.
 const DIFF=[{id:'geers',n:'Geers',d:'De gewone strijd.',score:1,hp:1,sp:1,hurt:1},
@@ -155,7 +159,7 @@ function skillState(sk,s){const rank=sk[s.id]|0,q=s.req&&SKILLS.find(x=>x.id===s
   return{rank,lock:skillSpent(sk,s.tree)<TIER*s.t?'tier':q&&(sk[q.id]|0)<q.max?'req':null,q};}
 // Skillpunten voor het halen van ronde r: 1 per 20 levels, 1 per miniboss (elke tiende ronde) en 3 zodra je daarmee level 100 bereikt.
 const pointsFor=r=>(r%20===0?1:0)+(r%10===0?1:0)+(r===99?3:0);
-const hpMul=r=>B.hpX*B.hp0*(1+B.lin*r)*Math.pow(B.g,r)*(r>B.late?Math.pow(B.g2,r-B.late):1);
+const hpMul=r=>B.hpX*B.hp0*(1+B.lin*r)*Math.pow(B.g,r)*(r>B.late?Math.pow(B.g2,r-B.late):1)*tough(r);
 
 function create(skills,diff){const m=mods(skills),di=diffIdx(diff);
   return{m,diff:di,D:DIFF[di],gold:B.startGold+m.start,lives:B.lives+m.lives,round:1,cleared:0,phase:'prep',timer:PREP,wt:0,q:[],road:new Set(),trail:new Set(),path:null,rv:0,pv:null,pvk:-1,
