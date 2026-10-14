@@ -15,11 +15,7 @@ npm start
 
 Open daarna <http://localhost:3000>. Open het adres in een tweede venster om met twee spelers te testen. Start je alleen, dan doen acht bots mee.
 
-Met Docker kan het ook:
-
-```bash
-docker compose up -d --build
-```
+Met Docker draait het spel samen met een Cloudflare Tunnel, zodat het ook online staat. Zie [Online zetten met een Cloudflare Tunnel](#online-zetten-met-een-cloudflare-tunnel).
 
 ## Opbouw
 
@@ -145,6 +141,36 @@ Het spel kan op elke host draaien die een Node.js-server of een Docker-container
 De overige instellingen staan in [`server/.env.example`](server/.env.example).
 
 Staat de frontend ergens anders dan de server, vul dan het adres van de server in bij `client/js/config.js` en zet het adres van de frontend op de server in `CORS_ORIGINS`.
+
+### Online zetten met een Cloudflare Tunnel
+
+`docker-compose.yml` start twee containers: het spel en `cloudflared`. Die laatste maakt zelf een verbinding naar Cloudflare, dus je hoeft geen poorten in je router open te zetten en je IP-adres maakt niet uit. Alles draait in Docker; op de computer zelf hoef je niets anders te installeren. Cloudflare regelt HTTPS en stuurt ook de lobby-WebSocket door.
+
+Voorwaarde: het domein `terpstack.dev` staat in je Cloudflare-account.
+
+1. **Tunnel maken.** Ga in het Cloudflare-dashboard naar **Zero Trust → Networks → Tunnels** en kies **Create a tunnel → Cloudflared**. Noem hem `ermetd`. Kies bij de installatie **Docker** en kopieer de lange tekst achter `--token`. Dat commando zelf hoef je niet uit te voeren.
+2. **Adres koppelen.** Voeg bij de tunnel een **Public Hostname** toe:
+
+   | Veld | Waarde |
+   |---|---|
+   | Subdomain | `ermetd` |
+   | Domain | `terpstack.dev` |
+   | Service type | `HTTP` |
+   | URL | `spel:3000` |
+
+   Staat er al een DNS-record `ermetd` (bijvoorbeeld van een eerdere tunnel), verwijder dat dan eerst onder **DNS → Records**.
+3. **Instellingen.** `cp .env.example .env` en vul `TUNNEL_TOKEN` (de tekst uit stap 1) en `ADMIN_PASSWORD` in.
+4. **Starten.**
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+   Na een paar seconden staat het spel op <https://ermetd.terpstack.dev>, en op de computer zelf op <http://localhost:3000>. In het dashboard staat de tunnel dan op **Healthy**. Werkt het niet: `docker compose logs tunnel`.
+
+De database staat in het Docker-volume `speldata` en blijft bewaard bij `docker compose down` en bij een update. Een update: `git pull` en dan weer `docker compose up -d --build`.
+
+Het spel is alleen bereikbaar zolang de computer aanstaat en niet slaapt. Zet het startgoud in de webadmin op 260 voordat anderen meespelen.
 
 ## Ontwikkelen
 
