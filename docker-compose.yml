@@ -6,7 +6,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Staat er een proxy (Caddy, nginx, een hostingplatform) voor? Zet dit dan op 1.
+      # Staat er een proxy (bijvoorbeeld nginx of een hostingplatform) voor? Zet dit dan op 1.
       TRUST_PROXY: "0"
       # Wachtwoord van de webadmin op /admin (minstens 10 tekens). Leeg = webadmin uit.
       ADMIN_PASSWORD: ""

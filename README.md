@@ -146,51 +146,6 @@ De overige instellingen staan in [`server/.env.example`](server/.env.example).
 
 Staat de frontend ergens anders dan de server, vul dan het adres van de server in bij `client/js/config.js` en zet het adres van de frontend op de server in `CORS_ORIGINS`.
 
-### Vanaf je eigen computer, op ermetd.harrevelt.nl
-
-`docker-compose.online.yml` zet [Caddy](https://caddyserver.com) voor het spel. Caddy vraagt zelf een certificaat aan bij Let's Encrypt, vernieuwt het op tijd en stuurt ook de lobby-WebSocket door. Het spel zelf is dan niet meer rechtstreeks bereikbaar, alleen via Caddy.
-
-1. **DNS.** Maak bij de DNS van harrevelt.nl een A-record `ermetd` dat naar je publieke IP-adres wijst (te zien op whatismyip.com). Verandert dat adres soms, gebruik dan dynamische DNS.
-2. **Router.** Stuur TCP-poort 80 en 443 (en UDP 443 voor HTTP/3) door naar je computer. Geef die computer een vast IP-adres in je router. Poort 80 is nodig voor Let's Encrypt.
-3. **Instellingen.** `cp .env.example .env` en vul `ADMIN_PASSWORD` in.
-4. **Starten.** Stop eerst de lokale versie (`docker compose down`, de database blijft bewaard) en start dan:
-
-   ```bash
-   docker compose -f docker-compose.online.yml up -d --build
-   ```
-
-   Na ongeveer een minuut staat het spel op <https://ermetd.harrevelt.nl>. Gaat er iets mis met het certificaat: `docker compose -f docker-compose.online.yml logs caddy`.
-
-Krijg je de poorten niet open (komt je IP-adres in de router niet overeen met whatismyip.com, dan zit je achter CGNAT), gebruik dan de Cloudflare Tunnel hieronder.
-
-Het spel is alleen bereikbaar zolang je computer aanstaat en niet slaapt. Zet het startgoud in de webadmin op 260 voordat anderen meespelen.
-
-### Via een Cloudflare Tunnel, op ermetd.terpstack.dev
-
-`docker-compose.cloudflare.yml` zet `cloudflared` naast het spel. Die maakt zelf een verbinding naar Cloudflare, dus je hoeft geen poorten in je router open te zetten en je IP-adres maakt niet uit. Cloudflare regelt HTTPS en stuurt ook de lobby-WebSocket door. De instellingen staan in [`cloudflared/config.yml`](cloudflared/config.yml): de tunnel `0d1f68e1-7d00-4a37-a7f6-d39c4bb9cc20` stuurt `ermetd.terpstack.dev` naar het spel.
-
-Voorwaarde: het domein `terpstack.dev` staat in je Cloudflare-account.
-
-1. **cloudflared installeren** (eenmalig, om de tunnel te koppelen). Op Windows: `winget install --id Cloudflare.cloudflared`. Open daarna een nieuw terminalvenster.
-2. **Tunnel koppelen.**
-
-   ```bash
-   cloudflared tunnel login                                    # kies terpstack.dev in de browser
-   cloudflared tunnel route dns 0d1f68e1-7d00-4a37-a7f6-d39c4bb9cc20 ermetd.terpstack.dev
-   ```
-
-   De tunnel bestaat al (ID `0d1f68e1-7d00-4a37-a7f6-d39c4bb9cc20`). De tweede regel zet het DNS-record bij Cloudflare; staat dat er al, dan kun je hem overslaan. De sleutel van de tunnel staat in `%USERPROFILE%\.cloudflared\0d1f68e1-7d00-4a37-a7f6-d39c4bb9cc20.json` (Windows) of `~/.cloudflared/` (Mac, Linux). Kopieer dat bestand naar de map `cloudflared/` van dit project en noem het `credentials.json`. Het komt niet in git. Maak je ooit een nieuwe tunnel (`cloudflared tunnel create`), zet dan zijn ID in `cloudflared/config.yml`.
-3. **Instellingen.** `cp .env.example .env` en vul `ADMIN_PASSWORD` in. `DOMAIN` is hier niet nodig.
-4. **Starten.** Stop eerst een andere versie die draait (`docker compose down` of `docker compose -f docker-compose.online.yml down`; de database blijft bewaard) en start dan:
-
-   ```bash
-   docker compose -f docker-compose.cloudflare.yml up -d --build
-   ```
-
-   Na een paar seconden staat het spel op <https://ermetd.terpstack.dev>. Werkt het niet: `docker compose -f docker-compose.cloudflare.yml logs cloudflared`.
-
-Zet in het Cloudflare-dashboard onder **Network** ook **WebSockets** aan, als dat nog uit staat; anders werkt de lobby niet.
-
 ## Ontwikkelen
 
 ```bash

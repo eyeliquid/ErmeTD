@@ -3,7 +3,3 @@ node_modules/
 *.log
 server/data/
 .env
-
-# sleutels van de Cloudflare Tunnel
-cloudflared/*.json
-cloudflared/cert.pem
