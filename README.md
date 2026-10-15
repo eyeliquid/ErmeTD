@@ -31,6 +31,7 @@ client/                 frontend: gewone bestanden, geen bouwstap
     skills.js           de twee talentbomen
     heroes.js           de zes helden en het harnas
     maps.js             maps: ingang, uitgang, weg, doolhof, ring, doorgeven
+    forts.js            burchten: muren, torens, poorten, hoofdkwartier, fabriek, lantaarns, bruggen
     themes.js           hoe elke map eruitziet en klinkt: licht, grond, decor, vijanden, muziek
   js/engine.js          spelregels: rekent met de data (draait ook op de server)
   js/textures.js        alle texturen, procedureel getekend
@@ -88,11 +89,23 @@ Op alle maps behalve Klassiek zijn er voorlopig geen minigames: na golf 100 heb 
 
 | Map | Thema | Wat je ziet en hoort |
 | --- | --- | --- |
-| Klassiek | Rood Alarm | De oorspronkelijke schemering: blauw licht, stenen wegen, vuren. |
+| Klassiek | Rood Alarm | De oorspronkelijke schemering: blauw licht, stenen wegen, vuren en de stenen burcht. |
 | Estafette | Grand Prix | Zon, gemaaid gras in banen, asfalt met rood-witte stoepranden, bandenstapels, lichtmasten en startlichten. De vijanden rijden: karts, racemotoren, opleggers, monstertrucks, tankwagens en een reclamezeppelin. Snelle, stuwende muziek. |
 | Wintermaul | Bevroren Noorden | Sneeuw op de grond en de muren, ijspegels, een bevroren zee en vallende sneeuw. Sneeuwsoldaten, husky's, sneeuwrupsen, ijskristallen en een yeti. Trage muziek met klokjes. |
 | Groene Cirkel | Neon Nexus | Een ruimtestation: metalen vloer met een lichtgevend raster, een groene ring van licht, neonstrips, zwevende lichtjes en een zee van niets. Droids, zweeftanks en een moederschip. Elektronische muziek met een arpeggio. |
 | Doolhofbouwer | Koningsdoolhof | Een warme avond: bloemenweide, keien, zandsteen, banieren, schilden en een poort met een valhek, opstijgende vonken. Voetknechten, wolven, een stormram, raven en een draak. Getokkelde muziek met een bourdon. |
+
+Elk thema heeft ook een eigen burcht (`client/js/data/forts.js`):
+
+| Burcht | Thema | Muren en torens | Poorten | Hoofdkwartier en fabriek |
+| --- | --- | --- | --- | --- |
+| Stenen burcht | Rood Alarm | De oorspronkelijke vesting. | | |
+| Pitstraat | Grand Prix | Betonnen vangrails met een rood-witte rand en een vanghek, bandenstapels met lichtmasten. | Een startportaal met vijf rode lampen waar de vijand binnenkomt, een geblokt finishportaal waar hij weggaat, sponsorportalen bij de bruggen. | Een racetoren met glas en een geblokt bord; een pitgarage met roldeur en uitlaten. |
+| IJsburcht | Bevroren Noorden | Muren van ijsblokken met sneeuw en ijspegels, ronde ijstorens met een sneeuwkoepel en een kristal. | Een ijsboog met een kristal (in), een houten poort met lantaarns (uit). | Een blokhut met besneeuwd dak en een sneeuwpop; een ijsgrot met blauw vuur. |
+| Ruimtestation | Neon Nexus | Metalen schotten met neonstrips, zeshoekige pylonen met zwevende lichtringen. | Krachtvelden: roze (in), groen (uit), blauw (brug). | Een commandokoepel op een landingsplatform in je eigen kleur; een roze portaal. |
+| Ridderburcht | Koningsdoolhof | Hoge zandstenen muren met kantelen, schietgaten en schilden, vierkante torens met wimpels. | Poortgebouwen met een valhek en fakkels; rode banieren (in), blauwe (uit). | Een donjon met kantelen; een legerkamp met tenten, een palissade en vuur. |
+
+De poorten laten zo ook zien waar de vijand binnenkomt en weggaat. `buildFort` in `client/js/game.js` zet de stukken van een burcht op hun plek; een burcht wordt pas gebouwd als hij voor het eerst nodig is.
 
 Een thema verandert niets aan de spelregels: een Kart is een Conscript met een ander jasje. Kleuren, licht, grond, weg, zee, decor, de namen en modellen van de vijanden, de muziekstijl en de accentkleur van de knoppen staan per thema in `client/js/data/themes.js`. `applyTheme` in `client/js/game.js` zet ze bij de start van een potje. Het decor staat op de muren en de pieren, nooit op het speelveld.
 

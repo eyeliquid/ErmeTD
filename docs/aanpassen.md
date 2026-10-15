@@ -21,6 +21,7 @@ npm test
 | een held aanpassen | `data/heroes.js` |
 | hoe de vijand door een vesting loopt | `data/maps.js` |
 | hoe een map eruitziet en klinkt | `data/themes.js` |
+| hoe de burcht van een vesting eruitziet | `data/forts.js` |
 
 ## Een vijand aanpassen
 
@@ -66,10 +67,22 @@ Een thema staat in `data/themes.js`. Je hoeft alleen te noemen wat anders is dan
 - **Muren:** `wall.tint` kleurt de stenen; met `wall.metal: 1` worden het stalen platen.
 - **Lampen en vuren:** `lamp` en `fire`.
 - **In de lucht:** `particles` met `kind` sneeuw, lichtjes (`motes`) of vonken (`sparks`).
-- **Decor:** `decor.solid` en `decor.glow` zijn modellen met dezelfde bouwstenen als de vijanden, in de maten van één vesting. De muur ligt op -0,53 en 13,53; zet niets op het speelveld zelf (0 tot 13), daar bouwen de spelers.
+- **Burcht:** `fort` kiest de burcht uit `data/forts.js`. Zie hieronder.
 - **Vijanden:** per vijand een andere naam (`n`), andere kleuren (`paint: {'#oude kleur': '#nieuwe kleur'}`) of een heel ander model (`model`). De getallen blijven die uit `enemies.js`.
 - **Muziek:** `music` kiest een stijl uit `STYLES` in `music.js`. Daar kun je ook een eigen stijl maken: akkoorden, melodie, tempo en welke lagen meespelen.
 - **Knoppen:** `ui.accent` en `ui.trim` kleuren de knoppen en randen tijdens het spel.
+
+## Een burcht maken of aanpassen
+
+Een burcht in `data/forts.js` bestaat uit stukken: `base` (het eiland en de pieren), `wall`, `corner`, `gate`, `hq`, `factory`, `lamp` en `bridge`. Elk stuk is een lijstje bouwstenen, dezelfde als bij de vijanden. Je tekent elk stuk maar één keer; het spel zet het op alle plekken neer en draait het mee.
+
+- **Muur:** `wall(k, L)` tekent een stuk muur van `L` lang, langs x van -L/2 tot L/2. Buiten is -z. Steek niet verder dan 0,5 naar binnen (+z), anders staat de muur op het speelveld; de test controleert dat.
+- **Poort:** `gate(k, role)` krijgt `'in'`, `'out'` of `'side'`, zodat je kunt laten zien waar de vijand binnenkomt en weggaat. Houd het midden (x -0,8 tot 0,8, tot 1,5 hoog) vrij: daar lopen de helden over de brug.
+- **Hoofdkwartier en fabriek:** in hun eigen maten, met 0,0 in het midden van de pier. De voorkant van het hoofdkwartier is -x, die van de fabriek +x. `band` en `flag` zeggen waar de kleur van de speler komt.
+- **Licht en vuur:** `k.lit.box(…)` en de andere `k.lit`-stenen geven zelf licht (ramen, neon, kristallen). `k.light(x, y, z, kleur, grootte)` is een gloed, `k.fire(x, y, z, grootte)` een vuur met rook in de vuurkleur van het thema. Vuur is zwaar: gebruik er per burcht maar een paar.
+- **Materiaal:** `mat` is `'stone'` (metselwerk), `'metal'` (platen) of `'plain'` (glad, voor beton, ijs en hout).
+
+Een nieuwe burcht: kopieer er een, geef hem een nieuwe sleutel en zet die bij een thema in `data/themes.js` als `fort`.
 
 ## Testen in de browser
 
@@ -80,3 +93,4 @@ Open het spel met `#dev` achter het adres, bijvoorbeeld <http://localhost:3000/#
 - `__ratd.g()`: je eigen spel, met goud, levens en vijanden.
 - `__ratd.fields()`: alle vestingen in het potje, met hun levens.
 - `__ratd.E.inject(__ratd.g(), 'tank', 1)`: een vijand in je vesting zetten, bijvoorbeeld om te kijken hoe hij eruitziet.
+- `__ratd.view(15, 9, 11, -.6)`: de camera los op een plek in je vesting zetten (x, z, afstand, draaiing), bijvoorbeeld om de burcht te bekijken.

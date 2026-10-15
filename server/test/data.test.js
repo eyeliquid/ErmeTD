@@ -4,7 +4,7 @@
 // Draai hem met `npm test`.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const D = ['balance', 'towers', 'enemies', 'skills', 'heroes', 'maps', 'themes']
+const D = ['balance', 'towers', 'enemies', 'skills', 'heroes', 'maps', 'forts', 'themes']
   .reduce((o, f) => Object.assign(o, require('../../client/js/data/' + f + '.js')), {});
 const E = require('../../client/js/engine.js');
 
@@ -15,7 +15,12 @@ const num = v => typeof v === 'number' && Number.isFinite(v);
 function fakeKit() {
   const used = [];
   const part = name => (...a) => { used.push({ name, col: a.find(x => typeof x === 'string') }); return name; };
-  return { used, kit: { box: part('box'), ball: part('ball'), rod: part('rod'), cyl: part('cyl'), cone: part('cone'), gem: part('gem'), ring: part('ring') } };
+  const names = ['box', 'ball', 'rod', 'cyl', 'cone', 'gem', 'ring'], kit = {}, lit = {};
+  for (const n of names) { kit[n] = part(n); lit[n] = part(n); }
+  kit.lit = lit;
+  kit.light = (x, y, z, col, size) => { used.push({ name: 'light', col: col || '#ffffff', pos: [x, y, z] }); return 'light'; };
+  kit.fire = (x, y, z, size) => { used.push({ name: 'fire', col: '#ffffff', pos: [x, y, z] }); return 'fire'; };
+  return { used, kit };
 }
 
 test('vijanden: alle velden kloppen en elke vijand heeft een eigen letter', () => {
@@ -100,10 +105,35 @@ test('thema\'s: kleuren zijn geldig, vijanden bestaan en modellen geven onderdel
       if (o.paint) for (const [a, b] of Object.entries(o.paint)) assert.ok(hex(a) && hex(b), `${id}.${en}: paint ${a} → ${b}`);
       if (o.model) { const { kit } = fakeKit(); assert.ok(o.model(kit).length, `${id}.${en}: model`); }
     }
-    if (t.decor) {
-      const { kit } = fakeKit();
-      if (t.decor.solid) assert.ok(t.decor.solid(kit).length, id + ': decor');
-      if (t.decor.glow) assert.ok(hex(t.decor.glow.color) && t.decor.glow.parts(kit).length, id + ': lichtend decor');
+    if (t.fort != null) assert.ok(D.FORTS[t.fort], `${id}: burcht ${t.fort} bestaat niet in data/forts.js`);
+  }
+});
+
+test('burchten: elk stuk bestaat, geeft onderdelen met geldige kleuren en blijft van het speelveld af', () => {
+  const pieces = ['base', 'wall', 'corner', 'gate', 'hq', 'factory', 'lamp', 'bridge'];
+  for (const [id, F] of Object.entries(D.FORTS)) {
+    assert.ok(F.n, id + ': naam');
+    assert.ok(['stone', 'metal', 'plain'].includes(F.mat), id + ': mat is stone, metal of plain');
+    if (F.band) assert.ok(F.band.length === 4 && F.band.every(num), id + ': band = [breed, hoog, diep, hoogte]');
+    for (const p of pieces) {
+      assert.equal(typeof F[p], 'function', `${id}: stuk ${p} ontbreekt`);
+      const runs = p === 'gate' ? ['in', 'out', 'side'] : p === 'wall' || p === 'bridge' ? [6.3] : [undefined];
+      for (const arg of runs) {
+        const { kit, used } = fakeKit();
+        const parts = [F[p](kit, arg)].flat(4);
+        assert.ok(parts.length, `${id}.${p}: geeft onderdelen`);
+        for (const u of used) assert.ok(hex(u.col), `${id}.${p}: kleur ${u.col} is een #rrggbb-kleur`);
+      }
+    }
+    // een muur en een poort mogen niet verder dan 0,5 naar binnen (+z) steken, anders staan ze op het speelveld
+    for (const [p, arg] of [['wall', 6.3], ['gate', 'in'], ['gate', 'out'], ['gate', 'side']]) {
+      const inner = [];
+      const k = {}, lit = {}, at = (col, z, d) => inner.push(z + (d || 0) / 2);
+      k.box = lit.box = (w, h, d, col, x, y, z) => at(col, z, d);
+      for (const n of ['ball', 'rod', 'cyl', 'cone', 'gem', 'ring']) k[n] = lit[n] = () => {};
+      k.lit = lit; k.light = () => {}; k.fire = () => {};
+      F[p](k, arg);
+      assert.ok(Math.max(...inner) <= .5, `${id}.${p}(${arg}): steekt ${Math.max(...inner).toFixed(2)} naar binnen, maximaal 0,5`);
     }
   }
 });
