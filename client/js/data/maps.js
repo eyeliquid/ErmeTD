@@ -9,7 +9,7 @@ const N=13,MID=6,GATE=8;
 ERME.N=N;
 ERME.MID=MID;   // de middelste rij: daar zitten de poorten links en rechts in de muur
 ERME.GATE=GATE; // de kolom van de openingen in de boven- en ondermuur
-const at=(x,y)=>y*N+x,LEFT=y=>at(0,y),RIGHT=y=>at(N-1,y),TOP=x=>at(x,0),BOTTOM=x=>at(x,N-1);
+const at=(x,y)=>y*N+x,ROW=(y,x0,x1)=>{const o=[];for(let x=x0;x<=x1;x++)o.push(at(x,y));return o;},LEFT=y=>at(0,y),RIGHT=y=>at(N-1,y),TOP=x=>at(x,0),BOTTOM=x=>at(x,N-1);
 const C_IN=LEFT(MID),C_OUT=RIGHT(MID);
 ERME.C_IN=C_IN;ERME.C_OUT=C_OUT;
 
@@ -19,6 +19,10 @@ const RING=(()=>{const c=[at(0,MID),at(1,MID)],L=2,R=N-3;
   for(let y=L+1;y<=R;y++)c.push(at(R,y));for(let x=R-1;x>=L;x--)c.push(at(x,R));for(let y=R-1;y>MID;y--)c.push(at(L,y));
   return c;})();
 ERME.RING=RING;
+
+// De ijsmuurtjes van Wintermaul: drie muren dwars over het veld, om en om met een opening links en rechts.
+// De vijand moet er zigzaggend tussendoor: links langs de bovenste, rechts langs de middelste, links langs de onderste.
+const ZIGZAG=[...ROW(3,3,N-1),...ROW(6,0,N-4),...ROW(9,3,N-1)];
 
 // De velden van een map:
 //  id, n, k, d  sleutel, naam, soort en uitleg in de lobby
@@ -30,12 +34,13 @@ ERME.RING=RING;
 //  loop         vaste ring: {cells: de vakken, at: waar de ring begint}. De vijand blijft rondjes lopen, elk rondje kost levens
 //  pass         wat erdoor komt loopt door naar de volgende vesting: 'row' naar rechts, 'col' naar beneden
 //  pool         alle vestingen delen één levenspot
+//  block        vaste muurtjes: vakken waar niemand kan bouwen en waar de vijand omheen moet. Hoe ze eruitzien bepaalt de burcht (block)
 //  mini         de minigames na elke tiende golf doen mee
 // De volgorde hier is de volgorde in de lobby. De eerste is de standaard.
 ERME.MAPS={
  classic:{id:'classic',theme:'alarm',n:'Klassiek',k:'Je eigen weg',d:'Zoals je gewend bent: de vijand komt links binnen en gaat rechts weg. In de bouwfase leg je zelf de weg. Met minigames na elke tiende golf.',in:C_IN,out:C_OUT,roads:true,mini:true},
  relay:{id:'relay',theme:'racing',n:'Estafette',k:'Doorlopen',d:'Wat jij doorlaat, loopt verder door de vesting rechts van je. Alleen de laatste vesting op de rij verliest er levens door. Hoe verder rechts, hoe zwaarder het wordt.',in:C_IN,out:C_OUT,roads:true,pass:'row'},
- wintermaul:{id:'wintermaul',theme:'winter',n:'Wintermaul',k:'Samenwerken',d:'De vijand komt boven binnen en zakt van vesting naar vesting naar beneden. Er is geen weg: je bouwt het doolhof met je torens. Iedereen deelt één levenspot; is die leeg, dan verliest het hele team.',in:GATE,out:BOTTOM(GATE),maze:true,pass:'col',pool:true},
+ wintermaul:{id:'wintermaul',theme:'winter',n:'Wintermaul',k:'Samenwerken',d:'De vijand komt boven binnen en zakt van vesting naar vesting naar beneden. IJsmuurtjes dwingen hem te zigzaggen; met je torens maak je het doolhof nog langer. Iedereen deelt één levenspot; is die leeg, dan verliest het hele team.',in:GATE,out:BOTTOM(GATE),maze:true,block:ZIGZAG,pass:'col',pool:true},
  circle:{id:'circle',theme:'scifi',n:'Groene Cirkel',k:'Rondje',d:'De vijand stapt op een vaste ring en blijft rondjes lopen tot hij dood is. Er is geen uitgang: elk rondje dat een vijand afmaakt kost levens. Bouw binnen en buiten de ring.',in:C_IN,out:-1,loop:{cells:RING,at:2}},
  maze:{id:'maze',theme:'knights',n:'Doolhofbouwer',k:'Vrij bouwen',d:'Geen weg en geen vaste route. De vijand komt links binnen en wil onder weg. Je torens zijn je muren: maak zijn weg zo lang mogelijk, ook tijdens een golf.',in:C_IN,out:BOTTOM(GATE),maze:true}
 };

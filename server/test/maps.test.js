@@ -103,3 +103,14 @@ test('Wintermaul: bij een gedeelde levenspot beslist de spellaag over verlies', 
   assert.ok(G.lives <= 0);
   assert.notEqual(G.phase, 'over');
 });
+
+test('Wintermaul: de ijsmuurtjes laten de vijand zigzaggen en je kunt er niet op bouwen', () => {
+  const G = E.create({}, 0, 'wintermaul');
+  E.lock(G);
+  const blk = E.blockOf(G.mp);
+  assert.ok(blk.size > 0, 'er zijn muurtjes');
+  assert.ok(G.path.len >= 40, 'de route is minstens 40 vakken lang, niet recht naar beneden (' + G.path.len + ')');
+  for (const c of G.path.cells) assert.ok(!blk.has(c), 'de route loopt nooit over een muurtje');
+  G.gold = 1e6;
+  for (const c of blk) assert.equal(E.canBuild(G, c, 'sentry'), false, 'op een muurtje kun je niet bouwen');
+});

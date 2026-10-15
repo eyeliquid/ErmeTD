@@ -475,7 +475,7 @@ const fortGeo=(parts,wuv)=>parts.length?merge(parts,wuv):null;
 // (de poorten laten zien waar de vijand binnenkomt en weggaat).
 const fortBy={};let FORT=null;
 function buildFort(th){const id=FORTS[th.fort]?th.fort:'castle',F=FORTS[id],role=c=>c===MP.in?'in':c===MP.out?'out':'side',
-    key=id+'|'+SIDES.map(sd=>role(sd.cell)).join('');if(fortBy[key])return fortBy[key];
+    key=id+'|'+MAP+'|'+SIDES.map(sd=>role(sd.cell)).join('');if(fortBy[key])return fortBy[key];
   const k=fortKit(),main={solid:[],lit:[],lights:[],fires:[]},brE={solid:[],lit:[],lights:[],fires:[]},brS={solid:[],lit:[],lights:[],fires:[]};
   fortPlace(F.base(k),0,0,0,main);
   for(const sd of SIDES){for(const[a0,a1]of[[-.7,sd.gap[0]],[sd.gap[1],13.7]]){const L=a1-a0,c=(a0+a1)/2;fortPlace(F.wall(k,L),sd.h?c:sd.at,sd.h?sd.at:c,sd.rot,main);}
@@ -483,6 +483,7 @@ function buildFort(th){const id=FORTS[th.fort]?th.fort:'castle',F=FORTS[id],role
   for(const[x,z,r]of[[-.53,-.53,0],[13.53,-.53,-Math.PI/2],[13.53,13.53,Math.PI],[-.53,13.53,Math.PI/2]])fortPlace(F.corner(k),x,z,r,main);
   for(const[x,z,r]of LAMPS)fortPlace(F.lamp(k),x,z,r,main);
   fortPlace(F.hq(k),15.2,9.4,0,main);fortPlace(F.factory(k),-2.1,3.8,0,main);
+  for(const c of MP.block||[]){const x=c%N;fortPlace((F.block||FORTS.castle.block)(k),x+.5,(c-x)/N+.5,0,main);} // vaste muurtjes op het speelveld
   const L=FW-13.72;fortPlace(F.bridge(k,L),13.36+L/2,6.5,0,brE);fortPlace(F.bridge(k,L),8.5,13.36+L/2,Math.PI/2,brS);
   const mat=F.mat==='metal'?FORTMAT.metal:F.mat==='plain'?FORTMAT.plain:FORTMAT.stone,uv=F.mat==='plain'?0:.5;
   const geos=[main,brE,brS].map(o=>({s:fortGeo(o.solid,uv),l:fortGeo(o.lit),o})),grp=new T3.Group();
@@ -1946,13 +1947,14 @@ const MAP_DEMO=(()=>{const at=(x,y)=>y*N+x,row=(y,a,b)=>{const o=[];for(let x=a;
   const zig=[];{let y=E.MID;const cs=[0,4,8,12];let up=true;cs.forEach((x,k)=>{const to=k===cs.length-1?E.MID:up?1:N-2;for(;y!==to;y+=Math.sign(to-y))zig.push(at(x,y));zig.push(at(x,y));if(k<cs.length-1){for(let u=x+1;u<cs[k+1];u++)zig.push(at(u,y));up=!up;}});}
   return{classic:{road:zig,tw:[at(2,3),at(2,9),at(6,4),at(6,8),at(10,3),at(10,9)]},
     relay:{road:row(E.MID,0,N-1),tw:[at(3,5),at(3,7),at(7,5),at(9,7)]},
-    wintermaul:{tw:[...row(3,3,12),...row(6,0,9),...row(9,3,12)]},
+    wintermaul:{tw:[]}, // de ijsmuurtjes komen uit de map zelf (block)
     circle:{tw:[at(5,5),at(7,5),at(5,7),at(7,7),at(6,4),at(0,1),at(12,11)]},
     maze:{tw:[...col(2,0,9),...col(5,3,12),...col(8,0,9),...col(11,3,11)]}};})();
 function drawMapCv(cv,id){const M=E.mapOf(id),th=themeOf(M.theme),D=MAP_DEMO[id]||{},g=cv.getContext('2d'),W=cv.width,k=W/(N+2),O=k;
   const tw=new Set(D.tw||[]),r=D.road?{cells:D.road,road:true}:E.route(new Set(),c=>tw.has(c),M),cell=(c,col,pad)=>{const x=c%N,y=(c-x)/N;g.fillStyle=col;g.fillRect(O+x*k+(pad||0),O+y*k+(pad||0),k-2*(pad||0)+.6,k-2*(pad||0)+.6);};
   g.fillStyle=th.sea.base;g.fillRect(0,0,W,W);g.fillStyle=th.ground.base;g.fillRect(O,O,N*k,N*k);
   for(const c of r.cells)cell(c,r.road?th.road.a:th.trail[0]);
+  for(const c of M.block||[])cell(c,th.ui.trim,k*.06); // vaste muurtjes
   for(const c of tw)cell(c,th.ui.accent,k*.18);
   g.strokeStyle='#000';g.lineWidth=1;g.strokeRect(O-.5,O-.5,N*k+1,N*k+1);
   // pijlen: groen naar binnen, rood naar buiten; bij doorgeven goud naar de volgende vesting
