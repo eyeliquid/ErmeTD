@@ -85,6 +85,18 @@ Speler 1 kiest in de lobby de map (knop **Map**, boven de moeilijkheidsgraad). I
 
 Op alle maps behalve Klassiek zijn er voorlopig geen minigames: na golf 100 heb je gewonnen.
 
+Elke map is ook zwaarder dan Klassiek: de vijanden krijgen meer levens. Dat staat bij de map in de lobby en in `hard` in `client/js/data/maps.js`.
+
+| Map | Levens van de vijanden |
+| --- | --- |
+| Klassiek | ×1 |
+| Estafette | ×1,5 |
+| Wintermaul | ×2 |
+| Groene Cirkel | ×3 |
+| Doolhofbouwer | ×5 |
+
+Het komt bovenop de moeilijkheidsgraad (Geers, Super Geers, Alleen voor Geers) en op de webadmin.
+
 ### Thema's: elke map zijn eigen look and feel
 
 | Map | Thema | Wat je ziet en hoort |

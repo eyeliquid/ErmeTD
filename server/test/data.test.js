@@ -86,6 +86,7 @@ test('maps: elke map wijst naar een bestaand thema en de poorten liggen in een o
     assert.ok(inGap(m.in), id + ': de ingang ligt in een opening van de muur');
     if (m.out >= 0) assert.ok(inGap(m.out), id + ': de uitgang ligt in een opening van de muur');
     if (m.pass) assert.ok(m.pass === 'row' || m.pass === 'col', id + ': pass is row of col');
+    if (m.hard != null) assert.ok(num(m.hard) && m.hard > 0, id + ': hard is een getal boven 0');
     for (const c of m.block || []) {
       assert.ok(Number.isInteger(c) && c >= 0 && c < N * N, `${id}: muurtje ${c} ligt op het veld`);
       assert.ok(c !== m.in && c !== m.out, `${id}: een muurtje mag niet op de ingang of uitgang`);

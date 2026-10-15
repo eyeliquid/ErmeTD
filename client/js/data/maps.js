@@ -36,12 +36,13 @@ const ZIGZAG=[...ROW(3,3,N-1),...ROW(6,0,N-4),...ROW(9,3,N-1)];
 //  pool         alle vestingen delen één levenspot
 //  block        vaste muurtjes: vakken waar niemand kan bouwen en waar de vijand omheen moet. Hoe ze eruitzien bepaalt de burcht (block)
 //  mini         de minigames na elke tiende golf doen mee
+//  hard         hoe zwaar de map is ten opzichte van Klassiek: de levens van elke vijand gaan keer dit getal (weglaten = 1)
 // De volgorde hier is de volgorde in de lobby. De eerste is de standaard.
 ERME.MAPS={
  classic:{id:'classic',theme:'alarm',n:'Klassiek',k:'Je eigen weg',d:'Zoals je gewend bent: de vijand komt links binnen en gaat rechts weg. In de bouwfase leg je zelf de weg. Met minigames na elke tiende golf.',in:C_IN,out:C_OUT,roads:true,mini:true},
- relay:{id:'relay',theme:'racing',n:'Estafette',k:'Doorlopen',d:'Wat jij doorlaat, loopt verder door de vesting rechts van je. Alleen de laatste vesting op de rij verliest er levens door. Hoe verder rechts, hoe zwaarder het wordt.',in:C_IN,out:C_OUT,roads:true,pass:'row'},
- wintermaul:{id:'wintermaul',theme:'winter',n:'Wintermaul',k:'Samenwerken',d:'De vijand komt boven binnen en zakt van vesting naar vesting naar beneden. IJsmuurtjes dwingen hem te zigzaggen; met je torens maak je het doolhof nog langer. Iedereen deelt één levenspot; is die leeg, dan verliest het hele team.',in:GATE,out:BOTTOM(GATE),maze:true,block:ZIGZAG,pass:'col',pool:true},
- circle:{id:'circle',theme:'scifi',n:'Groene Cirkel',k:'Rondje',d:'De vijand stapt op een vaste ring en blijft rondjes lopen tot hij dood is. Er is geen uitgang: elk rondje dat een vijand afmaakt kost levens. Bouw binnen en buiten de ring.',in:C_IN,out:-1,loop:{cells:RING,at:2}},
- maze:{id:'maze',theme:'knights',n:'Doolhofbouwer',k:'Vrij bouwen',d:'Geen weg en geen vaste route. De vijand komt links binnen en wil onder weg. Je torens zijn je muren: maak zijn weg zo lang mogelijk, ook tijdens een golf.',in:C_IN,out:BOTTOM(GATE),maze:true}
+ relay:{id:'relay',hard:1.5,theme:'racing',n:'Estafette',k:'Doorlopen',d:'Wat jij doorlaat, loopt verder door de vesting rechts van je. Alleen de laatste vesting op de rij verliest er levens door. Hoe verder rechts, hoe zwaarder het wordt.',in:C_IN,out:C_OUT,roads:true,pass:'row'},
+ wintermaul:{id:'wintermaul',hard:2,theme:'winter',n:'Wintermaul',k:'Samenwerken',d:'De vijand komt boven binnen en zakt van vesting naar vesting naar beneden. IJsmuurtjes dwingen hem te zigzaggen; met je torens maak je het doolhof nog langer. Iedereen deelt één levenspot; is die leeg, dan verliest het hele team.',in:GATE,out:BOTTOM(GATE),maze:true,block:ZIGZAG,pass:'col',pool:true},
+ circle:{id:'circle',hard:3,theme:'scifi',n:'Groene Cirkel',k:'Rondje',d:'De vijand stapt op een vaste ring en blijft rondjes lopen tot hij dood is. Er is geen uitgang: elk rondje dat een vijand afmaakt kost levens. Bouw binnen en buiten de ring.',in:C_IN,out:-1,loop:{cells:RING,at:2}},
+ maze:{id:'maze',hard:5,theme:'knights',n:'Doolhofbouwer',k:'Vrij bouwen',d:'Geen weg en geen vaste route. De vijand komt links binnen en wil onder weg. Je torens zijn je muren: maak zijn weg zo lang mogelijk, ook tijdens een golf.',in:C_IN,out:BOTTOM(GATE),maze:true}
 };
 })(typeof module!=='undefined'&&module.exports?module.exports:(window.ERME=window.ERME||{}));
