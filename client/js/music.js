@@ -12,7 +12,7 @@ let ctx=null,master,out,wet,noiseBuf,timer=null,step=0,nextT=0,want=null,mini=fa
 
 const hz=m=>440*Math.pow(2,(m-69)/12);
 const tierOf=l=>Math.max(0,Math.min(4,Math.floor(((+l||1)-1)/20)));
-const tempo=(l,m)=>(BASE+PER_TIER*tierOf(l))*(m?MINI_MUL:1);
+const tempo=(l,m,st)=>(BASE+((STYLES[st]||STYLES.alarm).bpm||0)+PER_TIER*tierOf(l))*(m?MINI_MUL:1);
 
 function init(){
   if(ctx)return true;
@@ -60,20 +60,37 @@ const rim=(t,g)=>noise(wet,t,.05,g,'bandpass',2600,5);
 const snare=(t,g)=>{noise(wet,t,.15,g,'bandpass',1900,.7);tone(wet,'triangle',200,t,.08,g*.6,{pluck:1,slide:140});};
 const keys=(ch,t,g)=>ch.forEach(m=>{tone(wet,'triangle',hz(m+12),t,1.1,g,{pluck:1,a:.006});tone(wet,'sine',hz(m+12),t,1.4,g*.9,{pluck:1});});
 
-const CH=[[52,55,59,62],[48,52,55,59],[55,59,62,66],[50,54,57,60]];   // Em7, Cmaj7, Gmaj7, D7
-const MEL=[[71,74,76],[76,74,71],[74,71,67],[69,66,69]];
+// Muziekstijlen: elk thema (data/themes.js, veld music) kiest er een. Alles wat een stijl weglaat, komt uit alarm.
+//  tr    transponeren in halve tonen          bpm   tempo erbij of eraf
+//  CH    vier akkoorden (MIDI-noten)          MEL   per akkoord drie melodienoten
+//  lead  golfvorm van de melodie              en lagen die je aan of uit zet:
+//  drive kick op elke tel en een stuwende bas (racen)     bells  hoge klokjes, geen hi-hat (winter)
+//  arp   een snel arpeggio (sci-fi)                        lute   getokkelde akkoorden en een bourdon (ridders)
+const STYLES={
+ alarm:{tr:0,bpm:0,lead:'sine',CH:[[52,55,59,62],[48,52,55,59],[55,59,62,66],[50,54,57,60]],MEL:[[71,74,76],[76,74,71],[74,71,67],[69,66,69]]}, // Em7, Cmaj7, Gmaj7, D7
+ racing:{tr:2,bpm:22,lead:'square',drive:true,CH:[[52,56,59,63],[57,61,64,68],[59,63,66,69],[49,52,56,59]],MEL:[[71,75,76],[73,76,80],[78,75,71],[73,71,68]]}, // Emaj7, Amaj7, B7, C#m7
+ winter:{tr:-3,bpm:-14,lead:'triangle',bells:true,CH:[[57,60,64,67],[53,57,60,64],[48,52,55,59],[52,55,59,62]],MEL:[[76,72,69],[72,69,65],[71,67,64],[71,74,76]]}, // Am7, Fmaj7, Cmaj7, Em7
+ scifi:{tr:-5,bpm:6,lead:'sawtooth',arp:true,CH:[[57,60,64,67],[53,57,60,64],[50,53,57,60],[52,56,59,62]],MEL:[[76,79,81],[77,76,72],[74,77,76],[71,68,71]]}, // Am7, Fmaj7, Dm7, E7
+ knights:{tr:-2,bpm:-8,lead:'triangle',lute:true,CH:[[50,53,57,62],[48,52,55,60],[46,50,53,58],[48,52,55,60]],MEL:[[74,72,69],[72,71,67],[70,69,65],[67,69,72]]} // Dm, C, Bb, C (dorisch)
+};
+let S=STYLES.alarm;
 const has=(a,s)=>a.indexOf(s)>-1;
 
 // Eén zestiende noot. s = stap in de maat (0-15), bar = maat (0-7), sp = duur van een zestiende in seconden.
 function play(s,bar,t,sp){
-  const ch=CH[bar%4],mel=MEL[bar%4],k=[2,8,11].indexOf(s);
+  const ch=S.CH[bar%4].map(m=>m+S.tr),mel=S.MEL[bar%4].map(m=>m+S.tr),k=[2,8,11].indexOf(s);
   if(!mini){
-    if(has([0,6,10],s))keys(ch,t,.045);
-    if(has([0,6,8,14],s))tone(out,'sine',hz(ch[0]-12),t,sp*2.5,.3,{a:.01,r:.1});
-    if(s===0||s===10)kick(t,.5);
-    if(s===4||s===12)rim(t,.18);
-    if(s%2===0)hat(t,.04);
-    if(bar>=4&&k>-1)tone(wet,'sine',hz(mel[k]+12),t,.9,.07,{pluck:1,a:.01});
+    if(S.lute){if(has([0,3,6,8,10,13],s))tone(wet,'triangle',hz(ch[[0,2,1,3,2,1][[0,3,6,8,10,13].indexOf(s)]]+12),t,.6,.05,{pluck:1,a:.003});
+      if(s===0)[ch[0]-12,ch[0]-5].forEach(m=>tone(wet,'sawtooth',hz(m),t,sp*16,.012,{cut:700,a:.3,r:.5}));}
+    else if(has([0,6,10],s))keys(ch,t,.045);
+    if(S.drive){if(s%2===0)tone(out,'sawtooth',hz(ch[0]-12+(s%8===6?7:0)),t,sp*1.6,.16,{cut:900,q:2,pluck:1});}
+    else if(has([0,6,8,14],s))tone(out,'sine',hz(ch[0]-12),t,sp*2.5,.3,{a:.01,r:.1});
+    if(S.drive?s%4===0:(s===0||s===10))kick(t,S.drive?.6:.5);
+    if(s===4||s===12)rim(t,S.bells?.1:.18);
+    if(!S.bells&&s%2===0)hat(t,S.drive?.06:.04);
+    if(S.bells&&has([0,7,10],s))tone(wet,'sine',hz(ch[[0,7,10].indexOf(s)+1]+24),t,1.6,.035,{pluck:1,a:.004});
+    if(S.arp)tone(wet,'triangle',hz(ch[[0,1,2,3,2,1][s%6]]+24),t,sp*1.1,.022,{pluck:1,a:.003,cut:2400});
+    if(bar>=4&&k>-1)tone(wet,S.lead||'sine',hz(mel[k]+12),t,.9,S.lead&&S.lead!=='sine'?.035:.07,{pluck:1,a:.01,cut:S.lead==='sine'?0:2200});
     return;
   }
   // minigame: rechte kick, echte snare, doorlopende bas, arpeggio en de melodie in elke maat
@@ -98,7 +115,7 @@ function tick(){
     if(s%4===0){                       // wisselen gebeurt op de tel, zodat het niet midden in een noot verspringt
       const m=!!want.mini;
       if(m&&!mini)noise(wet,nextT,1.2,.1,'highpass',5000);   // bekkenslag bij het begin van een minigame
-      mini=m;bpm=tempo(want.level,m);
+      mini=m;S=STYLES[want.style]||STYLES.alarm;bpm=tempo(want.level,m,want.style);
     }
     const sp=60/bpm/4;
     play(s,Math.floor(step/16)%8,nextT,sp);
@@ -108,19 +125,19 @@ function tick(){
 function fade(to,sec){const g=out.gain,n=ctx.currentTime;g.cancelScheduledValues(n);g.setValueAtTime(g.value,n);g.linearRampToValueAtTime(to,n+sec);}
 function start(){
   if(!init())return;
-  unlock();step=0;nextT=0;mini=!!want.mini;bpm=tempo(want.level,mini);
+  unlock();step=0;nextT=0;mini=!!want.mini;S=STYLES[want.style]||STYLES.alarm;bpm=tempo(want.level,mini,want.style);
   fade(1,.8);timer=setInterval(tick,50);tick();
 }
 function stop(){clearInterval(timer);timer=null;if(ctx)fade(0,.6);}
 
-// Elke frame aangeroepen door het spel. s = null (stil) of {level, mini}.
+// Elke frame aangeroepen door het spel. s = null (stil) of {level, mini, style}.
 function sync(s){
   want=on&&s?s:null;
   if(want&&!timer)start();else if(!want&&timer)stop();
 }
 function setOn(v){on=!!v;try{localStorage.setItem(KEY,on?'1':'0');}catch{}if(!on)sync(null);return on;}
 
-return{sync,setOn,isOn:()=>on,tempo,
+return{sync,setOn,isOn:()=>on,tempo,STYLES,
   state:()=>({on,playing:!!timer,bpm,mini,audio:ctx?ctx.state:'none'})};
 })();
 if(typeof module!=='undefined')module.exports=Music;
