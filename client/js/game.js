@@ -839,7 +839,7 @@ function beginGame(idx,mid,solo,mapId){closePops();clearBots();matchId=mid||Date
   $('#nogl').hidden=gl3;resize();cam.d=stage.clientWidth<760?46:24;cam.yaw=0;camHome();nextRound=0;if(solo)spawnBots();refresh();pushPresence(true);
   iconDraw($('#heroCv'),'hero'+save.hero);
   setText($('#hScoreL'),G.D.score>1?'Score '+mulText(G.D.score):'Score');$('#hScoreL').parentNode.title=`Score · ${G.D.n}`+(G.D.score>1?`, alles wat je scoort telt ${mulText(G.D.score)}`:'');
-  if(MAP!=='classic')toast(`Map: ${MP.n}. ${MP.d}`,7000);else if(G.diff)toast(`${G.D.n}: taaiere vijanden, score ${mulText(G.D.score)}`,3600);}
+  if(MAP!=='classic')toast(`Map: ${MP.n}${MP.hard>1?` (vijanden ${mulText(MP.hard)} zo taai)`:''}. ${MP.d}`,7000);else if(G.diff)toast(`${G.D.n}: taaiere vijanden, score ${mulText(G.D.score)}`,3600);}
 function endGame(){ended=true;const won=G.phase==='won';
   save.games++;save.best=Math.max(save.best,G.score);persist();
   if(acct&&Net.hasToken())Net.api('POST','/scores',{score:G.score,round:G.cleared,won}).catch(authFail);
@@ -1965,14 +1965,15 @@ function drawMapCv(cv,id){const M=E.mapOf(id),th=themeOf(M.theme),D=MAP_DEMO[id]
   if(M.loop){g.strokeStyle=th.ui.accent;g.lineWidth=Math.max(1.5,k*.22);const c0=O+6.5*k,R=k*2.2;g.beginPath();g.arc(c0,c0,R,-2.6,1.9);g.stroke();
     const a=1.9,ex=c0+Math.cos(a)*R,ey=c0+Math.sin(a)*R,tx=-Math.sin(a),ty=Math.cos(a),L=k*.7;g.fillStyle=th.ui.accent;g.beginPath();g.moveTo(ex+tx*L,ey+ty*L);g.lineTo(ex-ty*L*.6,ey+tx*L*.6);g.lineTo(ex+ty*L*.6,ey-tx*L*.6);g.closePath();g.fill();}}
 function setMap(id){if(!E.MAPS[id]||!isHost())return;lobbyMap=id;try{localStorage.setItem('ratd-map',id);}catch{}if(room&&!G)room.presence({mp:id}).catch(()=>{});renderMapPick();buildMapList();}
+const hardTxt=M=>M.hard&&M.hard!==1?' · '+mulText(M.hard)+' zo zwaar':'';
 function renderMapPick(){const id=lobbyMapNow(),M=E.mapOf(id),host=isHost();if($('#mapCv').dataset.m!==id){$('#mapCv').dataset.m=id;drawMapCv($('#mapCv'),id);}
-  setText($('#mapName'),M.n);setText($('#mapKind'),M.k+' · '+themeOf(M.theme).n+(M.mini?' · met minigames':''));setText($('#mapAct'),host?'Kiezen':'Bekijken');
+  setText($('#mapName'),M.n);setText($('#mapKind'),M.k+' · '+themeOf(M.theme).n+hardTxt(M)+(M.mini?' · met minigames':''));setText($('#mapAct'),host?'Kiezen':'Bekijken');
   setText($('#mapNote'),host?(room&&room.lobby&&lobbyPeers().some(p=>!own(p))?'Jij bent speler 1: jij kiest de map voor iedereen.':''):'Speler 1 kiest de map. Iedereen speelt dezelfde.');}
 let mapListSig='';
 function buildMapList(){const ul=$('#mapList'),now=lobbyMapNow(),host=isHost();mapListSig=now+host;ul.textContent='';
   setText($('#mapLead'),host?'Kies de map voor dit potje. Iedereen in de lobby speelt dezelfde map. Alleen op Klassiek doen de minigames voorlopig mee.':'Speler 1 kiest de map voor dit potje. Hier zie je wat er gekozen is.');
   for(const id of E.MAP_IDS){const M=E.MAPS[id],li=document.createElement('li'),b=document.createElement('button'),cv=document.createElement('canvas'),t=document.createElement('span'),n=document.createElement('b'),k=document.createElement('small'),d=document.createElement('p');
-    b.type='button';cv.width=cv.height=208;cv.setAttribute('aria-hidden','true');drawMapCv(cv,id);t.className='mt';n.textContent=M.n;k.textContent=M.k+' · '+themeOf(M.theme).n+(M.mini?' · met minigames':'');d.textContent=themeOf(M.theme).tag+'. '+M.d;t.append(n,k,d);b.append(cv,t);
+    b.type='button';cv.width=cv.height=208;cv.setAttribute('aria-hidden','true');drawMapCv(cv,id);t.className='mt';n.textContent=M.n;k.textContent=M.k+' · '+themeOf(M.theme).n+hardTxt(M)+(M.mini?' · met minigames':'');d.textContent=themeOf(M.theme).tag+'. '+M.d;t.append(n,k,d);b.append(cv,t);
     b.classList.toggle('on',id===now);b.setAttribute('aria-pressed',String(id===now));b.disabled=!host;b.onclick=()=>{setMap(id);};li.append(b);ul.append(li);}}
 $('#mapBtn').onclick=()=>{buildMapList();openPop('#popMap');};
 // Moeilijkheidsgraad: drie knoppen boven de startknop. De keuze geldt alleen voor jou en ligt vast zodra het potje begint.

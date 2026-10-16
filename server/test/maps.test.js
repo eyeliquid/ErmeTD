@@ -114,3 +114,10 @@ test('Wintermaul: de ijsmuurtjes laten de vijand zigzaggen en je kunt er niet op
   G.gold = 1e6;
   for (const c of blk) assert.equal(E.canBuild(G, c, 'sentry'), false, 'op een muurtje kun je niet bouwen');
 });
+
+test('moeilijkheid per map: de vijanden zijn taaier dan op Klassiek', () => {
+  const hp = id => { const G = E.create({}, 0, id); E.lock(G); G.phase = 'build'; G.timer = 0; for (let i = 0; i < 60; i++) E.step(G, 1 / 30); return G.en[0].max; };
+  const base = hp('classic');
+  for (const [id, x] of [['relay', 1.5], ['wintermaul', 2], ['circle', 3], ['maze', 5]])
+    assert.ok(Math.abs(hp(id) / base - x) < 1e-9, `${id}: ${x} keer zo veel levens als op Klassiek`);
+});

@@ -97,7 +97,7 @@ function waveMix(r){const m={};let tot=0;for(const s of makeWave(r)){const o=m[s
 // Hoe goed een toren bij ronde r past: het gemiddelde matchup-getal, gewogen naar levenspunten. Boven 1 is een goede keuze, onder 1 een slechte.
 function waveFit(tw,r){let f=0;for(const o of waveMix(r))f+=o.share*vs(tw,o.type);return f;}
 function startWave(G){if(G.phase!=='build')return;G.phase='wave';G.wt=0;G.q=makeWave(G.round);G.ev.push({k:'wave',r:G.round});}
-function spawn(G,s){const d=EN[s.type],r=G.round,hp=d.hp*hpMul(r)*s.hm*G.D.hp,p=posAt(G.path,0);
+function spawn(G,s){const d=EN[s.type],r=G.round,hp=d.hp*hpMul(r)*s.hm*G.D.hp*(G.mp.hard||1),p=posAt(G.path,0); // hard: hoe zwaar de map is (data/maps.js)
   G.en.push({id:G.nid++,type:s.type,hp,max:hp,d:0,sp:d.sp*G.D.sp,arm:d.arm||0,regen:d.regen||0,immune:!!d.immune,boss:!!d.boss,
     big:s.hm>1,leak:d.leak||1,b:Math.max(1,Math.round(B.gold0*B.goldX*d.b*s.hm*(1+B.goldLin*r)*G.m.gold)),sc:Math.round(d.b*s.hm*r*5*G.D.score),
     x:p[0],y:p[1],dx:p[2],dy:p[3],fz:0,fi:0,sT:0,sl:0,pT:0,pD:0});}
