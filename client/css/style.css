@@ -81,14 +81,14 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;bac
 .mapnow em{font-style:normal;font-family:var(--display);font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
 #mapNote{margin:0;color:var(--muted);font-size:14px}
 .maplist{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
-.maplist button{width:100%;display:grid;grid-template-columns:104px minmax(0,1fr);gap:14px;align-items:center;padding:10px;text-align:left;color:var(--text);background:linear-gradient(180deg,#232a34,#14181e);box-shadow:inset 0 0 0 1px var(--stone-600)}
+.maplist button{width:100%;display:grid;grid-template-columns:104px 104px minmax(0,1fr);gap:14px;align-items:center;padding:10px;text-align:left;color:var(--text);background:linear-gradient(180deg,#232a34,#14181e);box-shadow:inset 0 0 0 1px var(--stone-600)}
 .maplist canvas{width:104px;height:104px}
 .maplist p{margin:4px 0 0;font-weight:400;font-size:14px;line-height:1.4;color:var(--muted)}
 .maplist button.on{background:linear-gradient(180deg,#4a3a12,#261d09);box-shadow:inset 0 0 0 1px var(--gold),0 0 14px rgba(246,207,77,.25)}
 .maplist button.on small::after{content:" · gekozen";color:var(--gold)}
 .maplist button:disabled{opacity:1;cursor:default}
 .maplist button:disabled:not(.on){opacity:.62}
-@media(max-width:520px){.maplist button{grid-template-columns:72px minmax(0,1fr)} .maplist canvas{width:72px;height:72px}}
+@media(max-width:520px){.maplist button{grid-template-columns:72px 72px minmax(0,1fr)} .maplist canvas{width:72px;height:72px} .maplist button .mt{grid-column:1/-1}}
 #diffNote{margin:0;color:var(--muted);font-size:14px;min-height:1.45em}
 #rDiff{margin:0}
 .linkbtn{background:none;box-shadow:none;border:0;padding:0;font-size:14px;font-weight:700;color:var(--gold);text-decoration:underline;text-underline-offset:3px}

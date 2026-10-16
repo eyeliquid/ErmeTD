@@ -18,6 +18,8 @@
 //  factory(k)       de vijandelijke fabriek op de linkerpier, op 0,0. De voorkant is +x.
 //  lamp(k)          een lantaarn op de muur, voet op 0,0. Binnen is +z.
 //  bridge(k, L)     een brug van L lang langs x, midden op 0. Het wegdek ligt op hoogte 0.
+//  hub(k)           (mag ontbreken) iets groots in het midden van de wereld, voor maps die daar plaats voor hebben (een ring).
+//                   0,0 is het midden; de ruimte is ongeveer 30 bij 30.
 //  block(k)         een vast muurtje op één vak van het speelveld (alleen op maps met block), midden op 0,0, 1 bij 1.
 //                   Houd het laag (tot ongeveer 0,6): je kijkt eroverheen.
 //
@@ -152,6 +154,12 @@ ERME.FORTS={
     k.lit.box(L,.03,.04,'#5dffa0',0,.02,-.78),k.lit.box(L,.03,.04,'#5dffa0',0,.02,.78),
     ...along(L,1.2,.3,u=>[k.box(.05,.5,.05,'#5a6a78',u,.25,-.82),k.box(.05,.5,.05,'#5a6a78',u,.25,.82)]),
     k.box(L,.04,.04,'#5a6a78',0,.5,-.82),k.box(L,.04,.04,'#5a6a78',0,.5,.82),k.cyl(.35,.45,2,'#3a4652',0,-1.2,0,6)],
+  // de reactor in het midden van de ring: een platform, een kern die gloeit, zwevende ringen en vier pylonen
+  hub:k=>[k.cyl(9,10,1.7,'#2a3138',0,-.86,0,8),k.cyl(10.5,10.8,.7,'#151b21',0,-1.5,0,8),k.lit.ring(8.6,.06,'#5dffa0',0,.05,0),
+    k.cyl(2.2,2.8,1.2,'#3a4652',0,.6,0,8),k.cyl(1.2,1.6,3.5,'#5a6a78',0,2.9,0,8),k.lit.cyl(1.25,1.25,.15,'#5dffa0',0,2.2,0,16),k.lit.cyl(1.25,1.25,.15,'#5dffa0',0,3.4,0,16),
+    k.lit.ball(1.1,'#9fffd0',0,5.4,0),k.lit.ring(2.2,.08,'#5dffa0',0,5.4,0),k.lit.ring(3.2,.06,'#59c8f2',0,6.2,0),
+    ...[0,1,2,3].flatMap(i=>{const an=i*Math.PI/2+Math.PI/4,x=Math.cos(an)*6,z=Math.sin(an)*6;return[k.box(.6,4,.6,'#3a4652',x,2,z),k.lit.ball(.3,'#5dffa0',x,4.2,z),k.light(x,4.2,z,'#5dffa0',2)];}),
+    k.light(0,5.4,0,'#5dffa0',9)],
   // een metalen barrière met een neonrand
   block:k=>[k.box(.96,.42,.6,'#3a4652',0,.21,0),k.box(.98,.06,.66,'#5a6a78',0,.45,0),k.lit.box(.98,.03,.05,'#5dffa0',0,.38,.31),k.lit.box(.98,.03,.05,'#5dffa0',0,.38,-.31)]},
 

@@ -34,6 +34,7 @@ client/                 frontend: gewone bestanden, geen bouwstap
     forts.js            burchten: muren, torens, poorten, hoofdkwartier, fabriek, lantaarns, bruggen
     themes.js           hoe elke map eruitziet en klinkt: licht, grond, decor, vijanden, muziek
   js/engine.js          spelregels: rekent met de data (draait ook op de server)
+  js/world.js           de wereld per map: waar de vestingen liggen, de bruggen, waar doorgelaten vijanden heen gaan
   js/textures.js        alle texturen, procedureel getekend
   js/music.js           de muziek, met een stijl per thema
   js/net.js             alle communicatie met de backend
@@ -83,7 +84,32 @@ Speler 1 kiest in de lobby de map (knop **Map**, boven de moeilijkheidsgraad). I
 | Groene Cirkel | rondje | Een vaste ring zonder uitgang. De vijand blijft rondjes lopen tot hij dood is; elk rondje kost levens (een luchtschip 10). |
 | Doolhofbouwer | vrij bouwen | Geen weg: de vijand komt links binnen en wil onder weg. Je torens zijn je muren, ook tijdens een golf. |
 
-Op alle maps behalve Klassiek zijn er voorlopig geen minigames: na golf 100 heb je gewonnen.
+Op alle maps behalve Klassiek zijn er voorlopig geen minigames: na golf 100 heb je gewonnen. De minigame-eilanden en het doolhof staan daarom alleen in de wereld van Klassiek.
+
+### De wereld per map
+
+Elke map heeft een eigen indeling van de vestingen. Het aantal vestingen is ook het aantal spelers dat mee kan doen; zitten er meer spelers in de lobby, dan kan het potje op die map niet beginnen.
+
+| Map | Wereld | Spelers |
+| --- | --- | --- |
+| Klassiek | raster van 5 bij 5, bruggen naar alle buren, met de minigame-eilanden eromheen | 25 |
+| Estafette | vijf losse banen van vijf vestingen, alleen bruggen naar rechts | 25 |
+| Wintermaul | een piramide van 4, 3, 2 en 1, met schuine bruggen naar de vesting(en) eronder | 10 |
+| Groene Cirkel | een ring van twaalf rond een reactor | 12 |
+| Doolhofbouwer | een koninkrijk van 4 bij 4, met brede grachten | 16 |
+
+Op Wintermaul (genummerd van linksboven, rij voor rij):
+
+```
+1  2  3  4
+ 5  6  7
+  8  9
+   10
+```
+
+Wat 1 doorlaat gaat naar 5; van 2 gaat de helft naar 5 en de helft naar 6; van 3 de helft naar 6 en de helft naar 7; 4 gaat naar 7. 5 gaat naar 8, van 6 de helft naar 8 en de helft naar 9, 7 gaat naar 9. 8 en 9 gaan naar 10, en wat 10 doorlaat kost het team levens. Zit er in een vesting niemand, dan loopt de vijand er gewoon doorheen naar de volgende. De vestingen worden van onder naar boven gevuld, zodat er altijd iemand onderin staat.
+
+De indeling staat bij elke map in `world` in `client/js/data/maps.js`; `client/js/world.js` rekent er de plekken, de bruggen en de doorgangen (`next`) uit. In de mapkeuze staat naast het plaatje van een vesting ook een plaatje van de hele wereld.
 
 Elke map is ook zwaarder dan Klassiek: de vijanden krijgen meer levens. Dat staat bij de map in de lobby en in `hard` in `client/js/data/maps.js`.
 
