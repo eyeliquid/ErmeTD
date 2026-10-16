@@ -16,6 +16,9 @@ let matchId=0,built=false,prepEnd=0,t0=0,nx=0,sentWave=0,arenaFor=0,roadMode=fal
 let ACT=null;
 // De map van het potje (zie MAPS in engine.js). Speler 1 kiest hem in de lobby; iedereen in het potje speelt dezelfde.
 let MAP='classic',MP=E.mapOf('classic');
+// De indeling van de wereld voor deze map (world.js): waar de vestingen liggen, de bruggen en waar doorgelaten vijanden heen gaan.
+// NS is het aantal vestingen van de map; SLOTS (25) is het meeste dat een map kan hebben.
+let WL=World.build(MP),NS=WL.n;const capBy={},capOf=id=>capBy[id]||(capBy[id]=World.build(E.mapOf(id)).n);
 // lobbyMap: jouw keuze in de lobby. Die telt alleen als jij speler 1 bent; anders speel je de map van speler 1.
 let lobbyMap=(()=>{try{const v=localStorage.getItem('ratd-map');return E.MAPS[v]?v:'classic';}catch{return'classic';}})();
 const ownReal=p=>!!p&&(p.sameTab===undefined?!!p.isMe:!!p.sameTab),own=p=>ACT?p===ACT:ownReal(p);
@@ -119,7 +122,7 @@ function bindAccount(){
 
 /* ================= 3D ================= */
 const stage=$('#stage');
-let renderer=null,scene,camera,sun,sea,ray,gl3=false,FORTMAT,haloTex,hemi,fillL,SEAMAT,GMAT,LAMPMAT,GRUNGE,MASON,KERB=[];const lampDecals=[],SLOTOBJ=[];
+let renderer=null,scene,camera,sun,sea,ray,gl3=false,ISLEGRP=null,FORTMAT,haloTex,hemi,fillL,SEAMAT,GMAT,LAMPMAT,GRUNGE,MASON,KERB=[];const lampDecals=[],SLOTOBJ=[];
 // De drie lantaarns op de muren van elke vesting: [x, z, draaiing]. Hoe ze eruitzien bepaalt de burcht (data/forts.js).
 const LAMPS=[[3.5,-.53,0],[13.53,10.5,-Math.PI/2],[-.53,10.5,Math.PI/2]];
 const cam={tx:0,tz:0,d:25,yaw:0},PITCH=.86,AR=8.6;
@@ -153,7 +156,7 @@ function isleEdge(){const q=Math.random()*4|0,u=Math.random()*2-1,an=q*Math.PI/2
   else if(ISLE==='quad'){const a=an+Math.PI/4+u*1.1;x=Math.cos(an+Math.PI/4)*QD*1.4142+Math.cos(a)*(QR-.5);z=Math.sin(an+Math.PI/4)*QD*1.4142+Math.sin(a)*(QR-.5);}
   else{const w=(ISLE==='cross'?ARM:AR)-.6;x=Math.cos(an)*(AR-.4)-Math.sin(an)*u*w;z=Math.sin(an)*(AR-.4)+Math.cos(an)*u*w;}
   return[ACX+x,ACZ+z,Math.atan2(-z,-x)];}
-const slotO=s=>[(s%COLS)*FW,Math.floor(s/COLS)*FW];
+const slotO=s=>WL.pos[s]||[0,0];
 const TEAM=[];
 const _m=T3&&new T3.Matrix4(),_q=T3&&new T3.Quaternion(),_e=T3&&new T3.Euler(),_v=T3&&new T3.Vector3(),_s=T3&&new T3.Vector3(),_c=T3&&new T3.Color();
 // kleuren worden gedempt en verdonkerd: staal en steen in plaats van speelgoedkleuren
@@ -366,10 +369,12 @@ function init3D(){if(!T3)return false;
     // de strook en het vlaggetje in de kleur van de speler; waar ze precies zitten hangt af van de burcht (placeFort)
     const band=new T3.Mesh(raw('unitbox',()=>new T3.BoxGeometry(1,1,1)),tm);scene.add(band);
     const flag=new T3.Mesh(raw('flag',()=>new T3.BoxGeometry(.03,.42,.7)),tm);flag.castShadow=true;scene.add(flag);
-    for(const[x,z]of LAMPS){const d=decal('#ff9a40',5,.22);lampDecals.push(d);d.position.set(ox+x+(x<0?1:x>13?-1:0),.04,oz+z+(z<0?1:0));scene.add(d);}
+    const dec=[];for(const[x,z]of LAMPS){const d=decal('#ff9a40',5,.22);lampDecals.push(d);dec.push(d);scene.add(d);}
     const cv=document.createElement('canvas');cv.width=512;cv.height=128;const tex=new T3.CanvasTexture(cv);tex.encoding=T3.sRGBEncoding;
     const spr=new T3.Sprite(new T3.SpriteMaterial({map:tex,transparent:true,depthWrite:false,toneMapped:false}));spr.scale.set(3.4,.85,1);spr.position.set(ox+15.2,3.1,oz+9.4);scene.add(spr);
-    const L={g:cv.getContext('2d'),tex,spr,k:''};labels.push(L);labelDraw(L,'Vrije vesting','','#'+th.getHexString());SLOTOBJ.push({band,flag,spr});}
+    const L={g:cv.getContext('2d'),tex,spr,k:''};labels.push(L);labelDraw(L,'Vrije vesting','','#'+th.getHexString());SLOTOBJ.push({band,flag,spr,gr,dec});}
+  // de minigame-eilanden en het doolhof: alles wat hierna tot ISLEGRP gebouwd wordt, komt in één groep die alleen op Klassiek zichtbaar is
+  const c0=scene.children.length,f0=fires.length;
   {const am=mesh(arenaGeo,STONE);am.position.set(ACX,0,ACZ);scene.add(am);
     for(let i=0;i<30;i+=5){const an=i/30*Math.PI*2;addFire(ACX+Math.cos(an)*9.6,2.3,ACZ+Math.sin(an)*9.6,.7);}
     const sprA=nameSprite(ISLES.round.n,'#f6cf4d');sprA.scale.set(5,.95,1);sprA.position.set(ACX,4.2,ACZ-9.6);scene.add(sprA);}
@@ -428,6 +433,7 @@ function init3D(){if(!T3)return false;
     const d1=decal('#35cf4a',4,.45);d1.position.set(R.x+1.5,.07,R.z+R.W/2);const d2=decal('#f6cf4d',5,.6);d2.position.set(R.x+R.L-1,.07,R.z+R.W/2);scene.add(d1,d2);
     const sprP=nameSprite('Doolhof','#f6cf4d');sprP.scale.set(5,.95,1);sprP.position.set(R.x+R.L/2,3.6,R.z-1);scene.add(sprP);
     addFire(R.x+R.L-2,2.5,R.z+.3,.5);addFire(R.x+R.L-2,2.5,R.z+R.W-.3,.5);}
+  ISLEGRP=new T3.Group();for(const o of scene.children.slice(c0))ISLEGRP.add(o);scene.add(ISLEGRP);for(const f of fires.slice(f0))f.grp=ISLEGRP;
   for(const k of Object.keys(ENGEO)){const cap=k==='boss'?80:700,m=new T3.InstancedMesh(EN[k]?enemyGeo(k):geo('en_'+k,ENGEO[k]),MATE,cap);m.castShadow=true;m.frustumCulled=false;m.setColorAt(0,WHITE);m.count=0;scene.add(m);EI[k]={m,cap,n:0};}
   const hpm=()=>new T3.MeshBasicMaterial({depthTest:false,transparent:true,toneMapped:false});
   hpBack=new T3.InstancedMesh(new T3.PlaneGeometry(1,1),hpm(),900);hpBack.material.color.set('#000');hpBack.material.opacity=.75;hpBack.frustumCulled=false;hpBack.count=0;hpBack.renderOrder=4;scene.add(hpBack);
@@ -475,27 +481,36 @@ const fortGeo=(parts,wuv)=>parts.length?merge(parts,wuv):null;
 // (de poorten laten zien waar de vijand binnenkomt en weggaat).
 const fortBy={};let FORT=null;
 function buildFort(th){const id=FORTS[th.fort]?th.fort:'castle',F=FORTS[id],role=c=>c===MP.in?'in':c===MP.out?'out':'side',
-    key=id+'|'+SIDES.map(sd=>role(sd.cell)).join('');if(fortBy[key])return fortBy[key];
-  const k=fortKit(),main={solid:[],lit:[],lights:[],fires:[]},brE={solid:[],lit:[],lights:[],fires:[]},brS={solid:[],lit:[],lights:[],fires:[]};
+    key=id+'|'+MAP+'|'+SIDES.map(sd=>role(sd.cell)).join('');if(fortBy[key])return fortBy[key];
+  const k=fortKit(),main={solid:[],lit:[],lights:[],fires:[]},br={solid:[],lit:[],lights:[],fires:[]},hub={solid:[],lit:[],lights:[],fires:[]};
   fortPlace(F.base(k),0,0,0,main);
   for(const sd of SIDES){for(const[a0,a1]of[[-.7,sd.gap[0]],[sd.gap[1],13.7]]){const L=a1-a0,c=(a0+a1)/2;fortPlace(F.wall(k,L),sd.h?c:sd.at,sd.h?sd.at:c,sd.rot,main);}
     const g=(sd.gap[0]+sd.gap[1])/2;fortPlace(F.gate(k,role(sd.cell)),sd.h?g:sd.at,sd.h?sd.at:g,sd.rot,main);}
   for(const[x,z,r]of[[-.53,-.53,0],[13.53,-.53,-Math.PI/2],[13.53,13.53,Math.PI],[-.53,13.53,Math.PI/2]])fortPlace(F.corner(k),x,z,r,main);
   for(const[x,z,r]of LAMPS)fortPlace(F.lamp(k),x,z,r,main);
   fortPlace(F.hq(k),15.2,9.4,0,main);fortPlace(F.factory(k),-2.1,3.8,0,main);
-  const L=FW-13.72;fortPlace(F.bridge(k,L),13.36+L/2,6.5,0,brE);fortPlace(F.bridge(k,L),8.5,13.36+L/2,Math.PI/2,brS);
+  for(const c of MP.block||[]){const x=c%N;fortPlace((F.block||FORTS.castle.block)(k),x+.5,(c-x)/N+.5,0,main);} // vaste muurtjes op het speelveld
+  // de bruggen van de wereld (world.js), in wereldmaten: elk stuk tussen twee punten is een brug, gedraaid in zijn richting
+  for(const b of WL.bridges)for(let i=0;i+1<b.length;i++){const[ax,az]=b[i],[bx2,bz2]=b[i+1],dx=bx2-ax,dz=bz2-az,L=Math.hypot(dx,dz);
+    if(L>.05)fortPlace(F.bridge(k,L+(i&&i<b.length-2?.9:0)),(ax+bx2)/2,(az+bz2)/2,Math.atan2(-dz,dx),br);}
+  if(WL.hub&&F.hub)fortPlace(F.hub(k),WL.hub[0],WL.hub[1],0,hub); // het midden van een ring
   const mat=F.mat==='metal'?FORTMAT.metal:F.mat==='plain'?FORTMAT.plain:FORTMAT.stone,uv=F.mat==='plain'?0:.5;
-  const geos=[main,brE,brS].map(o=>({s:fortGeo(o.solid,uv),l:fortGeo(o.lit),o})),grp=new T3.Group();
-  for(let s=0;s<SLOTS;s++){const[ox,oz]=slotO(s),use=[geos[0]];if(s%COLS<COLS-1)use.push(geos[1]);if(s<SLOTS-COLS)use.push(geos[2]);
-    for(const u of use){if(u.s){const m=mesh(u.s,mat);m.position.set(ox,0,oz);grp.add(m);}if(u.l){const m=new T3.Mesh(u.l,FORTMAT.lit);m.position.set(ox,0,oz);grp.add(m);}
-      for(const[x,y,z,col,size]of u.o.lights){const h=col?halo(col,size,.85):new T3.Sprite(LAMPMAT);if(!col)h.scale.setScalar(size);h.position.set(ox+x,y,oz+z);grp.add(h);}
-      for(const[x,y,z,size]of u.o.fires)addFire(ox+x,y,oz+z,size,grp);}}
+  const geos=[main,br,hub].map(o=>({s:fortGeo(o.solid,uv),l:fortGeo(o.lit),o})),grp=new T3.Group();
+  const put=(u,ox,oz)=>{if(u.s){const m=mesh(u.s,mat);m.position.set(ox,0,oz);grp.add(m);}if(u.l){const m=new T3.Mesh(u.l,FORTMAT.lit);m.position.set(ox,0,oz);grp.add(m);}
+    for(const[x,y,z,col,size]of u.o.lights){const h=col?halo(col,size,.85):new T3.Sprite(LAMPMAT);if(!col)h.scale.setScalar(size);h.position.set(ox+x,y,oz+z);grp.add(h);}
+    for(const[x,y,z,size]of u.o.fires)addFire(ox+x,y,oz+z,size,grp);};
+  for(let s=0;s<NS;s++){const[ox,oz]=slotO(s);put(geos[0],ox,oz);}
+  put(geos[1],0,0);put(geos[2],0,0); // bruggen en hub liggen al op hun plek in de wereld
   grp.visible=false;scene.add(grp);return fortBy[key]={grp,F,id};}
 // Laat de burcht van thema th zien en zet de strook, het vlaggetje en de naam van elke speler op het hoofdkwartier.
 function placeFort(th){const f=buildFort(th);if(FORT&&FORT!==f)FORT.grp.visible=false;FORT=f;f.grp.visible=true;const F=f.F,b=F.band,fl=F.flag||[0,2.35,1.17];
-  for(let s=0;s<SLOTS;s++){const o=SLOTOBJ[s];if(!o)continue;const[ox,oz]=slotO(s);
-    o.band.visible=!!b;if(b){o.band.scale.set(b[0],b[1],b[2]);o.band.position.set(ox+15.2,b[3],oz+9.4);}
-    o.flag.position.set(ox+15.2+fl[0],fl[1],oz+9.4+fl[2]);o.spr.position.set(ox+15.2,F.label||3.1,oz+9.4);}}
+  for(let s=0;s<SLOTS;s++){const o=SLOTOBJ[s];if(!o)continue;const on=s<NS,[ox,oz]=slotO(s); // vestingen die deze map niet heeft, verdwijnen
+    o.band.visible=on&&!!b;o.flag.visible=o.spr.visible=o.gr.visible=on;for(const d of o.dec)d.visible=on;if(!on)continue;
+    if(b){o.band.scale.set(b[0],b[1],b[2]);o.band.position.set(ox+15.2,b[3],oz+9.4);}
+    o.flag.position.set(ox+15.2+fl[0],fl[1],oz+9.4+fl[2]);o.spr.position.set(ox+15.2,F.label||3.1,oz+9.4);o.gr.position.set(ox+N/2,.012,oz+N/2);
+    LAMPS.forEach(([x,z],i)=>o.dec[i].position.set(ox+x+(x<0?1:x>13?-1:0),.04,oz+z+(z<0?1:0)));}
+  if(ISLEGRP)ISLEGRP.visible=!!MP.mini; // de minigame-eilanden staan alleen bij Klassiek
+  sea.position.set((WL.box[0]+WL.box[2])/2,-1.25,(WL.box[1]+WL.box[3])/2);miniFit();}
 // Wat er in de lucht hangt: sneeuw die valt, lichtjes die zweven of vonken die opstijgen. Een wolk rond de camera.
 function makeParticles(P){const n=P.n||600,pos=new Float32Array(n*3),sp=new Float32Array(n),W=70,H=22,r=Textures.lcg(17);
   for(let i=0;i<n;i++){pos[i*3]=(r()-.5)*W;pos[i*3+1]=r()*H;pos[i*3+2]=(r()-.5)*W;sp[i]=.4+r();}
@@ -538,7 +553,7 @@ const focus=()=>camMode==='hero'&&G?[hero.x,hero.z]:[cam.tx,cam.tz];
 function camUpdate(){let fx,fz;
   if(camMode==='hero'&&G){hcam.d=Math.max(3.5,Math.min(26,hcam.d));hcam.pitch=Math.max(.1,Math.min(1.3,hcam.pitch));fx=hero.x;fz=hero.z;
     const cp=Math.cos(hcam.pitch)*hcam.d;camera.position.set(fx+Math.sin(hcam.yaw)*cp,1+Math.sin(hcam.pitch)*hcam.d,fz+Math.cos(hcam.yaw)*cp);camera.lookAt(fx,1,fz);}
-  else{cam.d=Math.max(11,Math.min(64,cam.d));cam.tx=Math.max(-30,Math.min(COLS*FW+24,cam.tx));cam.tz=Math.max(-30,Math.min(ROWS*FW+24,cam.tz));fx=cam.tx;fz=cam.tz;
+  else{cam.d=Math.max(11,Math.min(64,cam.d));cam.tx=Math.max(WL.box[0]-30,Math.min(WL.box[2]+31,cam.tx));cam.tz=Math.max(WL.box[1]-30,Math.min(WL.box[3]+31,cam.tz));fx=cam.tx;fz=cam.tz;
     const cp=Math.cos(PITCH)*cam.d;camera.position.set(fx+Math.sin(cam.yaw)*cp,Math.sin(PITCH)*cam.d,fz+Math.cos(cam.yaw)*cp);camera.lookAt(fx,0,fz);}
   sun.position.set(fx-34,24,fz+20);sun.target.position.set(fx,0,fz);}
 function camTo(s){const[ox,oz]=slotO(s);cam.tx=ox+6.5;cam.tz=oz+7+cam.d*.1;}
@@ -625,7 +640,7 @@ function fieldsNow(){const fs=[],used=new Set();
   if(G){let trail=G.trail;if(G.phase==='prep'){const pv=E.preview(G);if(pv.road)trail=NOSET;else{if(G.pvt!==pv){G.pvt=pv;G.pvs=new Set(pv.cells.filter(c=>!G.road.has(c)));}trail=G.pvs;}}
     fs.push({slot:mySlot,own:true,tw:G.tw,en:G.en,name:'Jij',r:G.round,l:G.lives,done:ended,road:G.road,trail,psig:'o'+G.rv});used.add(mySlot);}
   for(const p of peers){if(own(p)||p.bot||p.kind!=='viewer')continue;const pr=p.presence||{},sl=pr.sl;
-    if((pr.st!=='playing'&&pr.st!=='done')||!Number.isInteger(sl)||sl<0||sl>=SLOTS||used.has(sl)||typeof pr.tw!=='string')continue;
+    if((pr.st!=='playing'&&pr.st!=='done')||!Number.isInteger(sl)||sl<0||sl>=NS||used.has(sl)||typeof pr.tw!=='string')continue;
     used.add(sl);const d=decode(p);fs.push({slot:sl,own:false,tw:d.tw,en:d.en,name:nameOf(p),r:+pr.r||1,l:+pr.l||0,done:pr.st==='done',road:d.road,trail:d.trail,psig:typeof pr.pa==='string'?pr.pa:''});}
   botFields(fs,used);return fs;}
 const builderParts=()=>[bx(.52,.16,.32,'#b8901e',0,.2,0),bx(.2,.18,.26,'#2a2f35',.1,.36,0),bx(.44,.06,.06,'#2a2f35',-.08,.5,0,0,.5),bx(.2,.1,.3,'#8a6c16',-.18,.31,0),
@@ -799,25 +814,28 @@ function iconDraw(cv,ic){const g=cv.getContext('2d'),W=cv.width,H=cv.height;g.cl
   g.strokeStyle='rgba(255,255,255,.18)';g.lineWidth=2;g.strokeRect(1,1,W-2,H-2);}
 
 /* --- minimap en wereld-UI --- */
-const MW=COLS*FW+54,MH=MW*1.04,MX=-30,MZ=-31;
+// De minikaart: hoeveel van de wereld hij laat zien. Klassiek houdt de eilanden in beeld; de andere maps passen precies om de vestingen.
+let MW=COLS*FW+54,MH=MW*1.04,MX=-30,MZ=-31;
+function miniFit(){if(MP.mini){MW=COLS*FW+54;MX=-30;MZ=-31;}else{const[x0,z0,x1,z1]=WL.box;MX=x0-9;MZ=z0-8;MW=Math.max(x1+12-MX,(z1+8-MZ)/1.04);}MH=MW*1.04;}
 function drawMini(fs){const cv=$('#mini'),g=cv.getContext('2d'),k=cv.width/MW,by=new Map(fs.map(f=>[f.slot,f]));
   g.fillStyle='#071620';g.fillRect(0,0,cv.width,cv.height);const X=x=>(x-MX)*k,Z=z=>(z-MZ)*k;
-  for(let s=0;s<SLOTS;s++){const[ox,oz]=slotO(s),f=by.get(s),col='#'+TEAM[s].getHexString();
+  g.strokeStyle='#5a5040';g.lineWidth=Math.max(2,1.6*k);for(const b of WL.bridges){g.beginPath();b.forEach(([x,z],i)=>i?g.lineTo(X(x),Z(z)):g.moveTo(X(x),Z(z)));g.stroke();} // bruggen
+  for(let s=0;s<NS;s++){const[ox,oz]=slotO(s),f=by.get(s),col='#'+TEAM[s].getHexString();
     g.fillStyle=f?'#2f3d26':'#1c2620';g.fillRect(X(ox),Z(oz),N*k,N*k);
     if(f){g.fillStyle='#4f4632';for(const c of f.trail){const x=c%N;g.fillRect(X(ox+x),Z(oz+(c-x)/N),k+.5,k+.5);}g.fillStyle='#8a5a44';for(const c of f.road){const x=c%N;g.fillRect(X(ox+x),Z(oz+(c-x)/N),k+.5,k+.5);}}
     g.strokeStyle=f?col:'#39414c';g.lineWidth=f&&f.own?3:1.5;g.strokeRect(X(ox)-1,Z(oz)-1,N*k+2,N*k+2);
     if(f){g.fillStyle=col;for(const t of f.tw)g.fillRect(X(ox+t.x)-2.5,Z(oz+t.y)-2.5,5,5);g.fillStyle='#ff4034';for(const e of f.en)g.fillRect(X(ox+e.x)-1.5,Z(oz+e.y)-1.5,e.boss?6:3,e.boss?6:3);}}
-  for(const id in ISLES){const I=ISLES[id],x=X(I.x),z=Z(I.z),box=(w,d)=>{g.fillRect(x-w*k,z-d*k,2*w*k,2*d*k);g.strokeRect(x-w*k,z-d*k,2*w*k,2*d*k);},disc=(dx,dz,r)=>{g.beginPath();g.arc(x+dx*k,z+dz*k,r*k,0,7);g.fill();g.stroke();};
+  if(MP.mini)for(const id in ISLES){const I=ISLES[id],x=X(I.x),z=Z(I.z),box=(w,d)=>{g.fillRect(x-w*k,z-d*k,2*w*k,2*d*k);g.strokeRect(x-w*k,z-d*k,2*w*k,2*d*k);},disc=(dx,dz,r)=>{g.beginPath();g.arc(x+dx*k,z+dz*k,r*k,0,7);g.fill();g.stroke();};
     g.fillStyle='#3a3226';g.strokeStyle=arena&&ISLE===id&&arena.mode!=='run'?'#f6cf4d':'#7a6a48';g.lineWidth=2;
     if(id==='round')disc(0,0,9.5);else if(id==='casino'){box(ROUL.W+.6,ROUL.D+.6);g.fillStyle='#0f5a32';g.fillRect(x-ROUL.W*k+2,z-ROUL.D*k+2,2*ROUL.W*k-4,2*ROUL.D*k-4);}else if(id==='square')box(9.5,9.5);else if(id==='track'){g.fillStyle='#2f3a24';box(TRK+.5,TRK+.5);}else if(id==='cross'){box(9.5,3.2);box(3.2,9.5);g.fillRect(x-9.5*k+1,z-3.2*k+1,19*k-2,6.4*k-2);}
     else{g.lineWidth=3;g.beginPath();for(const[p,q]of[[1,1],[1,-1]]){g.moveTo(x-QD*k,z-p*q*QD*k);g.lineTo(x+QD*k,z+p*q*QD*k);}g.rect(x-QD*k,z-QD*k,2*QD*k,2*QD*k);g.stroke();g.lineWidth=2;for(const[p,q]of[[1,1],[1,-1],[-1,1],[-1,-1]])disc(p*QD,q*QD,3.6);}}
-  g.fillStyle='#3a3226';g.strokeStyle=arena&&arena.mode==='run'?'#f6cf4d':'#7a6a48';g.lineWidth=2;g.fillRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);g.strokeRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);
+  if(MP.mini){g.fillStyle='#3a3226';g.strokeStyle=arena&&arena.mode==='run'?'#f6cf4d':'#7a6a48';g.lineWidth=2;g.fillRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);g.strokeRect(X(RUN.x),Z(RUN.z),RUN.L*k,RUN.W*k);}
   for(const r of rheroes.values()){g.fillStyle='#'+TEAM[r.slot].getHexString();g.strokeStyle='#fff';g.lineWidth=1;g.beginPath();g.arc(X(r.x),Z(r.z),4,0,7);g.fill();g.stroke();}
   if(G){g.fillStyle='#fff';g.strokeStyle='#000';g.lineWidth=1.5;g.beginPath();g.arc(X(hero.x),Z(hero.z),5,0,7);g.fill();g.stroke();}
   if(gl3){const pts=[[-1,1],[1,1],[1,-1],[-1,-1]].map(([x,y])=>groundAt(x,y));if(pts.every(Boolean)){g.strokeStyle='#fff';g.lineWidth=1.5;g.beginPath();pts.forEach((p,i)=>i?g.lineTo(X(p.x),Z(p.z)):g.moveTo(X(p.x),Z(p.z)));g.closePath();g.stroke();}}}
 function miniGo(ev){const cv=$('#mini'),r=cv.getBoundingClientRect();if(camMode==='hero'){camMode='free';cam.d=30;cam.yaw=0;}cam.tx=MX+(ev.clientX-r.left)/r.width*MW;cam.tz=MZ+(ev.clientY-r.top)/r.height*MH+cam.d*.1;}
 function updWorldUi(fs){if(!fs)return;const by=new Map(fs.map(f=>[f.slot,f]));
-  if(gl3)for(let s=0;s<SLOTS;s++){const f=by.get(s);labelDraw(labels[s],f?f.name:'Vrije vesting',f?(f.done?'Uitgespeeld · ronde '+f.r:`Ronde ${f.r} · ${f.l} levens`):'','#'+TEAM[s].getHexString());labels[s].spr.material.opacity=f?1:.45;}
+  if(gl3)for(let s=0;s<NS;s++){const f=by.get(s);labelDraw(labels[s],f?f.name:'Vrije vesting',f?(f.done?'Uitgespeeld · ronde '+f.r:`Ronde ${f.r} · ${f.l} levens`):'','#'+TEAM[s].getHexString());labels[s].spr.material.opacity=f?1:.45;}
   if(TEAM.length)drawMini(fs);
   const ul=$('#qPlayers'),top=[...fs].sort((a,b)=>b.r-a.r).slice(0,6),sig=top.map(f=>f.slot+':'+f.name+':'+f.r).join();
   if(ul.dataset.k!==sig){ul.dataset.k=sig;ul.textContent='';for(const f of top){const li=document.createElement('li'),a=document.createElement('span'),b=document.createElement('b');a.textContent=f.name;if(TEAM[f.slot])a.style.color='#'+TEAM[f.slot].getHexString();b.textContent=f.r;b.className='num';li.append(a,b);ul.append(li);}}}
@@ -827,10 +845,11 @@ let toastT=0;
 function toast(msg,ms){if(ACT)return;const t=$('#toast');t.textContent=msg+toastAdd;toastAdd='';t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,ms||2400);}
 function setText(el,v){if(el.textContent!==v)el.textContent=v;}
 function takenSlots(matchIdValue=matchId){const s=new Set();for(const p of peers){if(own(p))continue;const pr=p.presence||{};if((pr.st!=='playing'&&pr.st!=='done')||Number(pr.mt)!==Number(matchIdValue))continue;if(Number.isInteger(pr.sl))s.add(pr.sl);if(Array.isArray(pr.bs))for(const v of pr.bs)if(Number.isInteger(v))s.add(v);}return s;}
-function freeSlot(idx,matchIdValue=matchId){const t=takenSlots(matchIdValue),free=[];for(let i=0;i<SLOTS;i++)if(!t.has(i))free.push(i);return free.length?free[(idx||0)%free.length]:0;}
+// Op een piramide (Wintermaul) komt alles onderin samen: daar eerst iemand neerzetten, dus van onder naar boven vullen.
+function freeSlot(idx,matchIdValue=matchId){const t=takenSlots(matchIdValue),free=[];for(let i=0;i<NS;i++)if(!t.has(i))free.push(i);if(MP.pass==='down')free.reverse();return free.length?free[(idx||0)%free.length]:0;}
 let waveTotal=1,nextRound=0;
 // solo: je begint alleen, dus acht bots doen mee
-function beginGame(idx,mid,solo,mapId){closePops();clearBots();matchId=mid||Date.now();mySlot=freeSlot(idx,matchId);E.tune(gameCfg);MAP=E.MAPS[mapId]?mapId:'classic';MP=E.mapOf(MAP);passLog={n:0,list:[]};pzSeen.clear();applyTheme(MP.theme);G=E.create(save.skills,save.diff,MAP);G.pass=passOn;HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
+function beginGame(idx,mid,solo,mapId){closePops();clearBots();matchId=mid||Date.now();MAP=E.MAPS[mapId]?mapId:'classic';MP=E.mapOf(MAP);WL=World.build(MP);NS=WL.n;mySlot=freeSlot(idx,matchId);E.tune(gameCfg);passLog={n:0,list:[]};pzSeen.clear();applyTheme(MP.theme);G=E.create(save.skills,save.diff,MAP);G.pass=passOn;HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
   myBm=0;myBh=0;msLast=null;finalMax=0;finalAt=0;built=false;nx=0;sentWave=0;arenaFor=0;roadMode=false;t0=performance.now();prepEnd=t0+E.PREP*1000; // E.PREP: na E.tune, dus met de bouwtijd uit de webadmin
   {const[ox,oz]=slotO(mySlot);hero={x:ox+6.5,z:oz+5.5,a:-1.57,hp:0,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false};}armour=0;arena=null;camMode='hero';hero.hp=maxHp();hcam.yaw=0;hcam.pitch=.62;hcam.d=stage.clientWidth<760?13:10;myState='playing';ready=false;
   $('#home').hidden=true;$('#game').hidden=false;$('#result').hidden=true;
@@ -838,7 +857,7 @@ function beginGame(idx,mid,solo,mapId){closePops();clearBots();matchId=mid||Date
   $('#nogl').hidden=gl3;resize();cam.d=stage.clientWidth<760?46:24;cam.yaw=0;camHome();nextRound=0;if(solo)spawnBots();refresh();pushPresence(true);
   iconDraw($('#heroCv'),'hero'+save.hero);
   setText($('#hScoreL'),G.D.score>1?'Score '+mulText(G.D.score):'Score');$('#hScoreL').parentNode.title=`Score · ${G.D.n}`+(G.D.score>1?`, alles wat je scoort telt ${mulText(G.D.score)}`:'');
-  if(MAP!=='classic')toast(`Map: ${MP.n}. ${MP.d}`,7000);else if(G.diff)toast(`${G.D.n}: taaiere vijanden, score ${mulText(G.D.score)}`,3600);}
+  if(MAP!=='classic')toast(`Map: ${MP.n}${MP.hard>1?` (vijanden ${mulText(MP.hard)} zo taai)`:''}. ${MP.d}`,7000);else if(G.diff)toast(`${G.D.n}: taaiere vijanden, score ${mulText(G.D.score)}`,3600);}
 function endGame(){ended=true;const won=G.phase==='won';
   save.games++;save.best=Math.max(save.best,G.score);persist();
   if(acct&&Net.hasToken())Net.api('POST','/scores',{score:G.score,round:G.cleared,won}).catch(authFail);
@@ -866,10 +885,13 @@ function liveFields(){const me=ACT?YOU:{G,mySlot,ended},o=new Map();
   for(const b of bots){const c=b.c;if(!c.ended&&c.G.phase!=='over')o.set(c.mySlot,{g:c.G});}
   for(const p of netPeers){if(ownReal(p)||p.kind!=='viewer')continue;const pr=p.presence||{};if(pr.st==='playing'&&Number(pr.mt)===Number(matchId)&&Number.isInteger(pr.sl)&&!o.has(pr.sl))o.set(pr.sl,{peer:p});}
   return o;}
-function passTarget(from){if(!MP.pass)return null;const live=liveFields(),c0=from%COLS,r0=Math.floor(from/COLS);let best=null;
-  for(const s of live.keys()){const c=s%COLS,r=Math.floor(s/COLS);
-    if(MP.pass==='row'?(r===r0&&c>c0&&(best===null||c<best%COLS)):(c===c0&&r>r0&&(best===null||r<Math.floor(best/COLS))))best=s;}
-  return best===null?null:{slot:best,...live.get(best)};}
+// Waar een doorgelaten vijand heen gaat: WL.next (world.js). Zijn het er twee, dan om en om. Zit er in een vesting niemand, dan loopt
+// hij er gewoon doorheen naar de volgende; komt hij nergens meer uit, dan kost hij levens.
+const passRR={};
+function passTarget(from){if(!MP.pass)return null;const live=liveFields();
+  const pick=(s,depth)=>{const nx=WL.next[s]||[];if(!nx.length||depth>12)return null;const k=passRR[s]=((passRR[s]|0)+1)%nx.length;
+    for(let i=0;i<nx.length;i++){const t=nx[(k+i)%nx.length];if(live.has(t))return t;const d=pick(t,depth+1);if(d!=null)return d;}return null;};
+  const t=pick(from,0);return t==null?null:{slot:t,...live.get(t)};}
 // E.step roept dit aan als een vijand jouw vesting uitloopt. true = doorgegeven, false = hij kost jou levens.
 function passOn(g,e){const t=passTarget(mySlot);if(!t)return false;const frac=Math.max(1,Math.min(9,Math.ceil(e.hp/e.max*9)));
   if(t.g){E.inject(t.g,e.type,frac/9);return true;}
@@ -914,11 +936,10 @@ function paintTo(c,on){const pc=paintLast;paintLast=c;if(pc<0||pc===c){roadSet(c
   while(x!==tx||y!==ty){if(Math.abs(tx-x)>=Math.abs(ty-y))x+=Math.sign(tx-x);else y+=Math.sign(ty-y);roadSet(y*N+x,on);}}
 function roadTool(){if(!MP.roads){roadMode=false;return;}roadMode=!roadMode;buildSel=null;sel=null;if(roadMode){camMode='free';cam.yaw=0;cam.d=stage.clientWidth<760?44:23;camTo(mySlot);}}
 /* --- held: lopen, botsen, aanvallen --- */
-function walkable(x,z){if(arena&&arena.block&&arena.block(x,z))return false;for(const k in ISLES)if(SHAPE[k](x-ISLES[k].x,z-ISLES[k].z))return true;if(runFree(x-RUN.x,z-RUN.z))return true;
-  const c=Math.floor((x+3.5)/FW),r=Math.floor((z+3.5)/FW);if(c<0||r<0||c>=COLS||r>=ROWS)return false;const lx=x-c*FW,lz=z-r*FW;
-  if(lx>=-.15&&lx<=13.15&&lz>=-.15&&lz<=13.15)return true;
-  if(lz>=5.85&&lz<=7.15&&((lx>13&&c<COLS-1)||(lx<0&&c>0)))return true;
-  if(lx>=7.85&&lx<=9.15&&((lz>13&&r<ROWS-1)||(lz<0&&r>0)))return true;return false;}
+function walkable(x,z){if(arena&&arena.block&&arena.block(x,z))return false;
+  if(MP.mini){for(const k in ISLES)if(SHAPE[k](x-ISLES[k].x,z-ISLES[k].z))return true;if(runFree(x-RUN.x,z-RUN.z))return true;} // de minigame-eilanden: alleen op Klassiek
+  for(let s=0;s<NS;s++){const p=WL.pos[s],lx=x-p[0],lz=z-p[1];if(lx>=-.15&&lx<=13.15&&lz>=-.15&&lz<=13.15)return true;}
+  return World.onBridge(WL,x,z);}
 function towerAt(x,z){if(!G)return false;const[ox,oz]=slotO(mySlot),lx=x-ox,lz=z-oz,cx=Math.floor(lx),cz=Math.floor(lz);if(cx<0||cz<0||cx>=N||cz>=N)return false;
   const t=G.map[cz*N+cx];return!!t&&Math.hypot(lx-t.x,lz-t.y)<(t.size>1?t.size*.47:.5);}
 function stepHero(dx,dz,manual){const h=hero,ok=(x,z)=>walkable(x,z)&&!(manual&&towerAt(x,z)&&!towerAt(h.x,h.z));
@@ -1474,10 +1495,10 @@ function botRoad(ai){if(!MP.roads){const cells=E.route(new Set(),()=>false,MP).c
   for(let c=0;c<N*N;c++){if(on.has(c)||c===E.C_IN||c===E.C_OUT)continue;const x=c%N,cy2=(c-x)/N;let n=0;
     for(const r of cells){const dx=r%N-x,dy=(r-r%N)/N-cy2;if(dx*dx+dy*dy<=6.5)n++;}sc.push([c,n+Math.random()]);}
   ai.roadQ=cells;ai.cells=sc.sort((p,q)=>q[1]-p[1]).map(p=>p[0]);}
-function spawnBots(){const hs=HEROES.map((h,i)=>i).filter(i=>i!==save.hero).sort(()=>Math.random()-.5),used=takenSlots(),free=[],mc=mySlot%COLS,mr=Math.floor(mySlot/COLS);
-  const far=s=>Math.hypot(s%COLS-mc,Math.floor(s/COLS)-mr);
-  for(let s=0;s<SLOTS;s++)if(s!==mySlot&&!used.has(s))free.push(s);
-  free.sort((p,q)=>far(p)-far(q)); // de vestingen rond die van jou
+function spawnBots(){const hs=HEROES.map((h,i)=>i).filter(i=>i!==save.hero).sort(()=>Math.random()-.5),used=takenSlots(),free=[],me=slotO(mySlot);
+  const far=s=>Math.hypot(slotO(s)[0]-me[0],slotO(s)[1]-me[1]);
+  for(let s=0;s<NS;s++)if(s!==mySlot&&!used.has(s))free.push(s);
+  free.sort((p,q)=>MP.pass==='down'?q-p:far(p)-far(q)); // de vestingen rond die van jou; op een piramide van onder naar boven
   bots=free.slice(0,BOTN).map((slot,i)=>{const g=E.create(save.skills,save.diff,MAP),[ox,oz]=slotO(slot),idx=hs[i%hs.length];g.maxLives=g.lives;g.pass=passOn;
     const b={peer:'bot-'+(i+1),kind:'viewer',by:null,name:'Bot '+BOTNAMES[i%BOTNAMES.length],sameTab:false,isMe:false,bot:true,presence:{},mx:0,mz:0,shove:null,
       c:{G:g,HM:g.m,hero:{x:ox+6.5,z:oz+5.5,a:-1.57,hp:HEROES[idx].hp*g.m.hHp,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false},armour:0,mySlot:slot,arena:null,arenaFor:0,built:false,nx:0,sentWave:0,myBh:0,myBm:0,msLast:null,finalMax:0,finalAt:0,
@@ -1697,7 +1718,7 @@ function botsTick(dt){if(!bots.length)return;
   // komt een mens uit een ander potje op de plek van een bot te staan, dan verhuist de bot
   bslow-=dt;if(bslow<=0){bslow=1;const hum=new Set();
     for(const p of netPeers){const pr=p.presence||{};if(!ownReal(p)&&(pr.st==='playing'||pr.st==='done')&&Number.isInteger(pr.sl))hum.add(pr.sl);}
-    for(const b of bots){const c=b.c;if(!hum.has(c.mySlot))continue;const used=takenSlots();used.add(mySlot);let s=0;while(s<SLOTS&&used.has(s))s++;if(s>=SLOTS)continue;
+    for(const b of bots){const c=b.c;if(!hum.has(c.mySlot))continue;const used=takenSlots();used.add(mySlot);let s=0;while(s<NS&&used.has(s))s++;if(s>=NS)continue;
       const[ax,az]=slotO(c.mySlot),[cx,cz]=slotO(s);c.mySlot=s;if(!c.arena){c.hero.x+=cx-ax;c.hero.z+=cz-az;c.hero.tx=null;}c.orders=[];b.presence.sl=s;}}
   syncPeers();}
 
@@ -1801,7 +1822,7 @@ function paintRoster(list){const ul=$('#lobby'),sig=JSON.stringify(list);if(ul.d
 function paintMap(cells){const el=$('#world'),sig=JSON.stringify(cells);if(el.dataset.k===sig)return;el.dataset.k=sig;el.textContent='';let n=0;
   cells.forEach((c,i)=>{const d=document.createElement('div');d.className='cell'+(c?' '+c.st+(c.me?' me':''):'');const k=document.createElement('span');k.className='n';k.textContent=String(i+1);d.append(k);
     if(c){n++;const w=document.createElement('span');w.className='who';w.textContent=c.name;const s=document.createElement('span');s.className='st';s.textContent=c.sub;d.append(w,s);d.title=`Vesting ${i+1}: ${c.name}, ${c.sub}`;}else d.title=`Vesting ${i+1}: vrij`;el.append(d);});
-  setText($('#worldNote'),`${n} van ${SLOTS} vestingen bezet`);}
+  setText($('#worldNote'),`${n} van ${cells.length} vestingen bezet`);}
 /* Lobbykeuze: er zijn meerdere lobby's. Wie online is kiest er een; een lobby die gestart is gaat op slot. */
 const inLobby=()=>!!room&&!!room.lobby;
 let pickErr='',myLobby=null;
@@ -1832,7 +1853,7 @@ $('#lobbyLeave').onclick=()=>{if(room&&myState==='lobby'){ready=false;room.leave
 function renderLobby(){const picking=!!room&&!room.lobby;renderMapPick();if($('#popMap').open&&mapListSig!==lobbyMapNow()+isHost())buildMapList();$('#pick').hidden=!picking;$('#lobbyPanel').hidden=picking;
   $('#lobbyLeave').hidden=!inLobby();setText($('#lobbyTitle'),inLobby()?room.lobby.name:'Lobbychat');
   if(picking){renderPick();return;}
-  const btn=$('#startBtn'),help=$('#lobbyHelp'),cells=Array(SLOTS).fill(null);$('#chatIn').disabled=$('#chatSend').disabled=!room||!chatOn();$('#chatIn').placeholder=chatOn()?'Typ een bericht…':'De chat staat tijdelijk uit.';$('#lobbyDot').className='live'+(room&&room.open?'':' off');
+  const btn=$('#startBtn'),help=$('#lobbyHelp'),cap=capOf(lobbyMapNow()),cells=Array(cap).fill(null);$('#chatIn').disabled=$('#chatSend').disabled=!room||!chatOn();$('#chatIn').placeholder=chatOn()?'Typ een bericht…':'De chat staat tijdelijk uit.';$('#lobbyDot').className='live'+(room&&room.open?'':' off');
   if(!room){paintRoster([{name:'Jij',chip:connAt===-1?'Solo':'Verbinden',cl:'',score:'',h:save.hero,df:save.diff,me:true}]);cells[0]={name:'Jij',st:'lobby',me:true,sub:'jouw vesting'};paintMap(cells);
     setText($('#lobbyNote'),connAt===-1?'solo':'verbinden…');
     setText(btn,'Start spel');btn.disabled=false;setText(help,connAt===-1?'De gezamenlijke lobby is hier niet bereikbaar. Je speelt met acht bots.':'');return;}
@@ -1844,11 +1865,13 @@ function renderLobby(){const picking=!!room&&!room.lobby;renderMapPick();if($('#
     list.push({name:nameOf(p),chip,cl,score:pr.s?fmt(+pr.s):'',h:heroOf(p),df:diffOf(p),me:!!own(p)});});
   if(!all.length)list.push({name:'Jij',chip:'Verbinden',cl:'',score:'',h:save.hero,df:save.diff,me:true});
   paintRoster(list);
-  const taken=takenSlots(),free=[];for(let i=0;i<SLOTS;i++)if(!taken.has(i))free.push(i);
-  for(const p of all){const pr=p.presence||{};if(!own(p)&&(pr.st==='playing'||pr.st==='done')&&Number.isInteger(pr.sl)&&pr.sl>=0&&pr.sl<SLOTS)cells[pr.sl]={name:nameOf(p),st:'play',me:false,sub:pr.st==='done'?'uitgespeeld':'ronde '+(+pr.r||1)};}
+  const taken=takenSlots(),free=[];for(let i=0;i<cap;i++)if(!taken.has(i))free.push(i);
+  for(const p of all){const pr=p.presence||{};if(!own(p)&&(pr.st==='playing'||pr.st==='done')&&Number.isInteger(pr.sl)&&pr.sl>=0&&pr.sl<cap)cells[pr.sl]={name:nameOf(p),st:'play',me:false,sub:pr.st==='done'?'uitgespeeld':'ronde '+(+pr.r||1)};}
   lp.forEach((p,i)=>{if(!free.length)return;const s=free[i%free.length];if(!cells[s]||own(p))cells[s]={name:nameOf(p),st:'lobby',me:!!own(p),sub:own(p)?'jouw vesting':'in de lobby'};});
   paintMap(cells);
-  if(taken.size>=SLOTS||(!me&&lp.length>=SLOTS)){setText(btn,'Wereld vol');btn.disabled=true;setText(help,`Alle ${SLOTS} vestingen zijn bezet. Wacht tot er een vrijkomt.`);return;}
+  if(taken.size>=cap||(!me&&lp.length>=cap)){setText(btn,'Wereld vol');btn.disabled=true;setText(help,`Alle ${cap} vestingen zijn bezet. Wacht tot er een vrijkomt.`);return;}
+  // een map heeft maar zoveel vestingen als hij heeft: met meer spelers in de lobby kan dit potje niet beginnen
+  if(lp.length>cap){setText(btn,'Te veel spelers');btn.disabled=true;setText(help,`${E.mapOf(lobbyMapNow()).n} heeft plek voor ${cap} spelers en er zitten er ${lp.length} in de lobby. Kies een andere map.`);return;}
   btn.disabled=false;
   if(!others.length){setText(btn,'Start spel');setText(help,'Je bent alleen in de lobby. Start direct en acht bots doen mee, of wacht tot er meer spelers zijn. Elk potje begint met '+prepTxt()+' bouwen.');}
   else if(host&&own(host)){setText(btn,'Start spel');const n=others.filter(p=>p.presence.rd).length;setText(help,`${n} van ${others.length} andere spelers klaar. Jij bent de eerste speler en kunt altijd starten.`);}
@@ -1892,7 +1915,7 @@ function syncPeers(){const mine=peers.find(p=>own(p));if(mine)myPeer=mine.peer;c
     let r=rheroes.get(p.peer);if(!r){r={x,z,a:0,walk:0,atk:0,ak:pr.ak|0,pu:Array.isArray(pr.pu)?pr.pu[0]:0,obj:null,lab:null,sig:'',peer:p.peer,bot:!!p.bot};rheroes.set(p.peer,r);}
     if(Array.isArray(pr.pu)&&pr.pu[0]!==r.pu){r.pu=pr.pu[0];if(+pr.ar>0)gotPush(pr.pu);}
     if(Math.hypot(x-r.x,z-r.z)>10){r.x=x;r.z=z;}
-    r.tx=x;r.tz=z;r.ta=+pr.p[2]||0;r.idx=Math.max(0,Math.min(5,pr.h|0));r.slot=Number.isInteger(pr.sl)&&pr.sl>=0&&pr.sl<SLOTS?pr.sl:SLOTS;r.hp=+pr.hp||0;r.mh=+pr.mh||100;r.ar=+pr.ar||0;r.name=nameOf(p);
+    r.tx=x;r.tz=z;r.ta=+pr.p[2]||0;r.idx=Math.max(0,Math.min(5,pr.h|0));r.slot=Number.isInteger(pr.sl)&&pr.sl>=0&&pr.sl<NS?pr.sl:SLOTS;r.hp=+pr.hp||0;r.mh=+pr.mh||100;r.ar=+pr.ar||0;r.name=nameOf(p);
     if((pr.ak|0)!==r.ak){r.ak=pr.ak|0;r.atk=1;r.shoot=true;}}
   for(const[k,r]of rheroes)if(!seen.has(k)){if(r.obj)scene.remove(r.obj);if(r.lab)scene.remove(r.lab);rheroes.delete(k);}}
 function renderBoard(){const ul=$('#board');ul.textContent='';
@@ -1946,13 +1969,14 @@ const MAP_DEMO=(()=>{const at=(x,y)=>y*N+x,row=(y,a,b)=>{const o=[];for(let x=a;
   const zig=[];{let y=E.MID;const cs=[0,4,8,12];let up=true;cs.forEach((x,k)=>{const to=k===cs.length-1?E.MID:up?1:N-2;for(;y!==to;y+=Math.sign(to-y))zig.push(at(x,y));zig.push(at(x,y));if(k<cs.length-1){for(let u=x+1;u<cs[k+1];u++)zig.push(at(u,y));up=!up;}});}
   return{classic:{road:zig,tw:[at(2,3),at(2,9),at(6,4),at(6,8),at(10,3),at(10,9)]},
     relay:{road:row(E.MID,0,N-1),tw:[at(3,5),at(3,7),at(7,5),at(9,7)]},
-    wintermaul:{tw:[...row(3,3,12),...row(6,0,9),...row(9,3,12)]},
+    wintermaul:{tw:[]}, // de ijsmuurtjes komen uit de map zelf (block)
     circle:{tw:[at(5,5),at(7,5),at(5,7),at(7,7),at(6,4),at(0,1),at(12,11)]},
     maze:{tw:[...col(2,0,9),...col(5,3,12),...col(8,0,9),...col(11,3,11)]}};})();
 function drawMapCv(cv,id){const M=E.mapOf(id),th=themeOf(M.theme),D=MAP_DEMO[id]||{},g=cv.getContext('2d'),W=cv.width,k=W/(N+2),O=k;
   const tw=new Set(D.tw||[]),r=D.road?{cells:D.road,road:true}:E.route(new Set(),c=>tw.has(c),M),cell=(c,col,pad)=>{const x=c%N,y=(c-x)/N;g.fillStyle=col;g.fillRect(O+x*k+(pad||0),O+y*k+(pad||0),k-2*(pad||0)+.6,k-2*(pad||0)+.6);};
   g.fillStyle=th.sea.base;g.fillRect(0,0,W,W);g.fillStyle=th.ground.base;g.fillRect(O,O,N*k,N*k);
   for(const c of r.cells)cell(c,r.road?th.road.a:th.trail[0]);
+  for(const c of M.block||[])cell(c,th.ui.trim,k*.06); // vaste muurtjes
   for(const c of tw)cell(c,th.ui.accent,k*.18);
   g.strokeStyle='#000';g.lineWidth=1;g.strokeRect(O-.5,O-.5,N*k+1,N*k+1);
   // pijlen: groen naar binnen, rood naar buiten; bij doorgeven goud naar de volgende vesting
@@ -1962,15 +1986,24 @@ function drawMapCv(cv,id){const M=E.mapOf(id),th=themeOf(M.theme),D=MAP_DEMO[id]
   arrow(M.in,'#35cf4a',false);if(M.out>=0)arrow(M.out,M.pass?th.ui.accent:'#e8372a',true);
   if(M.loop){g.strokeStyle=th.ui.accent;g.lineWidth=Math.max(1.5,k*.22);const c0=O+6.5*k,R=k*2.2;g.beginPath();g.arc(c0,c0,R,-2.6,1.9);g.stroke();
     const a=1.9,ex=c0+Math.cos(a)*R,ey=c0+Math.sin(a)*R,tx=-Math.sin(a),ty=Math.cos(a),L=k*.7;g.fillStyle=th.ui.accent;g.beginPath();g.moveTo(ex+tx*L,ey+ty*L);g.lineTo(ex-ty*L*.6,ey+tx*L*.6);g.lineTo(ex+ty*L*.6,ey-tx*L*.6);g.closePath();g.fill();}}
+// Een plaatje van de hele wereld van een map: waar de vestingen liggen en de bruggen ertussen (world.js).
+function drawWorldCv(cv,id){const M=E.mapOf(id),th=themeOf(M.theme),L=World.build(M),g=cv.getContext('2d'),W=cv.width,[x0,z0,x1,z1]=L.box,pad=W*.08,
+    k=(W-2*pad)/Math.max(x1-x0,z1-z0),ox=(W-(x1-x0)*k)/2,oz=(W-(z1-z0)*k)/2,X=x=>ox+(x-x0)*k,Z=z=>oz+(z-z0)*k;
+  g.fillStyle=th.sea.base;g.fillRect(0,0,W,W);g.strokeStyle='rgba(255,255,255,.75)';g.lineWidth=Math.max(2,2.2*k);g.lineCap='round';
+  for(const b of L.bridges){g.beginPath();b.forEach(([x,z],i)=>i?g.lineTo(X(x),Z(z)):g.moveTo(X(x),Z(z)));g.stroke();}
+  if(L.hub){g.fillStyle=th.ui.accent;g.beginPath();g.arc(X(L.hub[0]),Z(L.hub[1]),9*k,0,7);g.fill();}
+  L.pos.forEach(([x,z])=>{g.fillStyle=th.ground.base;g.fillRect(X(x),Z(z),N*k,N*k);g.strokeStyle=th.ui.trim;g.lineWidth=1.5;g.strokeRect(X(x)+.5,Z(z)+.5,N*k-1,N*k-1);});}
 function setMap(id){if(!E.MAPS[id]||!isHost())return;lobbyMap=id;try{localStorage.setItem('ratd-map',id);}catch{}if(room&&!G)room.presence({mp:id}).catch(()=>{});renderMapPick();buildMapList();}
+const hardTxt=M=>M.hard&&M.hard!==1?' · '+mulText(M.hard)+' zo zwaar':'';
+const capTxt=id=>' · '+capOf(id)+' spelers';
 function renderMapPick(){const id=lobbyMapNow(),M=E.mapOf(id),host=isHost();if($('#mapCv').dataset.m!==id){$('#mapCv').dataset.m=id;drawMapCv($('#mapCv'),id);}
-  setText($('#mapName'),M.n);setText($('#mapKind'),M.k+' · '+themeOf(M.theme).n+(M.mini?' · met minigames':''));setText($('#mapAct'),host?'Kiezen':'Bekijken');
+  setText($('#mapName'),M.n);setText($('#mapKind'),M.k+' · '+themeOf(M.theme).n+capTxt(id)+hardTxt(M)+(M.mini?' · met minigames':''));setText($('#mapAct'),host?'Kiezen':'Bekijken');
   setText($('#mapNote'),host?(room&&room.lobby&&lobbyPeers().some(p=>!own(p))?'Jij bent speler 1: jij kiest de map voor iedereen.':''):'Speler 1 kiest de map. Iedereen speelt dezelfde.');}
 let mapListSig='';
 function buildMapList(){const ul=$('#mapList'),now=lobbyMapNow(),host=isHost();mapListSig=now+host;ul.textContent='';
   setText($('#mapLead'),host?'Kies de map voor dit potje. Iedereen in de lobby speelt dezelfde map. Alleen op Klassiek doen de minigames voorlopig mee.':'Speler 1 kiest de map voor dit potje. Hier zie je wat er gekozen is.');
   for(const id of E.MAP_IDS){const M=E.MAPS[id],li=document.createElement('li'),b=document.createElement('button'),cv=document.createElement('canvas'),t=document.createElement('span'),n=document.createElement('b'),k=document.createElement('small'),d=document.createElement('p');
-    b.type='button';cv.width=cv.height=208;cv.setAttribute('aria-hidden','true');drawMapCv(cv,id);t.className='mt';n.textContent=M.n;k.textContent=M.k+' · '+themeOf(M.theme).n+(M.mini?' · met minigames':'');d.textContent=themeOf(M.theme).tag+'. '+M.d;t.append(n,k,d);b.append(cv,t);
+    b.type='button';cv.width=cv.height=208;cv.setAttribute('aria-hidden','true');drawMapCv(cv,id);const wv=document.createElement('canvas');wv.width=wv.height=208;wv.setAttribute('aria-hidden','true');wv.className='world';drawWorldCv(wv,id);t.className='mt';n.textContent=M.n;k.textContent=M.k+' · '+themeOf(M.theme).n+capTxt(id)+hardTxt(M)+(M.mini?' · met minigames':'');d.textContent=themeOf(M.theme).tag+'. '+M.d;t.append(n,k,d);b.append(cv,wv,t);
     b.classList.toggle('on',id===now);b.setAttribute('aria-pressed',String(id===now));b.disabled=!host;b.onclick=()=>{setMap(id);};li.append(b);ul.append(li);}}
 $('#mapBtn').onclick=()=>{buildMapList();openPop('#popMap');};
 // Moeilijkheidsgraad: drie knoppen boven de startknop. De keuze geldt alleen voor jou en ligt vast zodra het potje begint.
@@ -2019,7 +2052,7 @@ $('#miniBtn').onclick=openMini;$('#lAgain').onclick=()=>{if(lab)startLab(lab.kin
 loadLocal();loadAcct();bindAccount();buildHud();
 try{if(init3D()){bindCanvas();renderIcons();}}catch(err){gl3=false;console.error(err);}
 renderHome();renderLobby();renderChat();if(!acct)showGate('new');requestAnimationFrame(frame);
-if(location.hash==='#dev')window.__ratd={E,g:()=>G,view:(x,z,d,yaw)=>{const[ox,oz]=slotO(mySlot);camMode='free';cam.tx=ox+x;cam.tz=oz+z;cam.d=d||24;cam.yaw=yaw||0;},map:()=>MAP,team:()=>G&&MP.pool?teamLives():null,fields:()=>[{who:'ik',slot:mySlot,l:G&&G.lives,r:G&&G.cleared,ph:G&&G.phase},...bots.map(b=>({who:b.name,slot:b.c.mySlot,l:b.c.G.lives,r:b.c.G.cleared,ph:b.c.G.phase}))].sort((a,b)=>a.slot-b.slot),waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>{enterArena(m,r);for(const b of bots)asBot(b,()=>enterArena(m,r));},bots:()=>bots,asBot,FIXED,miniFor,ISLES,ROUL,isle:()=>ISLE,isleOn,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
+if(location.hash==='#dev')window.__ratd={E,g:()=>G,passTo:from=>{const t=passTarget(from);return t?t.slot:null;},world:()=>WL,view:(x,z,d,yaw)=>{const[ox,oz]=slotO(mySlot);camMode='free';cam.tx=ox+x;cam.tz=oz+z;cam.d=d||24;cam.yaw=yaw||0;},map:()=>MAP,team:()=>G&&MP.pool?teamLives():null,fields:()=>[{who:'ik',slot:mySlot,l:G&&G.lives,r:G&&G.cleared,ph:G&&G.phase},...bots.map(b=>({who:b.name,slot:b.c.mySlot,l:b.c.G.lives,r:b.c.G.cleared,ph:b.c.G.phase}))].sort((a,b)=>a.slot-b.slot),waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>{enterArena(m,r);for(const b of bots)asBot(b,()=>enterArena(m,r));},bots:()=>bots,asBot,FIXED,miniFor,ISLES,ROUL,isle:()=>ISLE,isleOn,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
 // Sessie controleren: klopt het token nog, dan komt de voortgang van de server binnen.
 if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
 // Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.

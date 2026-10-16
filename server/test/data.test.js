@@ -85,7 +85,13 @@ test('maps: elke map wijst naar een bestaand thema en de poorten liggen in een o
     assert.ok(D.THEMES[m.theme], `${id}: thema ${m.theme} bestaat niet in data/themes.js`);
     assert.ok(inGap(m.in), id + ': de ingang ligt in een opening van de muur');
     if (m.out >= 0) assert.ok(inGap(m.out), id + ': de uitgang ligt in een opening van de muur');
-    if (m.pass) assert.ok(m.pass === 'row' || m.pass === 'col', id + ': pass is row of col');
+    if (m.pass) assert.ok(['row', 'col', 'down'].includes(m.pass), id + ': pass is row, col of down');
+    assert.ok(m.world && ['grid', 'pyramid', 'ring'].includes(m.world.kind), id + ': world is grid, pyramid of ring');
+    if (m.hard != null) assert.ok(num(m.hard) && m.hard > 0, id + ': hard is een getal boven 0');
+    for (const c of m.block || []) {
+      assert.ok(Number.isInteger(c) && c >= 0 && c < N * N, `${id}: muurtje ${c} ligt op het veld`);
+      assert.ok(c !== m.in && c !== m.out, `${id}: een muurtje mag niet op de ingang of uitgang`);
+    }
   }
 });
 
@@ -110,7 +116,8 @@ test('thema\'s: kleuren zijn geldig, vijanden bestaan en modellen geven onderdel
 });
 
 test('burchten: elk stuk bestaat, geeft onderdelen met geldige kleuren en blijft van het speelveld af', () => {
-  const pieces = ['base', 'wall', 'corner', 'gate', 'hq', 'factory', 'lamp', 'bridge'];
+  const pieces = ['base', 'wall', 'corner', 'gate', 'hq', 'factory', 'lamp', 'bridge', 'block'];
+  for (const [id, F] of Object.entries(D.FORTS)) if (F.hub) { const { kit } = fakeKit(); assert.ok([F.hub(kit)].flat(4).length, id + ': hub'); }
   for (const [id, F] of Object.entries(D.FORTS)) {
     assert.ok(F.n, id + ': naam');
     assert.ok(['stone', 'metal', 'plain'].includes(F.mat), id + ': mat is stone, metal of plain');

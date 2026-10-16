@@ -51,10 +51,11 @@ In `data/towers.js` staat per toren `cost`, `dmg`, `rate`, `range` en wat hij ex
 
 1. Kopieer in `data/maps.js` een map in `MAPS` en geef hem een nieuwe sleutel en `id` (die moeten gelijk zijn).
 2. Kies de ingang `in` en de uitgang `out`. Ze moeten in een opening van de muur liggen: links of rechts op rij `MID` (`LEFT(MID)`, `RIGHT(MID)`), of boven of onder in kolom `GATE` (`TOP(GATE)`, `BOTTOM(GATE)`). De test controleert dat.
-3. Kies de regels: `roads` (zelf een weg leggen), `maze` (doolhof bouwen met je torens), `loop` (een vaste ring), `pass` (doorgeven naar de buurman) en `pool` (gedeelde levens).
-4. Kies een thema met `theme`. Dat mag een bestaand thema zijn.
-5. Teken eventueel een voorbeeld voor de lobby: `MAP_DEMO` in `game.js` (een lijst vakken met torens). Zonder voorbeeld toont de lobby de route op een leeg veld.
-6. `npm test`.
+3. Kies de wereld met `world`: een raster (`grid`), een piramide (`pyramid`) of een ring (`ring`). Daarmee ligt ook vast hoeveel spelers mee kunnen doen en, bij `pass`, waar een doorgelaten vijand heen gaat. Zie de uitleg bovenin `maps.js`.
+4. Kies de regels: `roads` (zelf een weg leggen), `maze` (doolhof bouwen met je torens), `loop` (een vaste ring), `pass` (doorgeven naar de buurman) en `pool` (gedeelde levens).
+5. Kies een thema met `theme`. Dat mag een bestaand thema zijn.
+6. Teken eventueel een voorbeeld voor de lobby: `MAP_DEMO` in `game.js` (een lijst vakken met torens). Zonder voorbeeld toont de lobby de route op een leeg veld.
+7. `npm test`.
 
 De volgorde in `MAPS` is de volgorde in de lobby. De eerste map is de standaard.
 

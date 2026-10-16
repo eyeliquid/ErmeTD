@@ -34,6 +34,7 @@ client/                 frontend: gewone bestanden, geen bouwstap
     forts.js            burchten: muren, torens, poorten, hoofdkwartier, fabriek, lantaarns, bruggen
     themes.js           hoe elke map eruitziet en klinkt: licht, grond, decor, vijanden, muziek
   js/engine.js          spelregels: rekent met de data (draait ook op de server)
+  js/world.js           de wereld per map: waar de vestingen liggen, de bruggen, waar doorgelaten vijanden heen gaan
   js/textures.js        alle texturen, procedureel getekend
   js/music.js           de muziek, met een stijl per thema
   js/net.js             alle communicatie met de backend
@@ -79,11 +80,48 @@ Speler 1 kiest in de lobby de map (knop **Map**, boven de moeilijkheidsgraad). I
 | --- | --- | --- |
 | Klassiek | je eigen weg | Zoals altijd: links naar rechts, zelf een weg leggen, minigames na elke tiende golf. |
 | Estafette | doorlopen | Wat je doorlaat loopt verder door de vesting rechts van je op dezelfde rij. Alleen de laatste vesting op de rij verliest er levens door. |
-| Wintermaul | samenwerken | Van boven naar beneden, zonder weg: je bouwt het doolhof met je torens. Wat je doorlaat zakt naar de vesting eronder. Alle vestingen delen één levenspot; is die leeg, dan verliest iedereen. |
+| Wintermaul | samenwerken | Van boven naar beneden, zonder weg. Drie vaste ijsmuurtjes (`block` in `data/maps.js`) laten de vijand zigzaggen; met je torens maak je het doolhof nog langer. Wat je doorlaat zakt naar de vesting eronder. Alle vestingen delen één levenspot; is die leeg, dan verliest iedereen. |
 | Groene Cirkel | rondje | Een vaste ring zonder uitgang. De vijand blijft rondjes lopen tot hij dood is; elk rondje kost levens (een luchtschip 10). |
 | Doolhofbouwer | vrij bouwen | Geen weg: de vijand komt links binnen en wil onder weg. Je torens zijn je muren, ook tijdens een golf. |
 
-Op alle maps behalve Klassiek zijn er voorlopig geen minigames: na golf 100 heb je gewonnen.
+Op alle maps behalve Klassiek zijn er voorlopig geen minigames: na golf 100 heb je gewonnen. De minigame-eilanden en het doolhof staan daarom alleen in de wereld van Klassiek.
+
+### De wereld per map
+
+Elke map heeft een eigen indeling van de vestingen. Het aantal vestingen is ook het aantal spelers dat mee kan doen; zitten er meer spelers in de lobby, dan kan het potje op die map niet beginnen.
+
+| Map | Wereld | Spelers |
+| --- | --- | --- |
+| Klassiek | raster van 5 bij 5, bruggen naar alle buren, met de minigame-eilanden eromheen | 25 |
+| Estafette | vijf losse banen van vijf vestingen, alleen bruggen naar rechts | 25 |
+| Wintermaul | een piramide van 4, 3, 2 en 1, met schuine bruggen naar de vesting(en) eronder | 10 |
+| Groene Cirkel | een ring van twaalf rond een reactor | 12 |
+| Doolhofbouwer | een koninkrijk van 4 bij 4, met brede grachten | 16 |
+
+Op Wintermaul (genummerd van linksboven, rij voor rij):
+
+```
+1  2  3  4
+ 5  6  7
+  8  9
+   10
+```
+
+Wat 1 doorlaat gaat naar 5; van 2 gaat de helft naar 5 en de helft naar 6; van 3 de helft naar 6 en de helft naar 7; 4 gaat naar 7. 5 gaat naar 8, van 6 de helft naar 8 en de helft naar 9, 7 gaat naar 9. 8 en 9 gaan naar 10, en wat 10 doorlaat kost het team levens. Zit er in een vesting niemand, dan loopt de vijand er gewoon doorheen naar de volgende. De vestingen worden van onder naar boven gevuld, zodat er altijd iemand onderin staat.
+
+De indeling staat bij elke map in `world` in `client/js/data/maps.js`; `client/js/world.js` rekent er de plekken, de bruggen en de doorgangen (`next`) uit. In de mapkeuze staat naast het plaatje van een vesting ook een plaatje van de hele wereld.
+
+Elke map is ook zwaarder dan Klassiek: de vijanden krijgen meer levens. Dat staat bij de map in de lobby en in `hard` in `client/js/data/maps.js`.
+
+| Map | Levens van de vijanden |
+| --- | --- |
+| Klassiek | ×1 |
+| Estafette | ×1,5 |
+| Wintermaul | ×2 |
+| Groene Cirkel | ×3 |
+| Doolhofbouwer | ×5 |
+
+Het komt bovenop de moeilijkheidsgraad (Geers, Super Geers, Alleen voor Geers) en op de webadmin.
 
 ### Thema's: elke map zijn eigen look and feel
 
@@ -110,6 +148,7 @@ De poorten laten zo ook zien waar de vijand binnenkomt en weggaat. `buildFort` i
 Een thema verandert niets aan de spelregels: een Kart is een Conscript met een ander jasje. Kleuren, licht, grond, weg, zee, decor, de namen en modellen van de vijanden, de muziekstijl en de accentkleur van de knoppen staan per thema in `client/js/data/themes.js`. `applyTheme` in `client/js/game.js` zet ze bij de start van een potje. Het decor staat op de muren en de pieren, nooit op het speelveld.
 
 - **Waar het staat.** De spelregels van een map in `client/js/data/maps.js` (ingang `in`, uitgang `out`, `roads`, `maze`, `loop`, `pass`, `pool`, `mini`), het uiterlijk in `client/js/data/themes.js`. De voorbeeldplaatjes in de lobby staan in `MAP_DEMO` in `client/js/game.js`.
+- **Vaste muurtjes.** Een map kan met `block` vakken vastleggen waar niemand bouwt en waar de vijand omheen moet. De burcht bepaalt hoe ze eruitzien (stuk `block` in `data/forts.js`): ijs, banden, metaal, steen of een haag. Je held loopt er gewoon overheen.
 - **Doolhof.** Op Wintermaul en Doolhofbouwer kun je overal bouwen, behalve onder een vijand, zolang er een weg van de ingang naar de uitgang overblijft. Na elke nieuwe of verkochte toren zoekt de vijand meteen een nieuwe weg (`repath`); wie al loopt, gaat verder vanaf waar hij staat.
 - **Doorgeven.** Loopt een vijand je vesting uit, dan vraagt `E.step` via `G.pass` aan de spellaag of hij door kan. `passOn` in `client/js/game.js` zoekt de volgende vesting. Draait die in dezelfde browser (jij of een bot), dan komt de vijand er direct binnen (`E.inject`), met hetzelfde deel van zijn levens. Bij een andere speler gaat het via de presence `pz`: het totaal en de laatste 60 doorgegeven vijanden.
 - **Levenspot.** Op Wintermaul telt elke vesting zijn eigen levens; de pot is de som van alle vestingen in het potje (`teamLives`). De poorten boven en onder liggen in kolom 8, bij de openingen in de muur.

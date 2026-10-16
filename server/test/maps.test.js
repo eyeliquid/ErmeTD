@@ -103,3 +103,21 @@ test('Wintermaul: bij een gedeelde levenspot beslist de spellaag over verlies', 
   assert.ok(G.lives <= 0);
   assert.notEqual(G.phase, 'over');
 });
+
+test('Wintermaul: de ijsmuurtjes laten de vijand zigzaggen en je kunt er niet op bouwen', () => {
+  const G = E.create({}, 0, 'wintermaul');
+  E.lock(G);
+  const blk = E.blockOf(G.mp);
+  assert.ok(blk.size > 0, 'er zijn muurtjes');
+  assert.ok(G.path.len >= 40, 'de route is minstens 40 vakken lang, niet recht naar beneden (' + G.path.len + ')');
+  for (const c of G.path.cells) assert.ok(!blk.has(c), 'de route loopt nooit over een muurtje');
+  G.gold = 1e6;
+  for (const c of blk) assert.equal(E.canBuild(G, c, 'sentry'), false, 'op een muurtje kun je niet bouwen');
+});
+
+test('moeilijkheid per map: de vijanden zijn taaier dan op Klassiek', () => {
+  const hp = id => { const G = E.create({}, 0, id); E.lock(G); G.phase = 'build'; G.timer = 0; for (let i = 0; i < 60; i++) E.step(G, 1 / 30); return G.en[0].max; };
+  const base = hp('classic');
+  for (const [id, x] of [['relay', 1.5], ['wintermaul', 2], ['circle', 3], ['maze', 5]])
+    assert.ok(Math.abs(hp(id) / base - x) < 1e-9, `${id}: ${x} keer zo veel levens als op Klassiek`);
+});
