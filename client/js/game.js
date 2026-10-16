@@ -119,7 +119,9 @@ function bindAccount(){
 
 /* ================= 3D ================= */
 const stage=$('#stage');
-let renderer=null,scene,camera,sun,sea,ray,gl3=false,haloTex,hemi,fillL,SEAMAT,GMAT,LAMPMAT,GRUNGE,MASON,KERB=[];const lampDecals=[];
+let renderer=null,scene,camera,sun,sea,ray,gl3=false,FORTMAT,haloTex,hemi,fillL,SEAMAT,GMAT,LAMPMAT,GRUNGE,MASON,KERB=[];const lampDecals=[],SLOTOBJ=[];
+// De drie lantaarns op de muren van elke vesting: [x, z, draaiing]. Hoe ze eruitzien bepaalt de burcht (data/forts.js).
+const LAMPS=[[3.5,-.53,0],[13.53,10.5,-Math.PI/2],[-.53,10.5,Math.PI/2]];
 const cam={tx:0,tz:0,d:25,yaw:0},PITCH=.86,AR=8.6;
 // Zes minigame-eilanden rond het speelveld: onder het ronde, boven het vierkante, links het kruis, rechts de vier eilandjes, links onderin het casino en linksboven het racecircuit.
 // Elke minigame hoort bij één eiland (isle in KIND). ACX en ACZ zijn het midden van het eiland waar nu gespeeld wordt.
@@ -260,8 +262,8 @@ function makeTower(type,slot,lvl,spec){const g=new T3.Group(),head=new T3.Group(
 // KIT maakt van die bouwstenen echte vormen; paint vervangt kleuren: {oude kleur: nieuwe kleur}.
 const KIT=paint=>{const c=col=>(paint&&paint[col])||col;return{
   box:(w,h,d,col,x,y,z,ry,rz)=>bx(w,h,d,c(col),x,y,z,ry,rz),ball:(r,col,x,y,z,sc)=>sp(r,c(col),x,y,z,sc),rod:(r,len,col,x,y,z,tilt)=>brl(r,len,c(col),x,y,z,tilt),
-  cyl:(rt,rb,h,col,x,y,z,seg)=>cy(rt,rb,h,c(col),x,y,z,seg),cone:(r,h,col,x,y,z,down)=>P(new T3.ConeGeometry(r,h,12),c(col),x,y,z,down?Math.PI:0),
-  gem:(r,col,x,y,z)=>P(new T3.OctahedronGeometry(r),c(col),x,y,z),ring:(r,t,col,x,y,z,rx)=>P(new T3.TorusGeometry(r,t,8,18),c(col),x,y,z,rx==null?Math.PI/2:rx)};};
+  cyl:(rt,rb,h,col,x,y,z,seg)=>cy(rt,rb,h,c(col),x,y,z,seg),cone:(r,h,col,x,y,z,down,seg,ry)=>P(new T3.ConeGeometry(r,h,seg||12),c(col),x,y,z,down?Math.PI:0,ry||0),
+  gem:(r,col,x,y,z)=>P(new T3.OctahedronGeometry(r),c(col),x,y,z),ring:(r,t,col,x,y,z,rx,ry)=>P(new T3.TorusGeometry(r,t,8,18),c(col),x,y,z,rx==null?Math.PI/2:rx,ry||0)};};
 const ENGEO={};for(const k in EN)ENGEO[k]=()=>EN[k].model(KIT());
 // Het model van vijand k in het huidige thema.
 function enemyGeo(k){const o=THEME&&THEME.enemies[k];if(!o||(!o.model&&!o.paint))return geo('en_'+k,ENGEO[k]);
@@ -321,10 +323,11 @@ function labelDraw(L,title,sub,col){const k=title+'|'+sub;if(L.k===k)return;L.k=
   g.fillStyle='rgba(5,6,9,.86)';g.fillRect(4,16,504,96);g.strokeStyle='#a8842c';g.lineWidth=3;g.strokeRect(4,16,504,96);g.fillStyle=col;g.fillRect(8,20,12,88);
   g.fillStyle=col;g.font='400 44px Marcellus,"Palatino Linotype",Georgia,serif';g.textBaseline='middle';let t=title;while(g.measureText(t).width>460&&t.length>3)t=t.slice(0,-2);g.fillText(t,34,sub?50:64);
   if(sub){g.fillStyle='#f6cf4d';g.font='400 27px Marcellus,Georgia,serif';g.fillText(sub,34,90);}L.tex.needsUpdate=true;}
-function addFire(x,y,z,size){const f={x,y,z,size,seed:Math.random()*9,s:[],sm:[]};
-  for(let i=0;i<4;i++){const s=new T3.Sprite(new T3.SpriteMaterial({map:haloTex,color:'#ff9a30',blending:T3.AdditiveBlending,depthWrite:false,transparent:true,toneMapped:false}));scene.add(s);f.s.push(s);}
-  for(let i=0;i<2;i++){const s=new T3.Sprite(new T3.SpriteMaterial({map:haloTex,color:'#0b0b0d',depthWrite:false,transparent:true,opacity:.4}));scene.add(s);f.sm.push(s);}
-  f.d=decal('#ff7a20',size*5,.3);f.d.position.set(x,.04,z+.6);scene.add(f.d);fires.push(f);}
+// Een vuur met rook. parent: de groep waar het bij hoort (een burcht); zonder parent staat het los in de wereld.
+function addFire(x,y,z,size,parent){const f={x,y,z,size,seed:Math.random()*9,s:[],sm:[],grp:parent||null},to=parent||scene;
+  for(let i=0;i<4;i++){const s=new T3.Sprite(new T3.SpriteMaterial({map:haloTex,color:'#ff9a30',blending:T3.AdditiveBlending,depthWrite:false,transparent:true,toneMapped:false}));to.add(s);f.s.push(s);}
+  for(let i=0;i<2;i++){const s=new T3.Sprite(new T3.SpriteMaterial({map:haloTex,color:'#0b0b0d',depthWrite:false,transparent:true,opacity:.4}));to.add(s);f.sm.push(s);}
+  f.d=decal('#ff7a20',size*5,.3);f.d.position.set(x,.04,z+.6);to.add(f.d);fires.push(f);}
 function init3D(){if(!T3)return false;
   try{renderer=new T3.WebGLRenderer({antialias:true});}catch{return false;}
   renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));renderer.outputEncoding=T3.sRGBEncoding;renderer.shadowMap.enabled=true;renderer.shadowMap.type=T3.PCFSoftShadowMap;
@@ -335,6 +338,9 @@ function init3D(){if(!T3)return false;
   haloTex=new T3.CanvasTexture(Textures.halo());const grunge=texFrom(Textures.grunge(),true),mason=texFrom(Textures.masonry(),true);GRUNGE=grunge;MASON=mason;
   MAT=new T3.MeshStandardMaterial({vertexColors:true,map:grunge,bumpMap:grunge,bumpScale:.012,roughness:.55,metalness:.45});MATE=MAT.clone();MATE.metalness=.25;MATE.roughness=.7;
   STONE=new T3.MeshStandardMaterial({vertexColors:true,map:mason,bumpMap:mason,bumpScale:.03,roughness:.95,metalness:0});
+  // de materialen van de burchten (data/forts.js, veld mat); lit = onderdelen die zelf licht geven
+  FORTMAT={stone:STONE.clone(),metal:new T3.MeshStandardMaterial({vertexColors:true,map:grunge,bumpMap:grunge,bumpScale:.012,roughness:.5,metalness:.55}),
+    plain:new T3.MeshStandardMaterial({vertexColors:true,roughness:.75,metalness:.05}),lit:new T3.MeshBasicMaterial({vertexColors:true,toneMapped:false})};
   // schemering: laag warm zonlicht, koel blauw tegenlicht
   hemi=new T3.HemisphereLight('#8ea4d6','#2b2432',.62);scene.add(hemi);
   sun=new T3.DirectionalLight('#ffd0a0',1.75);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
@@ -345,25 +351,7 @@ function init3D(){if(!T3)return false;
   for(let i=0;i<=SLOTS;i++)TEAM.push(i===SLOTS?new T3.Color('#3d6fa8'):new T3.Color().setHSL((i*.618034+.6)%1,.72,.5));
   const gmat=GMAT=new T3.MeshStandardMaterial({bumpScale:.05,roughness:.95,metalness:0}),ggeo=new T3.PlaneGeometry(N,N).rotateX(-Math.PI/2);
   LAMPMAT=new T3.SpriteMaterial({map:haloTex,color:'#ffc070',blending:T3.AdditiveBlending,depthWrite:false,transparent:true,opacity:.9,toneMapped:false});
-  const st='#6c727c',sd='#4f555e',roof='#34507c',LAMPS=[[3.5,-.53],[13.53,10.5],[-.53,10.5]];
-  const isl=geo('island',()=>{const a=[bx(14.4,1.7,14.4,sd,6.5,-.86,6.5),bx(15.2,.7,15.2,'#3a3f47',6.5,-1.5,6.5),
-      // uitgang: poort rechts in het midden, met het hoofdkwartier ernaast op een pier
-      bx(.3,1.3,.4,st,13.53,.65,5.6),bx(.3,1.3,.4,st,13.53,.65,7.4),bx(.44,.3,2.2,st,13.53,1.42,6.5),
-      bx(2.8,1.7,3.2,sd,15.1,-.86,9.4),bx(1.4,1.3,2.1,st,15.2,.65,9.4),P(new T3.ConeGeometry(1.6,1,4),roof,15.2,1.8,9.4,0,Math.PI/4),bx(.1,.7,.5,'#1a1410',14.48,.35,9.4),cy(.035,.035,1.2,'#22262b',15.2,2,10.2,6),
-      // ingang: poort links in het midden, met de vijandelijke fabriek ernaast
-      bx(2.8,1.7,3.2,sd,-2,-.86,3.8),bx(1.5,1.2,2,'#5a352c',-2.1,.6,3.8),bx(1.7,.16,2.2,'#2a2422',-2.1,1.28,3.8),bx(.1,.8,1.1,'#0c0808',-1.33,.4,3.8),
-      cy(.13,.17,.9,'#33373c',-2.5,1.75,3.3,10),cy(.13,.17,.7,'#33373c',-2.5,1.65,4.3,10),bx(.3,1.3,.4,'#5a352c',-.53,.65,5.6),bx(.3,1.3,.4,'#5a352c',-.53,.65,7.4),bx(.4,.3,2.2,'#5a352c',-.53,1.42,6.5)];
-    // muren met kantelen; openingen voor de poorten en de bruggen
-    const wall=(horiz,fixed,gaps)=>{let p=-.7;for(const[g0,g1]of[...gaps,[13.7,13.7]]){const len=g0-p,c=p+len/2;if(len>.05){a.push(horiz?bx(len,.36,.34,st,c,.18,fixed):bx(.34,.36,len,st,fixed,.18,c));
-          for(let q=p+.3;q<g0-.25;q+=1)a.push(horiz?bx(.5,.24,.34,st,q,.48,fixed):bx(.34,.24,.5,st,fixed,.48,q));}p=g1;}};
-    wall(true,-.53,[[7.7,9.3]]);wall(true,13.53,[[7.7,9.3]]);wall(false,13.53,[[5.7,7.3]]);wall(false,-.53,[[5.7,7.3]]);
-    for(const[x,z]of[[7.6,-.53],[9.4,-.53],[7.6,13.53],[9.4,13.53],[13.53,5.6],[13.53,7.4],[-.53,5.6],[-.53,7.4]])a.push(bx(.36,1,.36,st,x,.5,z),bx(.44,.12,.44,sd,x,1.05,z));
-    for(const[x,z]of[[-.53,-.53],[13.53,-.53],[13.53,13.53],[-.53,13.53]])a.push(cy(.62,.7,2.1,st,x,.5,z,12),cy(.72,.72,.22,sd,x,1.62,z,12),P(new T3.ConeGeometry(.84,1.1,12),roof,x,2.28,z));
-    for(const[x,z]of LAMPS)a.push(cy(.04,.06,1.3,'#1c1f24',x,1,z,6),bx(.16,.16,.16,'#2a2d31',x,1.7,z));
-    return a;},.5);
-  const bridge=(k,horiz)=>geo(k,()=>{const L=FW-13.72,c=13.36+L/2,a=[];
-    if(horiz)a.push(bx(L,.5,1.8,sd,c,-.26,6.5),bx(L,.3,.14,st,c,.14,5.67),bx(L,.3,.14,st,c,.14,7.33),bx(.6,2,1.4,sd,c,-1.4,6.5));
-    else a.push(bx(1.8,.5,L,sd,8.5,-.26,c),bx(.14,.3,L,st,7.67,.14,c),bx(.14,.3,L,st,9.33,.14,c),bx(1.4,2,.6,sd,8.5,-1.4,c));return a;},.5);
+  const st='#6c727c',sd='#4f555e'; // de minigame-eilanden; de burchten zelf staan in data/forts.js
   const arenaGeo=geo('arena',()=>{const a=[cy(10,10.5,1.7,sd,0,-.86,0,40),cy(10.6,11,.7,'#3a3f47',0,-1.5,0,40),cy(9.1,9.1,.04,'#8f7a58',0,.02,0,40),cy(2.2,2.2,.03,'#6c2a25',0,.05,0,24),cy(1.6,1.6,.03,'#8f7a58',0,.06,0,24)];
     for(let i=0;i<30;i++){const an=i/30*Math.PI*2,x=Math.cos(an)*9.6,z=Math.sin(an)*9.6;a.push(bx(.5,i%5?1:1.9,2.05,st,x,i%5?.5:.95,z,-an));if(i%5===0)a.push(cy(.34,.2,.3,'#2a2d31',x,2.05,z,10));else a.push(bx(.5,.24,.6,st,x,1.12,z,-an));}
     return a;},.5);
@@ -372,17 +360,16 @@ function init3D(){if(!T3)return false;
       else a.push(P(new T3.DodecahedronGeometry(.3),'#6a6e75',cx-.1,.2,cz,r(),r(),0,[1,.75,1]),P(new T3.DodecahedronGeometry(.2),'#555a61',cx+.22,.13,cz+.12,r(),r(),0),bx(.24,.24,.24,'#5a4530',cx+.12,.12,cz-.26,.5),bx(.2,.2,.2,'#4a3826',cx-.2,.1,cz+.28,.2));}
     return a;});
   for(let s=0;s<SLOTS;s++){const[ox,oz]=slotO(s),th=TEAM[s];
-    const i=mesh(isl,STONE);i.position.set(ox,0,oz);scene.add(i);if(E.ROCK.size){const pr=mesh(props,MATE);pr.position.set(ox,0,oz);scene.add(pr);}
+    if(E.ROCK.size){const pr=mesh(props,MATE);pr.position.set(ox,0,oz);scene.add(pr);}
     const gr=new T3.Mesh(ggeo,gmat);gr.position.set(ox+N/2,.012,oz+N/2);gr.receiveShadow=true;scene.add(gr);
     const tm=new T3.MeshStandardMaterial({color:th,roughness:.7});
-    const band=new T3.Mesh(raw('band',()=>new T3.BoxGeometry(1.44,.14,2.14)),tm);band.position.set(ox+15.2,1.0,oz+9.4);scene.add(band);
-    const flag=new T3.Mesh(raw('flag',()=>new T3.BoxGeometry(.03,.42,.7)),tm);flag.position.set(ox+15.2,2.35,oz+10.57);flag.castShadow=true;scene.add(flag);
-    if(s%COLS<COLS-1){const b=mesh(bridge('brE',true),STONE);b.position.set(ox,0,oz);scene.add(b);}if(s<SLOTS-COLS){const b=mesh(bridge('brS',false),STONE);b.position.set(ox,0,oz);scene.add(b);}
-    for(const[x,z]of LAMPS){const h=new T3.Sprite(LAMPMAT);h.scale.setScalar(1.5);h.position.set(ox+x,1.72,oz+z);scene.add(h);const d=decal('#ff9a40',5,.22);lampDecals.push(d);d.position.set(ox+x+(x<0?1:x>13?-1:0),.04,oz+z+(z<0?1:0));scene.add(d);}
-    addFire(ox-2.5,2.3,oz+3.3,.6);addFire(ox-1.2,.5,oz+3.8,.5);
+    // de strook en het vlaggetje in de kleur van de speler; waar ze precies zitten hangt af van de burcht (placeFort)
+    const band=new T3.Mesh(raw('unitbox',()=>new T3.BoxGeometry(1,1,1)),tm);scene.add(band);
+    const flag=new T3.Mesh(raw('flag',()=>new T3.BoxGeometry(.03,.42,.7)),tm);flag.castShadow=true;scene.add(flag);
+    for(const[x,z]of LAMPS){const d=decal('#ff9a40',5,.22);lampDecals.push(d);d.position.set(ox+x+(x<0?1:x>13?-1:0),.04,oz+z+(z<0?1:0));scene.add(d);}
     const cv=document.createElement('canvas');cv.width=512;cv.height=128;const tex=new T3.CanvasTexture(cv);tex.encoding=T3.sRGBEncoding;
     const spr=new T3.Sprite(new T3.SpriteMaterial({map:tex,transparent:true,depthWrite:false,toneMapped:false}));spr.scale.set(3.4,.85,1);spr.position.set(ox+15.2,3.1,oz+9.4);scene.add(spr);
-    const L={g:cv.getContext('2d'),tex,spr,k:''};labels.push(L);labelDraw(L,'Vrije vesting','','#'+th.getHexString());}
+    const L={g:cv.getContext('2d'),tex,spr,k:''};labels.push(L);labelDraw(L,'Vrije vesting','','#'+th.getHexString());SLOTOBJ.push({band,flag,spr});}
   {const am=mesh(arenaGeo,STONE);am.position.set(ACX,0,ACZ);scene.add(am);
     for(let i=0;i<30;i+=5){const an=i/30*Math.PI*2;addFire(ACX+Math.cos(an)*9.6,2.3,ACZ+Math.sin(an)*9.6,.7);}
     const sprA=nameSprite(ISLES.round.n,'#f6cf4d');sprA.scale.set(5,.95,1);sprA.position.set(ACX,4.2,ACZ-9.6);scene.add(sprA);}
@@ -465,17 +452,50 @@ function themeOf(id){const b=THEMES.alarm,t=THEMES[id]||b;
   return{...b,...t,id:THEMES[id]?id:'alarm',light:{...b.light,...(t.light||{})},ui:{...b.ui,...(t.ui||{})},wall:{...b.wall,...(t.wall||{})},enemies:t.enemies||{}};}
 // De naam van een vijand zoals dit thema hem noemt.
 const enName=type=>(THEME&&THEME.enemies[type]&&THEME.enemies[type].n)||EN[type].n;
-const themeTex={},decorBy={};let particles=null,fireH=.1;
+const themeTex={};let particles=null,fireH=.1;
 function themeTextures(th){return themeTex[th.id]||(themeTex[th.id]=(()=>{const[g,gb]=Textures.ground(th.ground,N),[r,rb,t]=Textures.road(th.road,th.trail,th.trailGlow),sea=texFrom(Textures.sea(th.sea),true);
   sea.repeat.set(34,34);return{g:texFrom(g),gb:new T3.CanvasTexture(gb),r:texFrom(r),rb:new T3.CanvasTexture(rb),t:texFrom(t),sea};})());}
-// Decor rond elke vesting: één model per thema, 25 keer neergezet. Wordt pas gebouwd als het thema voor het eerst langskomt.
-function themeDecor(th){if(decorBy[th.id]!==undefined)return decorBy[th.id];const D=th.decor;if(!D){decorBy[th.id]=null;return null;}
-  const grp=new T3.Group(),k=KIT(),sol=D.solid?geo('dec_'+th.id,()=>D.solid(k)):null,gl=D.glow?geo('decg_'+th.id,()=>D.glow.parts(k)):null;
-  for(let s=0;s<SLOTS;s++){const[ox,oz]=slotO(s);
-    if(sol){const m=mesh(sol,MATE);m.position.set(ox,0,oz);grp.add(m);}
-    if(gl){const m=new T3.Mesh(gl,glow(D.glow.color));m.position.set(ox,0,oz);grp.add(m);}
-    for(const[x,y,z,col,sz]of D.halos||[]){const h=halo(col,sz||1.5,.85);h.position.set(ox+x,y,oz+z);grp.add(h);}}
-  grp.visible=false;scene.add(grp);return decorBy[th.id]=grp;}
+/* --- burchten (data/forts.js): elke vesting in de stijl van het thema --- */
+const FORTS=window.ERME.FORTS;
+// De bouwdoos voor een burcht: de gewone bouwstenen, plus k.lit (geeft zelf licht), k.light (een gloed) en k.fire (een vuur).
+function fortKit(){const k=KIT(),lit=KIT();
+  for(const n in lit){const f=lit[n];lit[n]=(...a)=>{const p=f(...a);p.lit=true;p.c=new T3.Color(a.find(v=>typeof v==='string'));return p;};}
+  k.lit=lit;k.light=(x,y,z,col,size)=>({light:[x,y,z,col||null,size||1.5]});k.fire=(x,y,z,size)=>({fire:[x,y,z,size||.5]});return k;}
+// Zet de onderdelen van een stuk op hun plek: draaien om de verticale as (rot) en verschuiven naar (x, z). Verzamelt alles in out.
+const _fm=T3&&new T3.Matrix4(),_fv=T3&&new T3.Vector3();
+function fortPlace(parts,x,z,rot,out){_fm.makeRotationY(rot||0).setPosition(x,0,z);
+  for(const p of[parts].flat(4)){if(!p)continue;
+    if(p.light||p.fire){const q=p.light||p.fire;_fv.set(q[0],q[1],q[2]).applyMatrix4(_fm);(p.light?out.lights:out.fires).push([_fv.x,_fv.y,_fv.z,...q.slice(3)]);continue;}
+    p.g.applyMatrix4(_fm);(p.lit?out.lit:out.solid).push(p);}}
+// De vier zijden van een vesting: waar de muur ligt, hoe hij gedraaid is, waar de opening zit en welk vak daar aan de rand ligt.
+const SIDES=[{h:true,at:-.53,rot:0,gap:[7.7,9.3],cell:E.GATE},{h:true,at:13.53,rot:Math.PI,gap:[7.7,9.3],cell:(N-1)*N+E.GATE},
+  {h:false,at:-.53,rot:Math.PI/2,gap:[5.7,7.3],cell:E.MID*N},{h:false,at:13.53,rot:-Math.PI/2,gap:[5.7,7.3],cell:E.MID*N+N-1}];
+const fortGeo=(parts,wuv)=>parts.length?merge(parts,wuv):null;
+// Bouwt de burcht van thema th: één model per vesting, 25 keer neergezet, met lichten en vuren. Wordt bewaard per burcht en per map
+// (de poorten laten zien waar de vijand binnenkomt en weggaat).
+const fortBy={};let FORT=null;
+function buildFort(th){const id=FORTS[th.fort]?th.fort:'castle',F=FORTS[id],role=c=>c===MP.in?'in':c===MP.out?'out':'side',
+    key=id+'|'+SIDES.map(sd=>role(sd.cell)).join('');if(fortBy[key])return fortBy[key];
+  const k=fortKit(),main={solid:[],lit:[],lights:[],fires:[]},brE={solid:[],lit:[],lights:[],fires:[]},brS={solid:[],lit:[],lights:[],fires:[]};
+  fortPlace(F.base(k),0,0,0,main);
+  for(const sd of SIDES){for(const[a0,a1]of[[-.7,sd.gap[0]],[sd.gap[1],13.7]]){const L=a1-a0,c=(a0+a1)/2;fortPlace(F.wall(k,L),sd.h?c:sd.at,sd.h?sd.at:c,sd.rot,main);}
+    const g=(sd.gap[0]+sd.gap[1])/2;fortPlace(F.gate(k,role(sd.cell)),sd.h?g:sd.at,sd.h?sd.at:g,sd.rot,main);}
+  for(const[x,z,r]of[[-.53,-.53,0],[13.53,-.53,-Math.PI/2],[13.53,13.53,Math.PI],[-.53,13.53,Math.PI/2]])fortPlace(F.corner(k),x,z,r,main);
+  for(const[x,z,r]of LAMPS)fortPlace(F.lamp(k),x,z,r,main);
+  fortPlace(F.hq(k),15.2,9.4,0,main);fortPlace(F.factory(k),-2.1,3.8,0,main);
+  const L=FW-13.72;fortPlace(F.bridge(k,L),13.36+L/2,6.5,0,brE);fortPlace(F.bridge(k,L),8.5,13.36+L/2,Math.PI/2,brS);
+  const mat=F.mat==='metal'?FORTMAT.metal:F.mat==='plain'?FORTMAT.plain:FORTMAT.stone,uv=F.mat==='plain'?0:.5;
+  const geos=[main,brE,brS].map(o=>({s:fortGeo(o.solid,uv),l:fortGeo(o.lit),o})),grp=new T3.Group();
+  for(let s=0;s<SLOTS;s++){const[ox,oz]=slotO(s),use=[geos[0]];if(s%COLS<COLS-1)use.push(geos[1]);if(s<SLOTS-COLS)use.push(geos[2]);
+    for(const u of use){if(u.s){const m=mesh(u.s,mat);m.position.set(ox,0,oz);grp.add(m);}if(u.l){const m=new T3.Mesh(u.l,FORTMAT.lit);m.position.set(ox,0,oz);grp.add(m);}
+      for(const[x,y,z,col,size]of u.o.lights){const h=col?halo(col,size,.85):new T3.Sprite(LAMPMAT);if(!col)h.scale.setScalar(size);h.position.set(ox+x,y,oz+z);grp.add(h);}
+      for(const[x,y,z,size]of u.o.fires)addFire(ox+x,y,oz+z,size,grp);}}
+  grp.visible=false;scene.add(grp);return fortBy[key]={grp,F,id};}
+// Laat de burcht van thema th zien en zet de strook, het vlaggetje en de naam van elke speler op het hoofdkwartier.
+function placeFort(th){const f=buildFort(th);if(FORT&&FORT!==f)FORT.grp.visible=false;FORT=f;f.grp.visible=true;const F=f.F,b=F.band,fl=F.flag||[0,2.35,1.17];
+  for(let s=0;s<SLOTS;s++){const o=SLOTOBJ[s];if(!o)continue;const[ox,oz]=slotO(s);
+    o.band.visible=!!b;if(b){o.band.scale.set(b[0],b[1],b[2]);o.band.position.set(ox+15.2,b[3],oz+9.4);}
+    o.flag.position.set(ox+15.2+fl[0],fl[1],oz+9.4+fl[2]);o.spr.position.set(ox+15.2,F.label||3.1,oz+9.4);}}
 // Wat er in de lucht hangt: sneeuw die valt, lichtjes die zweven of vonken die opstijgen. Een wolk rond de camera.
 function makeParticles(P){const n=P.n||600,pos=new Float32Array(n*3),sp=new Float32Array(n),W=70,H=22,r=Textures.lcg(17);
   for(let i=0;i<n;i++){pos[i*3]=(r()-.5)*W;pos[i*3+1]=r()*H;pos[i*3+2]=(r()-.5)*W;sp[i]=.4+r();}
@@ -491,7 +511,7 @@ function updParticles(dt){const o=particles;if(!o||!o.visible)return;const u=o.u
     else{p[k+1]+=Math.sin(u.t*.6+i*1.7)*dt*.25;p[k]+=Math.cos(u.t*.4+i)*dt*.2;}}
   a.needsUpdate=true;}
 // Zet het thema van map-thema id: licht, lucht, grond, weg, zee, muren, lampen, vuren, decor, deeltjes, vijanden, knoppen.
-function applyTheme(id){const th=themeOf(id);if(THEME&&THEME.id===th.id&&gl3===!!THEME.gl)return;THEME=th;THEME.gl=gl3;
+function applyTheme(id){const th=themeOf(id);if(THEME&&THEME.id===th.id&&gl3===!!THEME.gl&&THEME.mp===MAP)return;THEME=th;THEME.gl=gl3;THEME.mp=MAP;
   const gm=$('#game');gm.style.setProperty('--gold',th.ui.accent);gm.style.setProperty('--trim',th.ui.trim);gm.dataset.theme=th.id;
   if(!gl3)return;
   scene.background.set(th.sky);scene.fog.color.set(th.fog[0]);scene.fog.near=th.fog[1];scene.fog.far=th.fog[2];renderer.toneMappingExposure=th.exposure;
@@ -502,7 +522,7 @@ function applyTheme(id){const th=themeOf(id);if(THEME&&THEME.id===th.id&&gl3===!
   STONE.color.set(th.wall.tint);STONE.map=th.wall.metal?GRUNGE:MASON;STONE.bumpMap=STONE.map;STONE.metalness=th.wall.metal*.55;STONE.roughness=th.wall.metal?.6:.95;STONE.needsUpdate=true;
   LAMPMAT.color.set(th.lamp);for(const d of lampDecals)d.material.color.set(th.lamp);
   {const o={};new T3.Color(th.fire).getHSL(o);fireH=o.h;}for(const f of fires)f.d.material.color.set(th.fire); // de vlammen kleuren elke frame mee (updFx)
-  for(const k in decorBy)if(decorBy[k])decorBy[k].visible=false;const dg=themeDecor(th);if(dg)dg.visible=true;
+  placeFort(th);
   if(particles){scene.remove(particles);particles.geometry.dispose();particles=null;}if(th.particles&&!calm)particles=makeParticles(th.particles);
   for(const k in EN)if(EI[k])EI[k].m.geometry=enemyGeo(k);}
 function updRoads(fs){const sig=fs.map(f=>f.slot+':'+f.psig).join('|');if(sig===roadSig)return;roadSig=sig;let r=0,t=0,k=0;
@@ -574,7 +594,7 @@ function updFx(dt,time){
     if(p>=1){m.visible=false;pool[u.kind].push(m);live.splice(i,1);continue;}
     if(u.kind==='beam'){const w=u.w*(1-p*.9);m.scale.set(w,w,u.L);}
     else{m.scale.setScalar(u.r0+(u.r1-u.r0)*(1-(1-p)*(1-p)));m.material.opacity=u.op*(1-p);}}
-  const fc=focus();for(const f of fires){if(Math.abs(f.x-fc[0])+Math.abs(f.z-fc[1])>70){if(f.on!==false){f.on=false;for(const s of[...f.s,...f.sm])s.visible=false;}continue;}
+  const fc=focus();for(const f of fires){if(f.grp&&!f.grp.visible)continue;if(Math.abs(f.x-fc[0])+Math.abs(f.z-fc[1])>70){if(f.on!==false){f.on=false;for(const s of[...f.s,...f.sm])s.visible=false;}continue;}
     if(f.on===false){f.on=true;for(const s of[...f.s,...f.sm])s.visible=true;}
     f.s.forEach((s,i)=>{const p=(time*1.25+i/4+f.seed)%1;s.position.set(f.x+Math.sin(time*5+i*2+f.seed)*.08,f.y+p*f.size*1.6,f.z);const k=f.size*(1.5-p*.9);s.scale.set(k,k*1.3,1);s.material.opacity=(1-p)*.95;s.material.color.setHSL((fireH-p*.08+1)%1,1,.55-p*.15);});
     f.sm.forEach((s,i)=>{const p=(time*.33+i/2+f.seed)%1;s.position.set(f.x+p*1.2,f.y+f.size+p*3,f.z-p*.5);const k=f.size*(1.2+p*2.6);s.scale.set(k,k,1);s.material.opacity=.42*(1-p);});
@@ -1999,7 +2019,7 @@ $('#miniBtn').onclick=openMini;$('#lAgain').onclick=()=>{if(lab)startLab(lab.kin
 loadLocal();loadAcct();bindAccount();buildHud();
 try{if(init3D()){bindCanvas();renderIcons();}}catch(err){gl3=false;console.error(err);}
 renderHome();renderLobby();renderChat();if(!acct)showGate('new');requestAnimationFrame(frame);
-if(location.hash==='#dev')window.__ratd={E,g:()=>G,map:()=>MAP,team:()=>G&&MP.pool?teamLives():null,fields:()=>[{who:'ik',slot:mySlot,l:G&&G.lives,r:G&&G.cleared,ph:G&&G.phase},...bots.map(b=>({who:b.name,slot:b.c.mySlot,l:b.c.G.lives,r:b.c.G.cleared,ph:b.c.G.phase}))].sort((a,b)=>a.slot-b.slot),waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>{enterArena(m,r);for(const b of bots)asBot(b,()=>enterArena(m,r));},bots:()=>bots,asBot,FIXED,miniFor,ISLES,ROUL,isle:()=>ISLE,isleOn,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
+if(location.hash==='#dev')window.__ratd={E,g:()=>G,view:(x,z,d,yaw)=>{const[ox,oz]=slotO(mySlot);camMode='free';cam.tx=ox+x;cam.tz=oz+z;cam.d=d||24;cam.yaw=yaw||0;},map:()=>MAP,team:()=>G&&MP.pool?teamLives():null,fields:()=>[{who:'ik',slot:mySlot,l:G&&G.lives,r:G&&G.cleared,ph:G&&G.phase},...bots.map(b=>({who:b.name,slot:b.c.mySlot,l:b.c.G.lives,r:b.c.G.cleared,ph:b.c.G.phase}))].sort((a,b)=>a.slot-b.slot),waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>{enterArena(m,r);for(const b of bots)asBot(b,()=>enterArena(m,r));},bots:()=>bots,asBot,FIXED,miniFor,ISLES,ROUL,isle:()=>ISLE,isleOn,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
 // Sessie controleren: klopt het token nog, dan komt de voortgang van de server binnen.
 if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
 // Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.
