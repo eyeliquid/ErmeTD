@@ -14,6 +14,9 @@ const ROCK=new Set(); // geen bomen of rotsen meer: het hele veld is vrij
 // ---------- maps (zie data/maps.js) ----------
 const cellAt=(x,y)=>y*N+x;
 const MAP_IDS=Object.keys(MAPS),mapOf=id=>MAPS[id]||MAPS.classic;
+// De vaste muurtjes van map M (veld block) als verzameling. Daar kan niemand bouwen en de vijand loopt eromheen.
+const blockOf=M=>M._blk||(M._blk=new Set(M.block||[]));
+const hard=(M,c)=>ROCK.has(c)||blockOf(M).has(c);
 // Het punt net buiten de rand naast vak c: daar komt de vijand vandaan of loopt hij heen.
 function edgePt(c){const x=c%N,y=(c-x)/N;return x===0?[-.5,y+.5]:x===N-1?[N+.5,y+.5]:y===0?[x+.5,-.5]:[x+.5,N+.5];}
 // search zoekt de kortste route over de vakken die `pass` toelaat, van de ingang naar de uitgang van map M.
@@ -27,7 +30,7 @@ function search(pass,M){M=M||MAPS.classic;const A=M.in,Z=M.out,n=N*N,dist=new Fl
 // Eerst alleen over de gelegde weg. Ligt er geen doorlopende weg, dan recht over het gras, om turrets en rotsen heen.
 // Op een ringmap ligt de route altijd vast.
 function route(road,taken,M){M=M||MAPS.classic;if(M.loop)return{cells:M.loop.cells.slice(),road:false};
-  const free=c=>!ROCK.has(c)&&!taken(c),via=M.roads?search(c=>road.has(c)&&free(c),M):null;
+  const free=c=>!hard(M,c)&&!taken(c),via=M.roads?search(c=>road.has(c)&&free(c),M):null;
   if(via)return{cells:via,road:true};const g=search(free,M);if(g)return{cells:g,road:false};
   const row=[],x0=M.in%N,y0=(M.in-x0)/N;if(x0===0)for(let x=0;x<N;x++)row.push(cellAt(x,y0));else for(let y=0;y<N;y++)row.push(cellAt(x0,y));return{cells:row,road:false};}
 // pts: de punten waar de vijand langs loopt. Op een ringmap eindigt de lijn weer op het eerste ringvak; loopFrom is dat punt.
@@ -41,7 +44,7 @@ function nearD(P,x,y){let best=0,bd=Infinity;for(let i=0;i<P.len;i++){const a=P.
     t=Math.max(0,Math.min(1,((x-a[0])*vx+(y-a[1])*vy)/L)),dx=a[0]+vx*t-x,dy=a[1]+vy*t-y,d=dx*dx+dy*dy;if(d<bd-1e-9){bd=d;best=i+t;}}return best;}
 // De route zoals die nu zou worden: voor de voorvertoning tijdens de bouwfase.
 function preview(G){if(G.pvk!==G.rv){G.pv=route(G.road,c=>!!G.map[c],G.mp);G.pvk=G.rv;}return G.pv;}
-const canRoad=(G,c)=>G.mp.roads&&G.phase==='prep'&&c>=0&&c<N*N&&!ROCK.has(c)&&!G.map[c];
+const canRoad=(G,c)=>G.mp.roads&&G.phase==='prep'&&c>=0&&c<N*N&&!hard(G.mp,c)&&!G.map[c];
 function setRoad(G,c,on){if(!canRoad(G,c)||on===G.road.has(c))return false;if(on)G.road.add(c);else G.road.delete(c);G.rv++;return true;}
 // Doolhofmaps: na elke nieuwe of verkochte toren zoekt de vijand meteen een nieuwe weg. Wie al loopt, gaat verder vanaf waar hij staat.
 function repath(G){if(!G.path||!G.mp.maze)return;const r=route(G.road,c=>!!G.map[c],G.mp),P=mkPath(r.cells,r.road,G.mp);
@@ -135,13 +138,13 @@ function cellsOf(c,type){const sz=(T[type]&&T[type].size)||1;if(sz===1)return[c]
   if(x-h<0||y-h<0||x+h>=N||y+h>=N)return null;
   for(let dy=-h;dy<=h;dy++)for(let dx=-h;dx<=h;dx++)a.push((y+dy)*N+x+dx);return a;}
 function canBuild(G,c,type){if(!(c>=0&&c<N*N))return false;const cs=cellsOf(c,type);if(!cs)return false;
-  const M=G.mp;for(const k of cs)if(ROCK.has(k)||G.map[k]||k===M.in||k===M.out)return false;
+  const M=G.mp;for(const k of cs)if(hard(M,k)||G.map[k]||k===M.in||k===M.out)return false;
   if(M.loop)return cs.every(k=>!G.path.set.has(k)); // de ring ligt vast
   // Doolhof: overal bouwen, behalve onder een vijand, zolang er een weg van de ingang naar de uitgang overblijft.
   if(M.maze){for(const e of G.en){if(e.dead)continue;for(const k of cs){const x=k%N,y=(k-x)/N;if(Math.abs(e.x-x-.5)<.95&&Math.abs(e.y-y-.5)<.95)return false;}}
-    const bl=new Set(cs);return!!search(k=>!bl.has(k)&&!ROCK.has(k)&&!G.map[k],M);}
+    const bl=new Set(cs);return!!search(k=>!bl.has(k)&&!hard(M,k)&&!G.map[k],M);}
   if(G.path)return cs.every(k=>!G.path.set.has(k));if(cs.some(k=>G.road.has(k)))return false;
-  const bl=new Set(cs);return!!search(k=>!bl.has(k)&&!ROCK.has(k)&&!G.map[k],M);} // een toren mag de doorgang nooit helemaal afsluiten
+  const bl=new Set(cs);return!!search(k=>!bl.has(k)&&!hard(M,k)&&!G.map[k],M);} // een toren mag de doorgang nooit helemaal afsluiten
 const buildCost=(G,type)=>Math.round(T[type].cost*G.m.build);
 const upCost=(G,t)=>{const u=T[t.type].uc||[.5,.25];return Math.round(T[t.type].cost*(u[0]+u[1]*t.lvl)*G.m.up);};
 const specCost=(G,t,k)=>Math.round(T[t.type].cost*(k==='turbo'?3*G.m.turbo:2));
@@ -234,7 +237,7 @@ function lose(G){if(G.phase==='won'||G.phase==='over')return;G.phase='over';}
 function tune(s){if(!s||typeof s!=='object')return;const n=(v,lo,hi,d)=>{v=+v;return Number.isFinite(v)?Math.max(lo,Math.min(hi,v)):d;};
   B.startGold=Math.round(n(s.startGold,0,100000,B.startGold));B.lives=Math.round(n(s.lives,1,999,B.lives));
   B.hpX=n(s.enemyHp,.25,5,B.hpX);B.goldX=n(s.goldMul,.25,5,B.goldX);PREP=API.PREP=Math.round(n(s.prepSeconds,10,1800,PREP));}
-const API={D,MAPS,MAP_IDS,mapOf,RING,edgePt,repath,inject,nearD,WAKE,canWake,poke,MOVES,N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,tune,B,DIFF,diffIdx,T,TYPES,ALL,GEERS_NEED,maxLvl,hasTiers,tierOf,canTurbo,missingTurbo,geersReady,geersCount,sleeperReady,unlocked,cellsOf,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
+const API={D,MAPS,MAP_IDS,mapOf,blockOf,RING,edgePt,repath,inject,nearD,WAKE,canWake,poke,MOVES,N,ROUNDS,MID,C_IN,C_OUT,PREP,DIRS,tune,B,DIFF,diffIdx,T,TYPES,ALL,GEERS_NEED,maxLvl,hasTiers,tierOf,canTurbo,missingTurbo,geersReady,geersCount,sleeperReady,unlocked,cellsOf,EN,SKILLS,ROCK,posAt,mkPath,route,preview,canRoad,setRoad,lock,next,create,step,startWave,build,upgrade,sell,spec,canBuild,
   buildCost,upCost,specCost,sellValue,stats,mods,skillTotal,skillSpent,skillState,SKILL_MAX,TIER,pointsFor,hpMul,makeWave,hit,recalc,win,lose,VS,vs,strongVs,weakVs,counters,waveMix,waveFit};
 return API;
 })();

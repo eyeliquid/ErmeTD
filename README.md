@@ -79,7 +79,7 @@ Speler 1 kiest in de lobby de map (knop **Map**, boven de moeilijkheidsgraad). I
 | --- | --- | --- |
 | Klassiek | je eigen weg | Zoals altijd: links naar rechts, zelf een weg leggen, minigames na elke tiende golf. |
 | Estafette | doorlopen | Wat je doorlaat loopt verder door de vesting rechts van je op dezelfde rij. Alleen de laatste vesting op de rij verliest er levens door. |
-| Wintermaul | samenwerken | Van boven naar beneden, zonder weg: je bouwt het doolhof met je torens. Wat je doorlaat zakt naar de vesting eronder. Alle vestingen delen één levenspot; is die leeg, dan verliest iedereen. |
+| Wintermaul | samenwerken | Van boven naar beneden, zonder weg. Drie vaste ijsmuurtjes (`block` in `data/maps.js`) laten de vijand zigzaggen; met je torens maak je het doolhof nog langer. Wat je doorlaat zakt naar de vesting eronder. Alle vestingen delen één levenspot; is die leeg, dan verliest iedereen. |
 | Groene Cirkel | rondje | Een vaste ring zonder uitgang. De vijand blijft rondjes lopen tot hij dood is; elk rondje kost levens (een luchtschip 10). |
 | Doolhofbouwer | vrij bouwen | Geen weg: de vijand komt links binnen en wil onder weg. Je torens zijn je muren, ook tijdens een golf. |
 
@@ -110,6 +110,7 @@ De poorten laten zo ook zien waar de vijand binnenkomt en weggaat. `buildFort` i
 Een thema verandert niets aan de spelregels: een Kart is een Conscript met een ander jasje. Kleuren, licht, grond, weg, zee, decor, de namen en modellen van de vijanden, de muziekstijl en de accentkleur van de knoppen staan per thema in `client/js/data/themes.js`. `applyTheme` in `client/js/game.js` zet ze bij de start van een potje. Het decor staat op de muren en de pieren, nooit op het speelveld.
 
 - **Waar het staat.** De spelregels van een map in `client/js/data/maps.js` (ingang `in`, uitgang `out`, `roads`, `maze`, `loop`, `pass`, `pool`, `mini`), het uiterlijk in `client/js/data/themes.js`. De voorbeeldplaatjes in de lobby staan in `MAP_DEMO` in `client/js/game.js`.
+- **Vaste muurtjes.** Een map kan met `block` vakken vastleggen waar niemand bouwt en waar de vijand omheen moet. De burcht bepaalt hoe ze eruitzien (stuk `block` in `data/forts.js`): ijs, banden, metaal, steen of een haag. Je held loopt er gewoon overheen.
 - **Doolhof.** Op Wintermaul en Doolhofbouwer kun je overal bouwen, behalve onder een vijand, zolang er een weg van de ingang naar de uitgang overblijft. Na elke nieuwe of verkochte toren zoekt de vijand meteen een nieuwe weg (`repath`); wie al loopt, gaat verder vanaf waar hij staat.
 - **Doorgeven.** Loopt een vijand je vesting uit, dan vraagt `E.step` via `G.pass` aan de spellaag of hij door kan. `passOn` in `client/js/game.js` zoekt de volgende vesting. Draait die in dezelfde browser (jij of een bot), dan komt de vijand er direct binnen (`E.inject`), met hetzelfde deel van zijn levens. Bij een andere speler gaat het via de presence `pz`: het totaal en de laatste 60 doorgegeven vijanden.
 - **Levenspot.** Op Wintermaul telt elke vesting zijn eigen levens; de pot is de som van alle vestingen in het potje (`teamLives`). De poorten boven en onder liggen in kolom 8, bij de openingen in de muur.

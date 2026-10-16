@@ -18,6 +18,8 @@
 //  factory(k)       de vijandelijke fabriek op de linkerpier, op 0,0. De voorkant is +x.
 //  lamp(k)          een lantaarn op de muur, voet op 0,0. Binnen is +z.
 //  bridge(k, L)     een brug van L lang langs x, midden op 0. Het wegdek ligt op hoogte 0.
+//  block(k)         een vast muurtje op één vak van het speelveld (alleen op maps met block), midden op 0,0, 1 bij 1.
+//                   Houd het laag (tot ongeveer 0,6): je kijkt eroverheen.
 //
 // Extra bouwstenen voor een burcht:
 //  k.lit.box(…), k.lit.ball(…), …   hetzelfde, maar het onderdeel geeft zelf licht (neon, ramen, kristallen)
@@ -52,7 +54,8 @@ ERME.FORTS={
   factory:k=>[k.box(1.5,1.2,2,'#5a352c',0,.6,0),k.box(1.7,.16,2.2,'#2a2422',0,1.28,0),k.box(.1,.8,1.1,'#0c0808',.77,.4,0),
     k.cyl(.13,.17,.9,'#33373c',-.4,1.75,-.5,10),k.cyl(.13,.17,.7,'#33373c',-.4,1.65,.5,10),k.fire(-.4,2.3,-.5,.6),k.fire(.9,.5,0,.5)],
   lamp:k=>[k.cyl(.04,.06,1.3,'#1c1f24',0,1,0,6),k.box(.16,.16,.16,'#2a2d31',0,1.7,0),k.light(0,1.72,0,null,1.5)],
-  bridge:(k,L)=>[k.box(L,.5,1.8,'#4f555e',0,-.26,0),k.box(L,.3,.14,'#6c727c',0,.14,-.83),k.box(L,.3,.14,'#6c727c',0,.14,.83),k.box(.6,2,1.4,'#4f555e',0,-1.4,0)]},
+  bridge:(k,L)=>[k.box(L,.5,1.8,'#4f555e',0,-.26,0),k.box(L,.3,.14,'#6c727c',0,.14,-.83),k.box(L,.3,.14,'#6c727c',0,.14,.83),k.box(.6,2,1.4,'#4f555e',0,-1.4,0)],
+  block:k=>[k.box(.96,.4,.96,'#6c727c',0,.2,0),k.box(.46,.2,.96,'#6c727c',-.25,.5,0)]},
 
  // ---------- Pitstraat: een circuit met vangrails, tribunetorens en een racetoren (Grand Prix) ----------
  pits:{n:'Pitstraat',mat:'plain',band:[1.44,.12,2.14,.2],flag:[0,2.35,1.17],label:3.1,
@@ -81,7 +84,9 @@ ERME.FORTS={
     k.fire(-.4,1.9,-.5,.35),k.fire(-.4,1.7,.5,.3)],
   lamp:k=>[k.cyl(.035,.05,1.6,'#9aa0a8',0,.8,0,6),k.box(.04,.04,.45,'#9aa0a8',0,1.62,.2),k.box(.14,.06,.24,'#2a2d31',0,1.6,.4),k.lit.box(.1,.02,.2,'#fff6e0',0,1.56,.4),k.light(0,1.55,.4,null,1.5)],
   bridge:(k,L)=>[k.box(L,.5,1.8,'#33363b',0,-.26,0),k.box(L,.02,.06,'#f2f2f2',0,0,-.66),k.box(L,.02,.06,'#f2f2f2',0,0,.66),
-    ...[-.83,.83].flatMap(v=>blocks(L,.48,.02,0,(u,w,i)=>k.box(w,.1,.14,i%2?'#d8261c':'#f2f2f2',u,.04,v))),k.box(.6,2,1.4,'#8a9098',0,-1.4,0)]},
+    ...[-.83,.83].flatMap(v=>blocks(L,.48,.02,0,(u,w,i)=>k.box(w,.1,.14,i%2?'#d8261c':'#f2f2f2',u,.04,v))),k.box(.6,2,1.4,'#8a9098',0,-1.4,0)],
+  // een stapel banden
+  block:k=>[[-.24,-.24],[.24,-.24],[-.24,.24],[.24,.24]].flatMap(([x,z],j)=>[0,1,2].map(i=>k.ring(.2,.08,(i+j)%2?'#d8261c':'#15171a',x,.08+i*.15,z)))},
 
  // ---------- IJsburcht: muren van ijsblokken, sneeuw en een blokhut (Bevroren Noorden) ----------
  ice:{n:'IJsburcht',mat:'plain',band:[1.44,.1,2.14,.84],flag:[0,2.35,1.17],label:3.1,
@@ -116,7 +121,9 @@ ERME.FORTS={
   bridge:(k,L)=>[k.box(L,.12,1.7,'#6b4a2a',0,-.07,0),...blocks(L,.26,.04,0,(u,w,i)=>k.box(w,.05,1.74,i%2?'#7a5a3a':'#6b4a2a',u,0,0)),
     k.box(L,.03,.35,'#f4f8fb',0,.04,-.62),k.box(L,.03,.3,'#f4f8fb',0,.04,.65),
     ...along(L,1.5,.2,u=>[k.box(.08,.5,.08,'#6b4a2a',u,.25,-.85),k.box(.08,.5,.08,'#6b4a2a',u,.25,.85)]),
-    k.box(L,.03,.03,'#c8b48a',0,.42,-.85),k.box(L,.03,.03,'#c8b48a',0,.42,.85),k.box(.5,2,1.2,'#a9d4ee',0,-1.1,0)]},
+    k.box(L,.03,.03,'#c8b48a',0,.42,-.85),k.box(L,.03,.03,'#c8b48a',0,.42,.85),k.box(.5,2,1.2,'#a9d4ee',0,-1.1,0)],
+  // een ijsmuurtje: twee blokken ijs met sneeuw erop
+  block:k=>[k.box(.98,.26,.7,'#cfe8f8',0,.13,0),k.box(.98,.24,.62,'#a9d4ee',0,.38,0),k.box(1,.08,.66,'#f4f8fb',0,.54,0),k.ball(.14,'#f4f8fb',.2,.58,0,[1.5,.6,1.2])]},
 
  // ---------- Ruimtestation: metalen schotten, pylonen en een commandokoepel (Neon Nexus) ----------
  station:{n:'Ruimtestation',mat:'metal',band:[2.2,.05,2.7,.03],flag:[0,2.35,1.17],label:3.3,
@@ -144,7 +151,9 @@ ERME.FORTS={
   bridge:(k,L)=>[k.box(L,.3,1.6,'#2a3138',0,-.16,0),...along(L,.6,.3,u=>k.box(.04,.02,1.6,'#3a4652',u,0,0)),
     k.lit.box(L,.03,.04,'#5dffa0',0,.02,-.78),k.lit.box(L,.03,.04,'#5dffa0',0,.02,.78),
     ...along(L,1.2,.3,u=>[k.box(.05,.5,.05,'#5a6a78',u,.25,-.82),k.box(.05,.5,.05,'#5a6a78',u,.25,.82)]),
-    k.box(L,.04,.04,'#5a6a78',0,.5,-.82),k.box(L,.04,.04,'#5a6a78',0,.5,.82),k.cyl(.35,.45,2,'#3a4652',0,-1.2,0,6)]},
+    k.box(L,.04,.04,'#5a6a78',0,.5,-.82),k.box(L,.04,.04,'#5a6a78',0,.5,.82),k.cyl(.35,.45,2,'#3a4652',0,-1.2,0,6)],
+  // een metalen barrière met een neonrand
+  block:k=>[k.box(.96,.42,.6,'#3a4652',0,.21,0),k.box(.98,.06,.66,'#5a6a78',0,.45,0),k.lit.box(.98,.03,.05,'#5dffa0',0,.38,.31),k.lit.box(.98,.03,.05,'#5dffa0',0,.38,-.31)]},
 
  // ---------- Ridderburcht: zandsteen, kantelen, poortgebouwen en een donjon (Koningsdoolhof) ----------
  keep:{n:'Ridderburcht',mat:'stone',band:[1.44,.12,2.14,1.25],flag:[0,2.35,1.17],label:3.2,
@@ -180,6 +189,8 @@ ERME.FORTS={
     k.lit.cone(.07,.2,'#ffb050',0,1.5,.25,false,6),k.light(0,1.5,.25,null,1.4)],
   // een houten brug met planken en zware zijbalken
   bridge:(k,L)=>[k.box(L,.14,1.7,'#5a3e26',0,-.08,0),...blocks(L,.28,.04,0,(u,w,i)=>k.box(w,.05,1.74,i%2?'#6b4a2a':'#5a3e26',u,0,0)),
-    k.box(L,.12,.12,'#4a3422',0,.1,-.85),k.box(L,.12,.12,'#4a3422',0,.1,.85),k.box(.7,2,1.4,'#8a7a5a',0,-1.1,0)]}
+    k.box(L,.12,.12,'#4a3422',0,.1,-.85),k.box(L,.12,.12,'#4a3422',0,.1,.85),k.box(.7,2,1.4,'#8a7a5a',0,-1.1,0)],
+  // een lage haag
+  block:k=>[k.box(.96,.42,.6,'#2f4a22',0,.21,0),k.ball(.3,'#3a5a2a',-.25,.42,0,[1,.7,1]),k.ball(.3,'#355226',.25,.44,0,[1,.7,1])]}
 };
 })(typeof module!=='undefined'&&module.exports?module.exports:(window.ERME=window.ERME||{}));
