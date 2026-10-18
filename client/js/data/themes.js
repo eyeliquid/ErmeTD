@@ -15,10 +15,11 @@
 //  road          de weg die je legt. kind: 'cobble' | 'asphalt' | 'plate' | 'snow' | 'flagstone'; a, b = de twee hoofdkleuren
 //  trail         het pad over het gras: [kleur midden, kleur rand]; trailGlow = true laat het oplichten
 //  kerb          de stoeprand langs de weg; twee kleuren wisselen elkaar af
-//  sea           het water rond de vestingen. kind: 'water' | 'ice' | 'void'; base, light, dark, wave; blobs = hoe sterk de vlekken (standaard .22); rough en metal voor de glans
+//  sea           het water rond de vestingen. kind: 'water' | 'ice' | 'void' | 'sand' (duinen) | 'clouds'; y = hoogte van de zee (standaard -1,25); base, light, dark, wave; blobs = hoe sterk de vlekken (standaard .22); rough en metal voor de glans
 //  wall          tint van de minigame-eilanden; metal = 0..1 (1 = staalplaat in plaats van steen). De burchten zelf staan in data/forts.js
 //  lamp, fire    kleur van de lantaarns en van de vuren
-//  particles     iets dat in de lucht hangt: {kind: 'snow' | 'motes' | 'sparks', color, n}
+//  particles     iets dat in de lucht hangt: {kind: 'snow' | 'motes' | 'sparks' | 'dust', color, n}
+//  fly           (alleen bij een luchtaanval) hoe hoog de vijanden vliegen
 //  fort          de burcht: hoe muren, torens, poorten, hoofdkwartier, fabriek, lantaarns en bruggen eruitzien (data/forts.js)
 //  enemies       per vijand: n = andere naam, paint = {oude kleur: nieuwe kleur} op het gewone model, model = een heel ander model
 //  music         de muziekstijl (zie STYLES in music.js)
@@ -143,6 +144,89 @@ ERME.THEMES={
      k.cone(.05,.22,'#d8c8a8',1.05,2.12,.1),k.cone(.05,.22,'#d8c8a8',1.05,2.12,-.1),k.box(.9,.04,1.2,'#1f4a28',-.1,1.95,.75,0,.25),k.box(.9,.04,1.2,'#1f4a28',-.1,1.95,-.75,0,.25),
      k.rod(.08,.9,'#2f6a3a',-1.2,1.6,0,-.3),k.cone(.1,.2,'#1f4a28',-1.65,1.47,0)]}},
   fort:'keep',
-  music:'knights',ui:{accent:'#e6b830',trim:'#9a1f1a'}}
+  music:'knights',ui:{accent:'#e6b830',trim:'#9a1f1a'}},
+
+ // ---------- Zandstorm: een woestijn met tempels, mummies en een gouden kern (Zandstorm) ----------
+ desert:{n:'Zandstorm',tag:'Brandende zon, zandduinen en een tempel die van vier kanten belegerd wordt',
+  sky:'#d8a868',fog:['#d9b07a',35,130],exposure:1.1,
+  light:{hemi:['#ffe2b0','#8a6030',.9],sun:['#fff0d0',2.1],fill:['#ffb070',.3]},
+  ground:{kind:'sand',base:'#d8b47a',pal:['#e2c08a','#cfa86c','#e8cc98','#c99e60']},
+  road:{kind:'flagstone',a:'#c8a46a',b:'#9a7a48'},
+  trail:['rgba(150,108,58,.92)','rgba(170,130,80,.5)'],
+  kerb:['#b08a50'],
+  sea:{kind:'sand',base:'#c9a066',light:'240,210,160',dark:'150,110,60',wave:'255,240,210',rough:.95,metal:0},
+  wall:{tint:'#f0d8a8',metal:0},
+  lamp:'#ffb050',fire:'#ff8a20',
+  particles:{kind:'dust',color:'#f0d0a0',n:900},
+  fort:'temple',
+  enemies:{
+   inf:{n:'Mummie',model:k=>[k.box(.07,.15,.07,'#cfc2a0',0,.07,.04),k.box(.07,.15,.07,'#cfc2a0',0,.07,-.04),k.box(.15,.28,.13,'#e8dcc0',0,.29,0),
+     k.box(.155,.03,.135,'#b8ab88',0,.22,0),k.box(.155,.03,.135,'#b8ab88',0,.34,0),k.ball(.08,'#e8dcc0',0,.49,0),k.box(.02,.02,.08,'#ffb030',.07,.5,0),
+     k.box(.2,.05,.05,'#e8dcc0',.1,.36,.08),k.box(.2,.05,.05,'#e8dcc0',.1,.36,-.08)]},
+   dog:{n:'Scarabee',model:k=>[k.ball(.16,'#1f5a4a',0,.13,0,[1.3,.7,1]),k.box(.4,.02,.02,'#0e2a22',0,.24,0),k.ball(.07,'#1f5a4a',.2,.11,0),k.cone(.03,.1,'#e8b84a',.26,.17,0),
+     ...[-.1,0,.1].flatMap(x=>[k.box(.03,.03,.12,'#0e2a22',x,.04,.15),k.box(.03,.03,.12,'#0e2a22',x,.04,-.15)])]},
+   tank:{n:'Strijdwagen',model:k=>[k.box(.4,.08,.36,'#8a5a2a',0,.18,0),k.box(.06,.22,.36,'#c79a2a',-.18,.3,0),k.ring(.16,.03,'#c79a2a',-.02,.17,.2,0),k.ring(.16,.03,'#c79a2a',-.02,.17,-.2,0),
+     k.box(.4,.03,.03,'#5a3a1a',.3,.2,0),k.box(.28,.16,.12,'#3a2a1a',.52,.24,.08),k.box(.28,.16,.12,'#3a2a1a',.52,.24,-.08),k.ball(.08,'#c9a888',-.05,.42,0),k.box(.12,.18,.1,'#e8dcc0',-.05,.3,0)]},
+   drone:{n:'Gier',model:k=>[k.ball(.12,'#4a3426',0,.62,0,[1.4,.8,.9]),k.ball(.06,'#d8c8b0',.17,.66,0),k.cone(.03,.08,'#e8b84a',.24,.66,0),
+     k.box(.18,.02,.42,'#3a2a1e',0,.66,.22,0,.15),k.box(.18,.02,.42,'#3a2a1e',0,.66,-.22,0,.15)]},
+   mech:{n:'Steengolem',paint:{'#356f40':'#b8955a','#1f3023':'#8a6a40','#e8e8e8':'#3fe0c8','#15171a':'#8a6a40'}},
+   haz:{n:'Zandpriester',paint:{'#b89a22':'#2a3a7a','#101010':'#e8b84a','#6a6a6a':'#c79a2a','#222':'#c79a2a'}},
+   boss:{n:'Zonnebark',paint:{'#8f2019':'#c79a2a','#c79a2a':'#2a3a7a','#5a1410':'#e8dcc0','#22262b':'#5a3a1a','#3a1512':'#e8b84a'}}},
+  music:'desert',ui:{accent:'#e8b84a',trim:'#7a4a1a'}},
+
+ // ---------- Kaapvaart: twee piratenschepen op een tropische zee (Kaapvaart) ----------
+ pirates:{n:'Kaapvaart',tag:'Twee schepen, één zee: wie gaat er als eerste kopje onder?',
+  sky:'#5fa8d8',fog:['#8ec8e8',60,180],exposure:1.1,
+  light:{hemi:['#d8f0ff','#3a6a5a',.95],sun:['#fff4d8',2.2],fill:['#7fd0ff',.35]},
+  ground:{kind:'deck',base:'#8a6038',pal:['#9a6a3e','#8a5e34','#7c542e','#a4744a']},
+  road:{kind:'plank',a:'#5a3a1e',b:'#2a1a0e'},
+  trail:['rgba(60,38,18,.55)','rgba(60,38,18,.22)'],
+  kerb:['#c8b48a','#5a3a1e'],
+  sea:{kind:'water',base:'#13a0aa',light:'80,210,210',dark:'0,80,100',wave:'230,255,250',blobs:.15,rough:.2,metal:.4},
+  wall:{tint:'#c8a878',metal:0},
+  lamp:'#ffc070',fire:'#ff9a30',
+  particles:null,
+  fort:'ship',
+  enemies:{
+   inf:{n:'Piraat',paint:{'#8f2a22':'#e8e8e8','#4a5530':'#c8281e','#3a3f2a':'#5a3a1e','#2a2420':'#2a2a3a'}},
+   dog:{n:'Aap',paint:{'#6a4a30':'#5a3a22','#4d3422':'#c8a070'}},
+   tank:{n:'Kanonkar',model:k=>[k.box(.42,.1,.28,'#6b4a2a',-.04,.16,0),k.ring(.12,.04,'#5a3a1e',0,.12,.17,0),k.ring(.12,.04,'#5a3a1e',0,.12,-.17,0),
+     k.rod(.07,.5,'#2a2d31',.08,.28,0),k.ball(.08,'#2a2d31',-.16,.28,0),k.box(.14,.22,.12,'#e8e8e8',-.24,.3,.1),k.ball(.07,'#c9a888',-.24,.46,.1),k.box(.1,.04,.1,'#c8281e',-.24,.52,.1)]},
+   drone:{n:'Zeemeeuw',model:k=>[k.ball(.1,'#f2f2f2',0,.62,0,[1.5,.8,.8]),k.ball(.05,'#f2f2f2',.15,.66,0),k.cone(.025,.08,'#f2c230',.21,.66,0),
+     k.box(.14,.02,.46,'#c8ccd2',0,.66,0,0,.12),k.box(.14,.025,.12,'#2a2d31',-.02,.665,.25),k.box(.14,.025,.12,'#2a2d31',-.02,.665,-.25)]},
+   mech:{n:'Skelet',paint:{'#356f40':'#e8e4d8','#1f3023':'#cfc9b8','#e8e8e8':'#15171a','#15171a':'#8a8578'}},
+   haz:{n:'Kruitpiraat',paint:{'#b89a22':'#2a2a3a','#6a6a6a':'#15171a','#101010':'#ff8a20'}},
+   boss:{n:'Spookschip',model:k=>[k.box(1.9,.5,.8,'#3a2a1e',0,1.4,0),k.box(.5,.4,.8,'#2a1e14',-.75,1.8,0),k.cone(.4,.6,'#3a2a1e',1.15,1.4,0,false,4),
+     k.cyl(.05,.06,1.8,'#2a1e14',.2,2.4,0,6),k.cyl(.05,.06,1.4,'#2a1e14',-.5,2.2,0,6),k.lit.box(.04,.9,.7,'#bff0d0',.24,2.5,0),k.lit.box(.04,.7,.6,'#bff0d0',-.46,2.3,0),
+     k.box(.03,.25,.35,'#15171a',.2,3.3,.18),k.lit.ball(.06,'#7fffb0',.95,1.55,.35),k.lit.ball(.06,'#7fffb0',.95,1.55,-.35)]}},
+  music:'pirates',ui:{accent:'#f2c230',trim:'#8a2a1a'}},
+
+ // ---------- Hemelrijk: zwevende eilanden boven de wolken, vol koper en stoom (Hemelrijk) ----------
+ sky:{n:'Hemelrijk',tag:'Zwevende eilanden boven de wolken; de vijand komt door de lucht',
+  sky:'#8ec8f0',fog:['#d8ecfa',70,220],exposure:1.15,
+  light:{hemi:['#ffffff','#9ab0c8',1.0],sun:['#fff2d8',2.0],fill:['#a8d0ff',.4]},
+  ground:{kind:'grass',base:'#5a8a3a',pal:['#6a9a44','#4e7e32','#78a850','#5c8c3c'],blade:['rgba(200,240,140,.16)','rgba(20,50,10,.2)']},
+  road:{kind:'plank',a:'#7a5a3a',b:'#3a2a1a'},
+  trail:['rgba(255,255,255,.5)','rgba(200,230,255,.18)'],
+  kerb:['#c8a050'],
+  sea:{kind:'clouds',base:'#d8e8f4',light:'255,255,255',dark:'180,200,220',wave:'255,255,255',rough:.95,metal:0,y:-14},
+  wall:{tint:'#d8c8a0',metal:0},
+  lamp:'#ffe8a0',fire:'#ffb050',
+  particles:{kind:'motes',color:'#ffffff',n:400},
+  fort:'skyport',fly:.9,
+  enemies:{
+   inf:{n:'Gyrocopter',model:k=>[k.ball(.12,'#c8963a',0,.42,0,[1.3,1,1]),k.ball(.07,'#9fd8ff',.1,.46,0),k.box(.26,.04,.04,'#5a4a3a',-.2,.42,0),k.box(.02,.1,.1,'#5a4a3a',-.32,.44,0),
+     k.cyl(.02,.02,.14,'#3a2e24',0,.58,0,6),k.box(.6,.015,.05,'#7a5a3a',0,.66,0),k.box(.05,.015,.6,'#7a5a3a',0,.66,0)]},
+   dog:{n:'Mechanische vogel',model:k=>[k.ball(.1,'#b8683a',0,.42,0,[1.5,.8,.8]),k.ball(.05,'#c8963a',.14,.46,0),k.cone(.025,.08,'#5a5a5e',.2,.46,0),
+     k.box(.14,.02,.44,'#c8963a',0,.46,0,0,.15),k.lit.ball(.02,'#ff5a3a',.17,.48,.03)]},
+   tank:{n:'Bommenwerper',model:k=>[k.ball(.3,'#8a8a90',0,.75,0,[1.8,.8,.8]),k.box(.4,.12,.16,'#7a5a3a',0,.42,0),k.box(.04,.2,.2,'#5a5a5e',-.55,.8,0),
+     k.box(.04,.04,.4,'#5a5a5e',-.55,.8,0),k.ball(.05,'#2a2d31',.1,.32,0)]},
+   drone:{n:'Vlieger',paint:{'#9aa2ab':'#e85a3a','#ff3b2e':'#f2c230','#33373c':'#7a5a3a'}},
+   mech:{n:'Luchtballon',model:k=>[k.ball(.28,'#c8281e',0,.95,0,[1,1.15,1]),k.box(.04,.62,.58,'#f2c230',0,.95,0),k.box(.58,.62,.04,'#f2c230',0,.95,0),
+     k.box(.2,.14,.2,'#7a5a3a',0,.42,0),k.box(.01,.22,.01,'#3a2a1a',.08,.56,.08),k.box(.01,.22,.01,'#3a2a1a',-.08,.56,-.08)]},
+   haz:{n:'Raketman',model:k=>[k.box(.14,.24,.12,'#5a5a5e',0,.4,0),k.ball(.08,'#c8963a',0,.58,0),k.box(.02,.05,.1,'#9fd8ff',.07,.58,0),
+     k.cyl(.04,.04,.24,'#b8683a',-.09,.42,.05,8),k.cyl(.04,.04,.24,'#b8683a',-.09,.42,-.05,8),k.lit.cone(.04,.14,'#ffb050',-.09,.24,.05,true),k.lit.cone(.04,.14,'#ffb050',-.09,.24,-.05,true)]},
+   boss:{n:'Stoomluchtschip',paint:{'#8f2019':'#b88a4a','#c79a2a':'#5a3a1e','#5a1410':'#c8963a','#22262b':'#5a4a3a','#3a1512':'#9fd8ff'}}},
+  music:'steam',ui:{accent:'#e8a840',trim:'#6a4a2a'}}
 };
 })(typeof module!=='undefined'&&module.exports?module.exports:(window.ERME=window.ERME||{}));

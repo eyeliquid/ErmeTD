@@ -55,6 +55,18 @@ function ground(th,N){const S=2048,[cv,g]=mk(S),[bv,b]=mk(S/2),u=S/N,r=lcg(7),ki
       b.fillStyle='#8a8a8a';b.fillRect(x*u+4,y*u+4,u-8,u-8);if(r()<.35){g.strokeStyle='rgba(255,255,255,.05)';g.lineWidth=1;for(let k=0;k<6;k++){g.beginPath();const yy=y*u+8+r()*(u-16);g.moveTo(x*u+8,yy);g.lineTo(x*u+u-8,yy);g.stroke();}}}
     for(let i=0;i<14000;i++){g.fillStyle=r()>.5?'rgba(255,255,255,.04)':'rgba(0,0,0,.1)';g.fillRect(r()*S,r()*S,2,2);}
     g.shadowColor=th.glow;g.shadowBlur=14;grid(g,S,N,rgba(th.glow,.55),2.5);g.shadowBlur=0;vignette(g,S,.45);}
+  else if(kind==='sand'){ // woestijnzand met golvende ribbels
+    blobs(g,S,r,th.pal,360,60,260,.55);
+    for(let i=0;i<260;i++){const y0=r()*S,x0=r()*S,w=80+r()*220,a=2+r()*4;g.strokeStyle=r()>.5?'rgba(255,240,200,.16)':'rgba(120,80,30,.14)';g.lineWidth=2+r()*2;g.beginPath();
+      for(let x=0;x<=w;x+=8){const y=y0+Math.sin((x0+x)/38)*a;x?g.lineTo(x0+x,y):g.moveTo(x0+x,y);}g.stroke();b.strokeStyle='rgba(255,255,255,.2)';b.lineWidth=3;b.beginPath();b.moveTo(x0,y0);b.lineTo(x0+w,y0);b.stroke();}
+    for(let i=0;i<24000;i++){g.fillStyle=r()>.5?'rgba(255,245,210,.14)':'rgba(90,60,20,.14)';g.fillRect(r()*S,r()*S,1.5,1.5);}
+    grid(g,S,N,'rgba(90,60,20,.13)',2);vignette(g,S,.3);}
+  else if(kind==='deck'){ // een scheepsdek van planken, met spijkers en naden
+    const pl=u/3;for(let y=0;y<S;y+=pl){const off=(y/pl%2)*S/5;for(let x=-off;x<S;x+=S/2.5){const q=r();g.fillStyle=th.pal[(q*th.pal.length)|0];g.fillRect(x+2,y+2,S/2.5-4,pl-4);
+        g.fillStyle='rgba(0,0,0,.35)';g.fillRect(x,y,S/2.5,2);g.fillRect(x,y,2,pl);b.fillStyle='#909090';b.fillRect(x+3,y+3,S/2.5-6,pl-6);
+        g.fillStyle='rgba(40,30,20,.7)';for(const nx of[x+8,x+S/2.5-10])for(const ny of[y+pl*.3,y+pl*.7]){g.beginPath();g.arc(nx,ny,2,0,7);g.fill();}}}
+    for(let i=0;i<9000;i++){g.fillStyle=r()>.5?'rgba(255,230,190,.07)':'rgba(30,18,8,.12)';g.fillRect(r()*S,r()*S,6+r()*20,1);}
+    grid(g,S,N,'rgba(0,0,0,.18)',2);vignette(g,S,.38);}
   return[cv,bv];}
 
 // ---------- de weg en het pad over het gras: [weg, reliëf weg, pad] ----------
@@ -84,6 +96,10 @@ function road(th,trail,trailGlow){const S=256,[cv,g]=mk(S),[bv,b]=mk(S),[tv,t]=m
     g.fillStyle=th.a;g.fillRect(0,0,S,S);
     for(let i=0;i<3000;i++){g.fillStyle=r()>.5?'rgba(255,255,255,.25)':rgba(th.b,.35);g.fillRect(r()*S,r()*S,1+r()*3,1+r()*3);}
     for(let i=0;i<10;i++){g.fillStyle=rgba(th.b,.4);const x=r()*S,y=r()*S;g.beginPath();g.ellipse(x,y,7,11,r(),0,7);g.fill();b.fillStyle='#606060';b.beginPath();b.ellipse(x,y,7,11,0,0,7);b.fill();}}
+  else if(kind==='plank'){ // een loopplank van dwarse planken
+    g.fillStyle=th.b;g.fillRect(0,0,S,S);for(let i=0;i<8;i++){const q=r();g.fillStyle=q<.5?th.a:rgba(th.a,.85);g.fillRect(4,i*32+3,S-8,26);b.fillStyle=`rgb(${160+q*60|0},${160+q*60|0},${160+q*60|0})`;b.fillRect(4,i*32+3,S-8,26);
+      g.fillStyle='rgba(0,0,0,.35)';for(const x of[18,S-20]){g.beginPath();g.arc(x,i*32+16,3,0,7);g.fill();}}
+    for(let i=0;i<2500;i++){g.fillStyle=r()>.5?'rgba(255,230,190,.07)':'rgba(0,0,0,.14)';g.fillRect(r()*S,r()*S,4+r()*14,1);}}
   // het pad over het gras
   const gr=t.createRadialGradient(S/2,S/2,30,S/2,S/2,S*.72);gr.addColorStop(0,trail[0]);gr.addColorStop(1,trail[1]);t.fillStyle=gr;t.fillRect(0,0,S,S);
   if(trailGlow){t.strokeStyle='rgba(180,255,210,.55)';t.lineWidth=3;t.strokeRect(4,4,S-8,S-8);}
@@ -98,6 +114,11 @@ function sea(th){const S=256,[cv,g]=mk(S),r=lcg(3),kind=th.kind||'water';g.fillS
   else if(kind==='ice'){ // ijsschotsen en barsten
     for(let i=0;i<14;i++){g.fillStyle=`rgba(${th.wave},${.2+r()*.25})`;g.beginPath();const x=r()*S,y=r()*S,n=5+r()*3|0;for(let k=0;k<n;k++){const an=k/n*6.28,d=12+r()*22;k?g.lineTo(x+Math.cos(an)*d,y+Math.sin(an)*d):g.moveTo(x+Math.cos(an)*d,y+Math.sin(an)*d);}g.fill();}
     g.strokeStyle=`rgba(${th.dark},.45)`;g.lineWidth=1;for(let i=0;i<24;i++){let x=r()*S,y=r()*S;g.beginPath();g.moveTo(x,y);for(let k=0;k<4;k++){x+=(r()-.5)*40;y+=(r()-.5)*40;g.lineTo(x,y);}g.stroke();}}
+  else if(kind==='sand'){ // een zee van zandduinen
+    for(let i=0;i<40;i++){const y0=r()*S;g.strokeStyle=`rgba(${r()>.5?th.light:th.dark},.3)`;g.lineWidth=2+r()*3;g.beginPath();for(let x=-10;x<=S+10;x+=6){const y=y0+Math.sin(x/30+i)*6;x>-10?g.lineTo(x,y):g.moveTo(x,y);}g.stroke();}}
+  else if(kind==='clouds'){ // een wolkendek
+    for(let i=0;i<110;i++){const x=r()*S,y=r()*S,rad=14+r()*40;for(const ox of[-S,0,S])for(const oy of[-S,0,S]){const gr=g.createRadialGradient(x+ox,y+oy,0,x+ox,y+oy,rad);
+      gr.addColorStop(0,`rgba(${th.wave},.55)`);gr.addColorStop(1,`rgba(${th.wave},0)`);g.fillStyle=gr;g.fillRect(x+ox-rad,y+oy-rad,rad*2,rad*2);}}}
   else if(kind==='void'){ // de leegte met een lichtend raster
     g.strokeStyle=`rgba(${th.wave},.35)`;g.lineWidth=1.5;g.beginPath();for(let i=0;i<=S;i+=64){g.moveTo(i,0);g.lineTo(i,S);g.moveTo(0,i);g.lineTo(S,i);}g.stroke();
     for(let i=0;i<60;i++){g.fillStyle=`rgba(${th.wave},${r()*.6})`;g.fillRect(r()*S,r()*S,1.5,1.5);}}

@@ -84,7 +84,9 @@ test('maps: elke map wijst naar een bestaand thema en de poorten liggen in een o
     assert.ok(m.n && m.k && m.d, id + ': naam, soort en uitleg');
     assert.ok(D.THEMES[m.theme], `${id}: thema ${m.theme} bestaat niet in data/themes.js`);
     assert.ok(inGap(m.in), id + ': de ingang ligt in een opening van de muur');
-    if (m.out >= 0) assert.ok(inGap(m.out), id + ': de uitgang ligt in een opening van de muur');
+    // een uitgang midden in het veld mag alleen met vaste wegen (daar staat de kern); anders moet hij in een opening van de muur liggen
+    if (m.out >= 0 && !m.lanes) assert.ok(inGap(m.out), id + ': de uitgang ligt in een opening van de muur');
+    for (const l of m.lanes || []) { assert.ok(inGap(l[0]), id + ': elke weg begint in een opening van de muur'); assert.equal(l[l.length - 1], m.out, id + ': elke weg eindigt op de uitgang'); }
     if (m.pass) assert.ok(['row', 'col', 'down'].includes(m.pass), id + ': pass is row, col of down');
     assert.ok(m.world && ['grid', 'pyramid', 'ring'].includes(m.world.kind), id + ': world is grid, pyramid of ring');
     if (m.hard != null) assert.ok(num(m.hard) && m.hard > 0, id + ': hard is een getal boven 0');
@@ -102,10 +104,10 @@ test('thema\'s: kleuren zijn geldig, vijanden bestaan en modellen geven onderdel
   for (const [id, t] of Object.entries(D.THEMES)) {
     for (const k of ['sky', 'lamp', 'fire']) if (t[k] != null) assert.ok(hex(t[k]), `${id}.${k} is een #rrggbb-kleur`);
     if (t.ui) for (const k of ['accent', 'trim']) assert.ok(hex(t.ui[k]), `${id}.ui.${k}`);
-    if (t.ground) assert.ok(['grass', 'lawn', 'snow', 'metal', 'meadow'].includes(t.ground.kind), `${id}: grondsoort ${t.ground.kind}`);
-    if (t.road) assert.ok(['cobble', 'asphalt', 'plate', 'snow', 'flagstone'].includes(t.road.kind), `${id}: wegsoort ${t.road.kind}`);
-    if (t.sea) assert.ok(['water', 'ice', 'void'].includes(t.sea.kind), `${id}: zeesoort ${t.sea.kind}`);
-    if (t.particles) assert.ok(['snow', 'motes', 'sparks'].includes(t.particles.kind), `${id}: deeltjes ${t.particles.kind}`);
+    if (t.ground) assert.ok(['grass', 'lawn', 'snow', 'metal', 'meadow', 'sand', 'deck'].includes(t.ground.kind), `${id}: grondsoort ${t.ground.kind}`);
+    if (t.road) assert.ok(['cobble', 'asphalt', 'plate', 'snow', 'flagstone', 'plank'].includes(t.road.kind), `${id}: wegsoort ${t.road.kind}`);
+    if (t.sea) assert.ok(['water', 'ice', 'void', 'sand', 'clouds'].includes(t.sea.kind), `${id}: zeesoort ${t.sea.kind}`);
+    if (t.particles) assert.ok(['snow', 'motes', 'sparks', 'dust'].includes(t.particles.kind), `${id}: deeltjes ${t.particles.kind}`);
     for (const [en, o] of Object.entries(t.enemies || {})) {
       assert.ok(D.EN[en], `${id}: onbekende vijand ${en}`);
       if (o.paint) for (const [a, b] of Object.entries(o.paint)) assert.ok(hex(a) && hex(b), `${id}.${en}: paint ${a} → ${b}`);
@@ -117,6 +119,7 @@ test('thema\'s: kleuren zijn geldig, vijanden bestaan en modellen geven onderdel
 
 test('burchten: elk stuk bestaat, geeft onderdelen met geldige kleuren en blijft van het speelveld af', () => {
   const pieces = ['base', 'wall', 'corner', 'gate', 'hq', 'factory', 'lamp', 'bridge', 'block'];
+  for (const [id, F] of Object.entries(D.FORTS)) if (F.core) { const { kit } = fakeKit(); assert.ok([F.core(kit)].flat(4).length, id + ': core'); }
   for (const [id, F] of Object.entries(D.FORTS)) if (F.hub) { const { kit } = fakeKit(); assert.ok([F.hub(kit)].flat(4).length, id + ': hub'); }
   for (const [id, F] of Object.entries(D.FORTS)) {
     assert.ok(F.n, id + ': naam');

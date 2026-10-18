@@ -13,6 +13,9 @@ test('elke map heeft zijn eigen aantal vestingen', () => {
   assert.equal(L('wintermaul').n, 10);
   assert.equal(L('circle').n, 12);
   assert.equal(L('maze').n, 16);
+  assert.equal(L('sand').n, 4);
+  assert.equal(L('pirates').n, 2);
+  assert.equal(L('sky').n, 6);
 });
 
 test('Wintermaul: een piramide van 4, 3, 2 en 1, en de vijanden lopen zoals afgesproken', () => {

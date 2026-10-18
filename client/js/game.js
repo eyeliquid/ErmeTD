@@ -263,10 +263,12 @@ function makeTower(type,slot,lvl,spec){const g=new T3.Group(),head=new T3.Group(
   g.scale.setScalar(type==='geers'?.88+.018*lvl:size>1?1:1+.045*lvl);g.userData={head,anims,aim:!!AIM[type]};return g;}
 // Het uiterlijk van de vijanden staat in data/enemies.js (model) en per thema in data/themes.js (andere naam, kleuren of model).
 // KIT maakt van die bouwstenen echte vormen; paint vervangt kleuren: {oude kleur: nieuwe kleur}.
-const KIT=paint=>{const c=col=>(paint&&paint[col])||col;return{
+// k.lit: bij vijanden gewoon dezelfde bouwstenen (een burcht maakt er echt lichtgevende onderdelen van, zie fortKit)
+const KIT=paint=>{const c=col=>(paint&&paint[col])||col;const o=KIT0(c);o.lit=o;return o;};
+const KIT0=c=>({
   box:(w,h,d,col,x,y,z,ry,rz)=>bx(w,h,d,c(col),x,y,z,ry,rz),ball:(r,col,x,y,z,sc)=>sp(r,c(col),x,y,z,sc),rod:(r,len,col,x,y,z,tilt)=>brl(r,len,c(col),x,y,z,tilt),
   cyl:(rt,rb,h,col,x,y,z,seg)=>cy(rt,rb,h,c(col),x,y,z,seg),cone:(r,h,col,x,y,z,down,seg,ry)=>P(new T3.ConeGeometry(r,h,seg||12),c(col),x,y,z,down?Math.PI:0,ry||0),
-  gem:(r,col,x,y,z)=>P(new T3.OctahedronGeometry(r),c(col),x,y,z),ring:(r,t,col,x,y,z,rx,ry)=>P(new T3.TorusGeometry(r,t,8,18),c(col),x,y,z,rx==null?Math.PI/2:rx,ry||0)};};
+  gem:(r,col,x,y,z)=>P(new T3.OctahedronGeometry(r),c(col),x,y,z),ring:(r,t,col,x,y,z,rx,ry)=>P(new T3.TorusGeometry(r,t,8,18),c(col),x,y,z,rx==null?Math.PI/2:rx,ry||0)});
 const ENGEO={};for(const k in EN)ENGEO[k]=()=>EN[k].model(KIT());
 // Het model van vijand k in het huidige thema.
 function enemyGeo(k){const o=THEME&&THEME.enemies[k];if(!o||(!o.model&&!o.paint))return geo('en_'+k,ENGEO[k]);
@@ -465,7 +467,7 @@ function themeTextures(th){return themeTex[th.id]||(themeTex[th.id]=(()=>{const[
 const FORTS=window.ERME.FORTS;
 // De bouwdoos voor een burcht: de gewone bouwstenen, plus k.lit (geeft zelf licht), k.light (een gloed) en k.fire (een vuur).
 function fortKit(){const k=KIT(),lit=KIT();
-  for(const n in lit){const f=lit[n];lit[n]=(...a)=>{const p=f(...a);p.lit=true;p.c=new T3.Color(a.find(v=>typeof v==='string'));return p;};}
+  for(const n in lit){if(n==='lit')continue;const f=lit[n];lit[n]=(...a)=>{const p=f(...a);p.lit=true;p.c=new T3.Color(a.find(v=>typeof v==='string'));return p;};}
   k.lit=lit;k.light=(x,y,z,col,size)=>({light:[x,y,z,col||null,size||1.5]});k.fire=(x,y,z,size)=>({fire:[x,y,z,size||.5]});return k;}
 // Zet de onderdelen van een stuk op hun plek: draaien om de verticale as (rot) en verschuiven naar (x, z). Verzamelt alles in out.
 const _fm=T3&&new T3.Matrix4(),_fv=T3&&new T3.Vector3();
@@ -480,7 +482,7 @@ const fortGeo=(parts,wuv)=>parts.length?merge(parts,wuv):null;
 // Bouwt de burcht van thema th: één model per vesting, 25 keer neergezet, met lichten en vuren. Wordt bewaard per burcht en per map
 // (de poorten laten zien waar de vijand binnenkomt en weggaat).
 const fortBy={};let FORT=null;
-function buildFort(th){const id=FORTS[th.fort]?th.fort:'castle',F=FORTS[id],role=c=>c===MP.in?'in':c===MP.out?'out':'side',
+function buildFort(th){const id=FORTS[th.fort]?th.fort:'castle',F=FORTS[id],lanesIn=new Set((MP.lanes||[]).map(l=>l[0])),role=c=>MP.fly?'side':lanesIn.has(c)||c===MP.in?'in':c===MP.out?'out':'side',
     key=id+'|'+MAP+'|'+SIDES.map(sd=>role(sd.cell)).join('');if(fortBy[key])return fortBy[key];
   const k=fortKit(),main={solid:[],lit:[],lights:[],fires:[]},br={solid:[],lit:[],lights:[],fires:[]},hub={solid:[],lit:[],lights:[],fires:[]};
   fortPlace(F.base(k),0,0,0,main);
@@ -489,6 +491,7 @@ function buildFort(th){const id=FORTS[th.fort]?th.fort:'castle',F=FORTS[id],role
   for(const[x,z,r]of[[-.53,-.53,0],[13.53,-.53,-Math.PI/2],[13.53,13.53,Math.PI],[-.53,13.53,Math.PI/2]])fortPlace(F.corner(k),x,z,r,main);
   for(const[x,z,r]of LAMPS)fortPlace(F.lamp(k),x,z,r,main);
   fortPlace(F.hq(k),15.2,9.4,0,main);fortPlace(F.factory(k),-2.1,3.8,0,main);
+  if(MP.out>=0&&!E.onEdge(MP.out)&&F.core){const x=MP.out%N;fortPlace(F.core(k),x+.5,(MP.out-x)/N+.5,0,main);} // de kern midden in het veld
   for(const c of MP.block||[]){const x=c%N;fortPlace((F.block||FORTS.castle.block)(k),x+.5,(c-x)/N+.5,0,main);} // vaste muurtjes op het speelveld
   // de bruggen van de wereld (world.js), in wereldmaten: elk stuk tussen twee punten is een brug, gedraaid in zijn richting
   for(const b of WL.bridges)for(let i=0;i+1<b.length;i++){const[ax,az]=b[i],[bx2,bz2]=b[i+1],dx=bx2-ax,dz=bz2-az,L=Math.hypot(dx,dz);
@@ -510,18 +513,19 @@ function placeFort(th){const f=buildFort(th);if(FORT&&FORT!==f)FORT.grp.visible=
     o.flag.position.set(ox+15.2+fl[0],fl[1],oz+9.4+fl[2]);o.spr.position.set(ox+15.2,F.label||3.1,oz+9.4);o.gr.position.set(ox+N/2,.012,oz+N/2);
     LAMPS.forEach(([x,z],i)=>o.dec[i].position.set(ox+x+(x<0?1:x>13?-1:0),.04,oz+z+(z<0?1:0)));}
   if(ISLEGRP)ISLEGRP.visible=!!MP.mini; // de minigame-eilanden staan alleen bij Klassiek
-  sea.position.set((WL.box[0]+WL.box[2])/2,-1.25,(WL.box[1]+WL.box[3])/2);miniFit();}
+  sea.position.set((WL.box[0]+WL.box[2])/2,th.sea&&th.sea.y!=null?th.sea.y:-1.25,(WL.box[1]+WL.box[3])/2);miniFit();} // hemelrijk: de wolken liggen ver onder de eilanden
 // Wat er in de lucht hangt: sneeuw die valt, lichtjes die zweven of vonken die opstijgen. Een wolk rond de camera.
 function makeParticles(P){const n=P.n||600,pos=new Float32Array(n*3),sp=new Float32Array(n),W=70,H=22,r=Textures.lcg(17);
   for(let i=0;i<n;i++){pos[i*3]=(r()-.5)*W;pos[i*3+1]=r()*H;pos[i*3+2]=(r()-.5)*W;sp[i]=.4+r();}
   const g=new T3.BufferGeometry();g.setAttribute('position',new T3.BufferAttribute(pos,3));
-  const snow=P.kind==='snow',mat=new T3.PointsMaterial({color:P.color,map:haloTex,size:snow?.28:.22,transparent:true,depthWrite:false,opacity:snow?.9:.8,
+  const snow=P.kind==='snow'||P.kind==='dust',mat=new T3.PointsMaterial({color:P.color,map:haloTex,size:snow?.28:.22,transparent:true,depthWrite:false,opacity:snow?.9:.8,
     blending:snow?T3.NormalBlending:T3.AdditiveBlending,toneMapped:false});
   const o=new T3.Points(g,mat);o.frustumCulled=false;o.userData={kind:P.kind,sp,W,H,t:0};scene.add(o);return o;}
 function updParticles(dt){const o=particles;if(!o||!o.visible)return;const u=o.userData,a=o.geometry.attributes.position,p=a.array,n=u.sp.length,fc=focus();u.t+=dt;
   o.position.set(fc[0],0,fc[1]);
   for(let i=0;i<n;i++){const k=i*3,s=u.sp[i];
     if(u.kind==='snow'){p[k+1]-=dt*(1+s*1.2);p[k]+=Math.sin(u.t*.8+i)*dt*.4;if(p[k+1]<0)p[k+1]+=u.H;}
+    else if(u.kind==='dust'){p[k]+=dt*(3+s*3);p[k+1]=Math.max(.1,p[k+1]+Math.sin(u.t*1.3+i)*dt*.3);if(p[k]>u.W/2)p[k]-=u.W;} // zand dat over de duinen waait
     else if(u.kind==='sparks'){p[k+1]+=dt*(.6+s);p[k]+=Math.sin(u.t*2+i)*dt*.3;if(p[k+1]>u.H*.4)p[k+1]=0;}
     else{p[k+1]+=Math.sin(u.t*.6+i*1.7)*dt*.25;p[k]+=Math.cos(u.t*.4+i)*dt*.2;}}
   a.needsUpdate=true;}
@@ -619,20 +623,24 @@ function updFx(dt,time){
 const ECODE=Object.fromEntries(Object.keys(EN).map(k=>[k,EN[k].code])),EDEC=Object.fromEntries(Object.entries(ECODE).map(([k,v])=>[v,k]));
 const b36=n=>Math.max(0,Math.min(1295,n)).toString(36).padStart(2,'0');
 const encT=()=>G.tw.map(t=>b36(t.c)+ALL.indexOf(t.type).toString(36)+t.lvl.toString(36)+(t.spec?t.spec[0]:'n')).join('');
-const encE=()=>G.en.slice(0,150).map(e=>ECODE[e.type]+b36(Math.round(e.d*10))+Math.max(0,Math.min(9,Math.ceil(e.hp/e.max*9)))+(e.fz>0?'f':e.pT>0?'p':'n')).join('');
+// vaste wegen: het getal is dan weg × 300 + afstand × 10, zodat de anderen weten op welke weg hij loopt
+const encE=()=>G.en.slice(0,150).map(e=>ECODE[e.type]+b36(MP.lanes?(e.li|0)*300+Math.min(299,Math.round(e.d*10)):Math.round(e.d*10))+Math.max(0,Math.min(9,Math.ceil(e.hp/e.max*9)))+(e.fz>0?'f':e.pT>0?'p':'n')).join('');
 // Weg in presence: tijdens de bouwfase 'P' + de wegvakken, daarna 'L' + de route op volgorde (gras = vak + 169).
 const encP=()=>G.path?'L'+G.path.cells.map(c=>b36(c+(G.road.has(c)?0:N*N))).join(''):'P'+[...G.road].map(b36).join('');
 const NOSET=new Set(),pcache=new Map();
+const laneBy={},lanePaths=()=>laneBy[MAP]||(laneBy[MAP]=MP.lanes.map(cs=>E.mkPath(cs,false,{...MP,in:cs[0]}))); // de vaste wegen van deze map
 function fieldPath(s){if(typeof s!=='string'||!s)return{road:NOSET,trail:NOSET,path:null};let o=pcache.get(s);if(o)return o;
   const road=new Set(),trail=new Set(),cells=[];
   for(let i=1;i+2<=s.length&&cells.length<N*N;i+=2){const v=parseInt(s.slice(i,i+2),36);if(!(v>=0&&v<2*N*N))continue;const c=v%(N*N);cells.push(c);(v<N*N?road:trail).add(c);}
-  o={road,trail,path:s[0]==='L'&&cells.length?E.mkPath(cells,!trail.size,MP):null};if(pcache.size>120)pcache.clear();pcache.set(s,o);return o;}
+  // luchtaanval: de lijn wisselt per golf, dus de poorten zijn het eerste en laatste vak
+  o={road,trail,path:s[0]==='L'&&cells.length?E.mkPath(cells,!trail.size,MP.fly?{...MP,in:cells[0],out:cells[cells.length-1]}:MP):null};if(pcache.size>120)pcache.clear();pcache.set(s,o);return o;}
 function decode(p){const pr=p.presence||{},fp=fieldPath(pr.pa),tw=[],en=[],s=typeof pr.tw==='string'?pr.tw:'',q=typeof pr.en==='string'?pr.en:'';
   for(let i=0;i+5<=s.length&&tw.length<170;i+=5){const k=parseInt(s.slice(i,i+2),36),type=ALL[parseInt(s[i+2],36)];if(!(k>=0&&k<N*N)||!type)continue;
     const x=k%N;tw.push({c:k,x:x+.5,y:(k-x)/N+.5,type,lvl:Math.min(E.maxLvl({type}),parseInt(s[i+3],36)||0),spec:{u:'ultra',t:'turbo',a:'awake',s:'spent'}[s[i+4]]||null,ang:null});}
   const el=Math.min(1.2,(performance.now()-(rx.get(p.peer)||0))/1000)*(pr.st==='playing'?Math.min(3,+pr.sp||1):0);
   for(let i=0;fp.path&&i+5<=q.length&&en.length<150;i+=5){const type=EDEC[q[i]];if(!type)continue;const fl=q[i+4];
-    const d=parseInt(q.slice(i+1,i+3),36)/10+(fl==='f'?0:EN[type].sp*el*.85);if(!(d<fp.path.len))continue;const pp=E.posAt(fp.path,d);
+    const v=parseInt(q.slice(i+1,i+3),36),LP=MP.lanes?lanePaths()[Math.floor(v/300)]:fp.path;if(!LP)continue;
+    const d=(MP.lanes?v%300:v)/10+(fl==='f'?0:EN[type].sp*el*.85);if(!(d<LP.len))continue;const pp=E.posAt(LP,d);
     en.push({id:i,type,d,x:pp[0],y:pp[1],dx:pp[2],dy:pp[3],hp:(+q[i+3]||0)/9,max:1,boss:type==='boss',fz:fl==='f'?1:0,pT:fl==='p'?1:0});}
   for(const t of tw){let bd=11;for(const e of en){const dx=e.x-t.x,dy=e.y-t.y,dd=dx*dx+dy*dy;if(dd<bd){bd=dd;t.ang=Math.atan2(dy,dx);t.tg=e;}}}
   const b=Array.isArray(pr.b)?{x:+pr.b[0]||0,y:+pr.b[1]||0,a:+pr.b[2]||0}:null;return{tw,en,builder:b,road:fp.road,trail:fp.trail};}
@@ -744,6 +752,7 @@ function render3D(time,dt){if(!gl3)return;updParticles(dt);
     if(keys.q)cam.yaw+=1.6*dt;if(keys.e)cam.yaw-=1.6*dt;}
   fxNow=time;camUpdate();if(shakeT>0){shakeT-=dt;if(!calm){const k=shakeT*.7;camera.position.x+=(Math.random()-.5)*k;camera.position.y+=(Math.random()-.5)*k;}}sea.material.map.offset.set(time*.004,time*.003);setDark(!!(arena&&arena.dark));if(darkOn)darkL.position.set(hero.x,2.4,hero.z);
   const fs=fieldsNow(),seenT=new Set(),seenB=new Set();for(const k in EI)EI[k].n=0;let hp=0;updRoads(fs);
+  const FLYY=MP.fly?(THEME&&THEME.fly)||.9:0; // luchtaanval: de vijanden vliegen boven het veld
   cR.set(1,0,0).applyQuaternion(camera.quaternion);
   for(const fl of fs){const[ox,oz]=slotO(fl.slot);
     for(const t of fl.tw){const key=fl.slot*1000+t.c,sig=t.type+t.lvl+(t.spec||'');let o=tobj.get(key);
@@ -752,10 +761,10 @@ function render3D(time,dt){if(!gl3)return;updParticles(dt);
       if(!fl.own&&!fl.bot&&t.tg&&t.type!=='uplink'&&Math.random()<dt*1.6)spawnFx({k:t.type==='rail'?'rail':t.type==='prism'?'beam':'shot',a:[t.x,t.y],b:[t.tg.x,t.tg.y]},ox,oz);}
     for(const e of fl.en){const I=EI[e.type];if(!I||I.n>=I.cap)continue;const i=I.n++,es=e.big?1.6:1.25;
       const bob=e.type==='drone'?Math.sin(time*5+e.id)*.08:e.type==='boss'?Math.sin(time*1.4)*.06:e.fz>0?0:Math.abs(Math.sin(time*9+e.id))*.03;
-      dummy.position.set(ox+e.x,bob,oz+e.y);dummy.quaternion.identity();dummy.rotation.set(0,-Math.atan2(e.dy||0,e.dx||1),0);dummy.scale.setScalar(es);dummy.updateMatrix();
+      dummy.position.set(ox+e.x,bob+FLYY,oz+e.y);dummy.quaternion.identity();dummy.rotation.set(0,-Math.atan2(e.dy||0,e.dx||1),0);dummy.scale.setScalar(es);dummy.updateMatrix();
       I.m.setMatrixAt(i,dummy.matrix);I.m.setColorAt(i,e.fz>0?ICE:e.pT>0?TOXC:WHITE);
       const fr=Math.max(0,Math.min(1,e.hp/e.max));
-      if((fr<1||e.boss)&&hp<900){const w=e.boss?1.7:.62,h=e.boss?.14:.08,y=ETOP[e.type]*es;dummy.quaternion.copy(camera.quaternion);
+      if((fr<1||e.boss)&&hp<900){const w=e.boss?1.7:.62,h=e.boss?.14:.08,y=ETOP[e.type]*es+FLYY;dummy.quaternion.copy(camera.quaternion);
         dummy.position.set(ox+e.x,y,oz+e.y);dummy.scale.set(w+.05,h+.05,1);dummy.updateMatrix();hpBack.setMatrixAt(hp,dummy.matrix);
         dummy.position.set(ox+e.x-cR.x*(1-fr)*w/2,y,oz+e.y-cR.z*(1-fr)*w/2);dummy.scale.set(Math.max(.02,w*fr),h,1);dummy.updateMatrix();
         hpMesh.setMatrixAt(hp,dummy.matrix);hpMesh.setColorAt(hp,_c.set(fr>.5?'#35cf4a':fr>.25?'#f6cf4d':'#e8372a'));hp++;}}
@@ -849,7 +858,7 @@ function takenSlots(matchIdValue=matchId){const s=new Set();for(const p of peers
 function freeSlot(idx,matchIdValue=matchId){const t=takenSlots(matchIdValue),free=[];for(let i=0;i<NS;i++)if(!t.has(i))free.push(i);if(MP.pass==='down')free.reverse();return free.length?free[(idx||0)%free.length]:0;}
 let waveTotal=1,nextRound=0;
 // solo: je begint alleen, dus acht bots doen mee
-function beginGame(idx,mid,solo,mapId){closePops();clearBots();matchId=mid||Date.now();MAP=E.MAPS[mapId]?mapId:'classic';MP=E.mapOf(MAP);WL=World.build(MP);NS=WL.n;mySlot=freeSlot(idx,matchId);E.tune(gameCfg);passLog={n:0,list:[]};pzSeen.clear();applyTheme(MP.theme);G=E.create(save.skills,save.diff,MAP);G.pass=passOn;HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
+function beginGame(idx,mid,solo,mapId){closePops();clearBots();matchId=mid||Date.now();MAP=E.MAPS[mapId]?mapId:'classic';MP=E.mapOf(MAP);WL=World.build(MP);NS=WL.n;mySlot=freeSlot(idx,matchId);E.tune(gameCfg);passLog={n:0,list:[]};pzSeen.clear();applyTheme(MP.theme);G=E.create(save.skills,save.diff,MAP);G.pass=passOn;if(MP.duel)G.send=sendOn;HM=G.m;gamePts=0;toastAdd='';G.fxOn=true;G.maxLives=G.lives;orders=[];sel=null;buildSel=null;ended=false;speed=1;
   myBm=0;myBh=0;msLast=null;finalMax=0;finalAt=0;built=false;nx=0;sentWave=0;arenaFor=0;roadMode=false;t0=performance.now();prepEnd=t0+E.PREP*1000; // E.PREP: na E.tune, dus met de bouwtijd uit de webadmin
   {const[ox,oz]=slotO(mySlot);hero={x:ox+6.5,z:oz+5.5,a:-1.57,hp:0,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false};}armour=0;arena=null;camMode='hero';hero.hp=maxHp();hcam.yaw=0;hcam.pitch=.62;hcam.d=stage.clientWidth<760?13:10;myState='playing';ready=false;
   $('#home').hidden=true;$('#game').hidden=false;$('#result').hidden=true;
@@ -863,7 +872,7 @@ function endGame(){ended=true;const won=G.phase==='won';
   if(acct&&Net.hasToken())Net.api('POST','/scores',{score:G.score,round:G.cleared,won}).catch(authFail);
   myState='done';pushPresence(true);
   setText($('#rTitle'),won?'Overwinning':G.final?'De Titaan wint':MP.pool?'Het team is gevallen':'Basis gevallen');
-  setText($('#rText'),won?`Alle ${ROUNDS} golven afgeslagen en de Titaan is geveld. Het hoofdkwartier staat nog.`:G.final?`Alle ${ROUNDS} golven afgeslagen, maar de Titaan bleef overeind.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`:`Je hield stand tot en met ronde ${G.cleared}.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`);
+  setText($('#rText'),won?(MP.duel?'Je tegenstander is gezonken. Jouw schip vaart nog.':MP.mini?`Alle ${ROUNDS} golven afgeslagen en de Titaan is geveld. Het hoofdkwartier staat nog.`:`Alle ${ROUNDS} golven afgeslagen. Het hoofdkwartier staat nog.`):G.final?`Alle ${ROUNDS} golven afgeslagen, maar de Titaan bleef overeind.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`:`Je hield stand tot en met ronde ${G.cleared}.${save.pts?' Besteed je skillpunten en probeer het opnieuw.':' Probeer het opnieuw.'}`);
   setText($('#rDiff'),G.D.n+(G.D.score>1?' · score '+mulText(G.D.score):''));
   setText($('#rRound'),G.cleared+'/'+ROUNDS);setText($('#rScore'),fmt(G.score));setText($('#rXp'),'+'+gamePts);$('#result').hidden=false;}
 function toLobby(){if(arena)labClear(arena);arena=null;if(lab){lab=null;$('#labEnd').hidden=true;$('#game').classList.remove('lab');setText($('#quitBtn'),'Opgeven');}G=null;clearBots();myState='lobby';ready=false;$('#result').hidden=true;$('#game').hidden=true;$('#home').hidden=false;
@@ -898,12 +907,17 @@ function passOn(g,e){const t=passTarget(mySlot);if(!t)return false;const frac=Ma
   if(ACT)return false; // een bot geeft alleen door binnen deze browser
   passLog.n++;passLog.list.push(b36(t.slot)+ECODE[e.type]+frac);if(passLog.list.length>60)passLog.list.shift();pushPresence();return true;}
 // Wat andere spelers naar mijn vesting hebben doorgegeven.
-function recvPasses(){if(!MP.pass||!G||!G.path)return;for(const p of mates()){if(p.bot)continue;const pz=p.presence.pz;if(!Array.isArray(pz))continue;
+function recvPasses(){if(!(MP.pass||MP.duel)||!G||!G.path)return;for(const p of mates()){if(p.bot)continue;const pz=p.presence.pz;if(!Array.isArray(pz))continue;
     const n=pz[0]|0,str=typeof pz[1]==='string'?pz[1]:'',k=p.peer+'|'+matchId,seen=pzSeen.has(k)?pzSeen.get(k):0;if(n<=seen)continue;pzSeen.set(k,n);
     const all=str.match(/.{4}/g)||[],fresh=all.slice(Math.max(0,all.length-(n-seen)));
     for(const q of fresh){if(parseInt(q.slice(0,2),36)!==mySlot)continue;const type=EDEC[q[2]];if(type)E.inject(G,type,(+q[3]||9)/9);}}}
 // Wintermaul: alle vestingen samen hebben één levenspot. Wat een vijand onderaan kost, gaat eraf bij de vesting waar hij wegloopt.
 function teamLives(){let n=G.lives;for(const p of mates())n+=+p.presence.l||0;return n;}
+// Duel (Kaapvaart): van elke derde vijand die je verslaat, stuurt het spel een kopie naar je tegenstander. Gaat via dezelfde weg als
+// doorgeven: direct bij een bot, via de presence (pz) bij een mens.
+function sendOn(g,e){g.sendN=(g.sendN|0)+1;if(g.sendN%3)return;let t=null;for(const[s,v]of liveFields())if(s!==mySlot){t={slot:s,...v};break;}if(!t)return;
+  if(t.g){E.inject(t.g,e.type,1);return;}if(ACT)return;
+  passLog.n++;passLog.list.push(b36(t.slot)+ECODE[e.type]+'9');if(passLog.list.length>60)passLog.list.shift();pushPresence();}
 /* --- samen spelen: bouwfase, snelheid en rondes lopen gelijk --- */
 // De andere spelers in mijn potje die nog meedoen.
 function mates(){return peers.filter(p=>!own(p)&&p.kind==='viewer'&&p.presence&&p.presence.mt===matchId&&p.presence.st==='playing');}
@@ -913,6 +927,8 @@ function lead(){let b=null;const rk=p=>+p.presence.t||0;for(const p of mates())i
 function endPrep(){if(!G||G.phase!=='prep')return;E.lock(G);roadMode=false;built=true;pushPresence(true);
   toast(MP.loop?'De bouwfase is voorbij. De vijand stapt zo op de ring.':MP.maze?'De bouwfase is voorbij. De vijand zoekt zijn weg door jouw doolhof.':G.path.road?'De bouwfase is voorbij. De vijand volgt jouw weg.':'De bouwfase is voorbij. Zonder doorlopende weg steekt de vijand het gras over.');refresh();}
 function sync(){const now=performance.now(),ms=mates(),L=lead(),settled=!room||now-t0>4000;
+  // duel: is je tegenstander gevallen (of weg), dan heb jij gewonnen
+  if(MP.duel&&G.phase!=='prep'&&G.phase!=='over'&&G.phase!=='won'){if(ms.length)G.duelSeen=true;else if(G.duelSeen&&settled){E.win(G);return;}}
   if(!ACT)recvPasses();
   if(MP.pool&&G.phase!=='prep'&&G.phase!=='over'&&G.phase!=='won'&&teamLives()<=0)E.lose(G); // de gedeelde levenspot is leeg: het hele team verliest
   if(L){const sp=Math.max(1,Math.min(3,Math.round(+L.presence.sp)||1));if(sp!==speed){speed=sp;paintSpeed();}}
@@ -1499,7 +1515,7 @@ function spawnBots(){const hs=HEROES.map((h,i)=>i).filter(i=>i!==save.hero).sort
   const far=s=>Math.hypot(slotO(s)[0]-me[0],slotO(s)[1]-me[1]);
   for(let s=0;s<NS;s++)if(s!==mySlot&&!used.has(s))free.push(s);
   free.sort((p,q)=>MP.pass==='down'?q-p:far(p)-far(q)); // de vestingen rond die van jou; op een piramide van onder naar boven
-  bots=free.slice(0,BOTN).map((slot,i)=>{const g=E.create(save.skills,save.diff,MAP),[ox,oz]=slotO(slot),idx=hs[i%hs.length];g.maxLives=g.lives;g.pass=passOn;
+  bots=free.slice(0,BOTN).map((slot,i)=>{const g=E.create(save.skills,save.diff,MAP),[ox,oz]=slotO(slot),idx=hs[i%hs.length];g.maxLives=g.lives;g.pass=passOn;if(MP.duel)g.send=sendOn;
     const b={peer:'bot-'+(i+1),kind:'viewer',by:null,name:'Bot '+BOTNAMES[i%BOTNAMES.length],sameTab:false,isMe:false,bot:true,presence:{},mx:0,mz:0,shove:null,
       c:{G:g,HM:g.m,hero:{x:ox+6.5,z:oz+5.5,a:-1.57,hp:HEROES[idx].hp*g.m.hHp,cd:0,atk:0,walk:0,tx:null,tz:null,moving:false},armour:0,mySlot:slot,arena:null,arenaFor:0,built:false,nx:0,sentWave:0,myBh:0,myBm:0,msLast:null,finalMax:0,finalAt:0,
         shieldT:0,shieldCd:0,sprintT:0,sprintCd:0,pushCd:0,pushOut:null,akCount:0,orders:[],ended:false,myState:'playing',myT:myT+1+i,myPeer:'bot-'+(i+1),camMode:'hero',hcam:{yaw:0,pitch:.5,d:9},buildSel:null,sel:null,roadMode:false,ready:false,gl3:false,peers:botPeers,rheroes:new Map(),hi:idx},
@@ -1971,7 +1987,9 @@ const MAP_DEMO=(()=>{const at=(x,y)=>y*N+x,row=(y,a,b)=>{const o=[];for(let x=a;
     relay:{road:row(E.MID,0,N-1),tw:[at(3,5),at(3,7),at(7,5),at(9,7)]},
     wintermaul:{tw:[]}, // de ijsmuurtjes komen uit de map zelf (block)
     circle:{tw:[at(5,5),at(7,5),at(5,7),at(7,7),at(6,4),at(0,1),at(12,11)]},
-    maze:{tw:[...col(2,0,9),...col(5,3,12),...col(8,0,9),...col(11,3,11)]}};})();
+    maze:{tw:[...col(2,0,9),...col(5,3,12),...col(8,0,9),...col(11,3,11)]},
+    sand:{tw:[at(1,4),at(4,8),at(9,4),at(9,9),at(4,3),at(7,9)]},pirates:{road:zig,tw:[at(2,3),at(6,8),at(10,3)]},
+    sky:{tw:[at(3,3),at(9,3),at(3,9),at(9,9),at(5,5),at(7,7)]}};})();
 function drawMapCv(cv,id){const M=E.mapOf(id),th=themeOf(M.theme),D=MAP_DEMO[id]||{},g=cv.getContext('2d'),W=cv.width,k=W/(N+2),O=k;
   const tw=new Set(D.tw||[]),r=D.road?{cells:D.road,road:true}:E.route(new Set(),c=>tw.has(c),M),cell=(c,col,pad)=>{const x=c%N,y=(c-x)/N;g.fillStyle=col;g.fillRect(O+x*k+(pad||0),O+y*k+(pad||0),k-2*(pad||0)+.6,k-2*(pad||0)+.6);};
   g.fillStyle=th.sea.base;g.fillRect(0,0,W,W);g.fillStyle=th.ground.base;g.fillRect(O,O,N*k,N*k);
@@ -1983,7 +2001,10 @@ function drawMapCv(cv,id){const M=E.mapOf(id),th=themeOf(M.theme),D=MAP_DEMO[id]
   const arrow=(c,col,out)=>{const x=c%N,y=(c-x)/N;let dx=0,dy=0;if(x===0)dx=-1;else if(x===N-1)dx=1;else if(y===0)dy=-1;else dy=1;
     const cx=O+(x+.5+dx)*k,cy=O+(y+.5+dy)*k,s=out?1:-1,L=k*.55,ux=dx*s,uy=dy*s; // u: waar de pijl heen wijst
     g.fillStyle=col;g.beginPath();g.moveTo(cx+ux*L,cy+uy*L);g.lineTo(cx-ux*L-uy*L,cy-uy*L+ux*L);g.lineTo(cx-ux*L+uy*L,cy-uy*L-ux*L);g.closePath();g.fill();};
-  arrow(M.in,'#35cf4a',false);if(M.out>=0)arrow(M.out,M.pass?th.ui.accent:'#e8372a',true);
+  if(M.lanes){for(const l of M.lanes)arrow(l[0],'#35cf4a',false);const x=M.out%N,y=(M.out-x)/N;g.fillStyle='#e8372a';g.beginPath();g.arc(O+(x+.5)*k,O+(y+.5)*k,k*.75,0,7);g.fill();} // vier poorten, een kern in het midden
+  else if(M.fly){for(const[a]of E.FLY)arrow(a,'#35cf4a',false);g.setLineDash([k*.6,k*.4]);g.strokeStyle='rgba(255,255,255,.8)';g.lineWidth=Math.max(1.5,k*.18); // de vier vlieglijnen
+    for(const[a,b]of E.FLY.slice(0,2)){const ax=a%N,ay=(a-ax)/N,bx=b%N,by=(b-bx)/N;g.beginPath();g.moveTo(O+(ax+.5)*k,O+(ay+.5)*k);g.lineTo(O+(bx+.5)*k,O+(by+.5)*k);g.stroke();}g.setLineDash([]);}
+  else{arrow(M.in,'#35cf4a',false);if(M.out>=0)arrow(M.out,M.pass?th.ui.accent:'#e8372a',true);}
   if(M.loop){g.strokeStyle=th.ui.accent;g.lineWidth=Math.max(1.5,k*.22);const c0=O+6.5*k,R=k*2.2;g.beginPath();g.arc(c0,c0,R,-2.6,1.9);g.stroke();
     const a=1.9,ex=c0+Math.cos(a)*R,ey=c0+Math.sin(a)*R,tx=-Math.sin(a),ty=Math.cos(a),L=k*.7;g.fillStyle=th.ui.accent;g.beginPath();g.moveTo(ex+tx*L,ey+ty*L);g.lineTo(ex-ty*L*.6,ey+tx*L*.6);g.lineTo(ex+ty*L*.6,ey-tx*L*.6);g.closePath();g.fill();}}
 // Een plaatje van de hele wereld van een map: waar de vestingen liggen en de bruggen ertussen (world.js).
@@ -2003,7 +2024,7 @@ let mapListSig='';
 function buildMapList(){const ul=$('#mapList'),now=lobbyMapNow(),host=isHost();mapListSig=now+host;ul.textContent='';
   setText($('#mapLead'),host?'Kies de map voor dit potje. Iedereen in de lobby speelt dezelfde map. Alleen op Klassiek doen de minigames voorlopig mee.':'Speler 1 kiest de map voor dit potje. Hier zie je wat er gekozen is.');
   for(const id of E.MAP_IDS){const M=E.MAPS[id],li=document.createElement('li'),b=document.createElement('button'),cv=document.createElement('canvas'),t=document.createElement('span'),n=document.createElement('b'),k=document.createElement('small'),d=document.createElement('p');
-    b.type='button';cv.width=cv.height=208;cv.setAttribute('aria-hidden','true');drawMapCv(cv,id);const wv=document.createElement('canvas');wv.width=wv.height=208;wv.setAttribute('aria-hidden','true');wv.className='world';drawWorldCv(wv,id);t.className='mt';n.textContent=M.n;k.textContent=M.k+' · '+themeOf(M.theme).n+capTxt(id)+hardTxt(M)+(M.mini?' · met minigames':'');d.textContent=themeOf(M.theme).tag+'. '+M.d;t.append(n,k,d);b.append(cv,wv,t);
+    b.type='button';cv.width=cv.height=208;cv.setAttribute('aria-hidden','true');drawMapCv(cv,id);const wv=document.createElement('canvas');wv.width=wv.height=208;wv.setAttribute('aria-hidden','true');wv.className='world';drawWorldCv(wv,id);t.className='mt';n.textContent=M.n;k.textContent=M.k+' · '+themeOf(M.theme).n+capTxt(id)+hardTxt(M)+(M.mini?' · met minigames':'');d.textContent=themeOf(M.theme).tag+(/[.!?]$/.test(themeOf(M.theme).tag)?' ':'. ')+M.d;t.append(n,k,d);b.append(cv,wv,t);
     b.classList.toggle('on',id===now);b.setAttribute('aria-pressed',String(id===now));b.disabled=!host;b.onclick=()=>{setMap(id);};li.append(b);ul.append(li);}}
 $('#mapBtn').onclick=()=>{buildMapList();openPop('#popMap');};
 // Moeilijkheidsgraad: drie knoppen boven de startknop. De keuze geldt alleen voor jou en ligt vast zodra het potje begint.
@@ -2052,7 +2073,7 @@ $('#miniBtn').onclick=openMini;$('#lAgain').onclick=()=>{if(lab)startLab(lab.kin
 loadLocal();loadAcct();bindAccount();buildHud();
 try{if(init3D()){bindCanvas();renderIcons();}}catch(err){gl3=false;console.error(err);}
 renderHome();renderLobby();renderChat();if(!acct)showGate('new');requestAnimationFrame(frame);
-if(location.hash==='#dev')window.__ratd={E,g:()=>G,passTo:from=>{const t=passTarget(from);return t?t.slot:null;},world:()=>WL,view:(x,z,d,yaw)=>{const[ox,oz]=slotO(mySlot);camMode='free';cam.tx=ox+x;cam.tz=oz+z;cam.d=d||24;cam.yaw=yaw||0;},map:()=>MAP,team:()=>G&&MP.pool?teamLives():null,fields:()=>[{who:'ik',slot:mySlot,l:G&&G.lives,r:G&&G.cleared,ph:G&&G.phase},...bots.map(b=>({who:b.name,slot:b.c.mySlot,l:b.c.G.lives,r:b.c.G.cleared,ph:b.c.G.phase}))].sort((a,b)=>a.slot-b.slot),waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>{enterArena(m,r);for(const b of bots)asBot(b,()=>enterArena(m,r));},bots:()=>bots,asBot,FIXED,miniFor,ISLES,ROUL,isle:()=>ISLE,isleOn,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
+if(location.hash==='#dev')window.__ratd={E,g:()=>G,bots:()=>bots,passTo:from=>{const t=passTarget(from);return t?t.slot:null;},world:()=>WL,view:(x,z,d,yaw)=>{const[ox,oz]=slotO(mySlot);camMode='free';cam.tx=ox+x;cam.tz=oz+z;cam.d=d||24;cam.yaw=yaw||0;},map:()=>MAP,team:()=>G&&MP.pool?teamLives():null,fields:()=>[{who:'ik',slot:mySlot,l:G&&G.lives,r:G&&G.cleared,ph:G&&G.phase},...bots.map(b=>({who:b.name,slot:b.c.mySlot,l:b.c.G.lives,r:b.c.G.cleared,ph:b.c.G.phase}))].sort((a,b)=>a.slot-b.slot),waveAct,roadTool,endPrep,paint:(cs,on)=>{paintLast=-1;for(const c of cs)paintTo(c,on!==false);},sync:()=>({matchId,built,nx,speed,lead:!lead(),mates:mates().length,phase:G&&G.phase,timer:G&&G.timer,cleared:G&&G.cleared}),setPrep:s=>{prepEnd=performance.now()+s*1000;},mission:(m,r)=>{enterArena(m,r);for(const b of bots)asBot(b,()=>enterArena(m,r));},bots:()=>bots,asBot,FIXED,miniFor,ISLES,ROUL,isle:()=>ISLE,isleOn,KIND,LAB,startLab,lab:()=>lab,setHero:i=>{save.hero=i;},setDiff:i=>{save.diff=E.diffIdx(i);renderDiff();},dmg:d=>{myBh+=d;},arena:()=>arena,hero:()=>hero,useShield,enterArena,tick:n=>{const p=window.__ratdPause;window.__ratdPause=false;for(let t=0;t<n;t+=.05)logic(.05);window.__ratdPause=p;},keys,state:()=>({hero,arena,armour,gold:G&&G.gold,round:G&&G.round,camMode,tw:G&&G.tw.length})};
 // Sessie controleren: klopt het token nog, dan komt de voortgang van de server binnen.
 if(Net.hasToken())Net.api('GET','/me').then(r=>{const known=!!acct;signedIn(r);if(!known&&!G&&gateMode!=='rename')showHome();},authFail);
 // Lobby verbinden. Lukt dat niet, dan kun je alleen spelen; de verbinding blijft het op de achtergrond proberen.
