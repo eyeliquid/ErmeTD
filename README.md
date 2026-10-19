@@ -83,6 +83,9 @@ Speler 1 kiest in de lobby de map (knop **Map**, boven de moeilijkheidsgraad). I
 | Wintermaul | samenwerken | Van boven naar beneden, zonder weg. Drie vaste ijsmuurtjes (`block` in `data/maps.js`) laten de vijand zigzaggen; met je torens maak je het doolhof nog langer. Wat je doorlaat zakt naar de vesting eronder. Alle vestingen delen één levenspot; is die leeg, dan verliest iedereen. |
 | Groene Cirkel | rondje | Een vaste ring zonder uitgang. De vijand blijft rondjes lopen tot hij dood is; elk rondje kost levens (een luchtschip 10). |
 | Doolhofbouwer | vrij bouwen | Geen weg: de vijand komt links binnen en wil onder weg. Je torens zijn je muren, ook tijdens een golf. |
+| Zandstorm | belegering | De vijand komt uit alle vier de poorten tegelijk en volgt vier vaste wegen (`lanes`) naar de kern midden in je vesting. Wat de kern bereikt, kost levens. |
+| Kaapvaart | duel | Eén tegen één, elk met een eigen weg. Van elke derde vijand die je verslaat, stuurt het spel een kopie naar je tegenstander (`duel`). Wie als laatste overeind staat, wint. |
+| Hemelrijk | luchtaanval | De vijand vliegt in een rechte lijn over alles heen (`fly`) en komt elke golf uit een andere richting: west, noord, oost en zuid. Je kunt overal bouwen; torens houden hem niet tegen. |
 
 Op alle maps behalve Klassiek zijn er voorlopig geen minigames: na golf 100 heb je gewonnen. De minigame-eilanden en het doolhof staan daarom alleen in de wereld van Klassiek.
 
@@ -97,6 +100,9 @@ Elke map heeft een eigen indeling van de vestingen. Het aantal vestingen is ook 
 | Wintermaul | een piramide van 4, 3, 2 en 1, met schuine bruggen naar de vesting(en) eronder | 10 |
 | Groene Cirkel | een ring van twaalf rond een reactor | 12 |
 | Doolhofbouwer | een koninkrijk van 4 bij 4, met brede grachten | 16 |
+| Zandstorm | 2 bij 2 tempels | 4 |
+| Kaapvaart | twee schepen tegenover elkaar, met een loopplank ertussen | 2 |
+| Hemelrijk | 3 bij 2 zwevende eilanden met hangbruggen, ver boven de wolken | 6 |
 
 Op Wintermaul (genummerd van linksboven, rij voor rij):
 
@@ -120,6 +126,9 @@ Elke map is ook zwaarder dan Klassiek: de vijanden krijgen meer levens. Dat staa
 | Wintermaul | ×2 |
 | Groene Cirkel | ×3 |
 | Doolhofbouwer | ×5 |
+| Zandstorm | ×2 |
+| Kaapvaart | ×1,5 |
+| Hemelrijk | ×1 |
 
 Het komt bovenop de moeilijkheidsgraad (Geers, Super Geers, Alleen voor Geers) en op de webadmin.
 
@@ -132,6 +141,9 @@ Het komt bovenop de moeilijkheidsgraad (Geers, Super Geers, Alleen voor Geers) e
 | Wintermaul | Bevroren Noorden | Sneeuw op de grond en de muren, ijspegels, een bevroren zee en vallende sneeuw. Sneeuwsoldaten, husky's, sneeuwrupsen, ijskristallen en een yeti. Trage muziek met klokjes. |
 | Groene Cirkel | Neon Nexus | Een ruimtestation: metalen vloer met een lichtgevend raster, een groene ring van licht, neonstrips, zwevende lichtjes en een zee van niets. Droids, zweeftanks en een moederschip. Elektronische muziek met een arpeggio. |
 | Doolhofbouwer | Koningsdoolhof | Een warme avond: bloemenweide, keien, zandsteen, banieren, schilden en een poort met een valhek, opstijgende vonken. Voetknechten, wolven, een stormram, raven en een draak. Getokkelde muziek met een bourdon. |
+| Zandstorm | Zandstorm | Brandende zon, zandduinen tot aan de horizon en waaiend zand. Mummies, scarabeeën, strijdwagens, gieren en een zonnebark. Muziek in een oosterse toonladder. |
+| Kaapvaart | Kaapvaart | Een tropische zee en een scheepsdek van planken. Piraten, apen, kanonkarren, zeemeeuwen, skeletten en een spookschip. Een stuwende shanty. |
+| Hemelrijk | Hemelrijk | Zwevende eilanden boven een wolkendek. Alles vliegt: gyrocopters, mechanische vogels, bommenwerpers, luchtballonnen, raketmannen en een stoomluchtschip. Vrolijke muziek met klokjes. |
 
 Elk thema heeft ook een eigen burcht (`client/js/data/forts.js`):
 
@@ -142,6 +154,9 @@ Elk thema heeft ook een eigen burcht (`client/js/data/forts.js`):
 | IJsburcht | Bevroren Noorden | Muren van ijsblokken met sneeuw en ijspegels, ronde ijstorens met een sneeuwkoepel en een kristal. | Een ijsboog met een kristal (in), een houten poort met lantaarns (uit). | Een blokhut met besneeuwd dak en een sneeuwpop; een ijsgrot met blauw vuur. |
 | Ruimtestation | Neon Nexus | Metalen schotten met neonstrips, zeshoekige pylonen met zwevende lichtringen. | Krachtvelden: roze (in), groen (uit), blauw (brug). | Een commandokoepel op een landingsplatform in je eigen kleur; een roze portaal. |
 | Ridderburcht | Koningsdoolhof | Hoge zandstenen muren met kantelen, schietgaten en schilden, vierkante torens met wimpels. | Poortgebouwen met een valhek en fakkels; rode banieren (in), blauwe (uit). | Een donjon met kantelen; een legerkamp met tenten, een palissade en vuur. |
+| Zonnetempel | Zandstorm | Zandstenen muren met hiërogliefen, obelisken met een gouden punt. | Pylonpoorten met een gevleugelde zonneschijf en rode banieren: de vijand komt overal binnen. | Een trappiramide; een graftombe met jakhalsbeelden. In het midden een gouden ankh: de kern (`core`). |
+| Piratenschip | Kaapvaart | Een houten reling met kanonnen, masten met zeilen en een kraaiennest. | Touwpalen met scheepslantaarns. | Een kapiteinshut met stuurrad; een kade met kruitvaten en de zwarte vlag. |
+| Luchthaven | Hemelrijk | Koperen relingen, propellertorens. Onder elk eiland hangt een rotspunt. | Bogen met een tandwiel. | Een klokkentoren; een meermast met een klein luchtschip. Hangbruggen zonder pijlers. |
 
 De poorten laten zo ook zien waar de vijand binnenkomt en weggaat. `buildFort` in `client/js/game.js` zet de stukken van een burcht op hun plek; een burcht wordt pas gebouwd als hij voor het eerst nodig is.
 

@@ -20,6 +20,7 @@
 //  bridge(k, L)     een brug van L lang langs x, midden op 0. Het wegdek ligt op hoogte 0.
 //  hub(k)           (mag ontbreken) iets groots in het midden van de wereld, voor maps die daar plaats voor hebben (een ring).
 //                   0,0 is het midden; de ruimte is ongeveer 30 bij 30.
+//  core(k)          (mag ontbreken) de kern op de uitgang, als die midden in het veld ligt (Zandstorm). 0,0 is het midden van dat vak.
 //  block(k)         een vast muurtje op één vak van het speelveld (alleen op maps met block), midden op 0,0, 1 bij 1.
 //                   Houd het laag (tot ongeveer 0,6): je kijkt eroverheen.
 //
@@ -199,6 +200,83 @@ ERME.FORTS={
   bridge:(k,L)=>[k.box(L,.14,1.7,'#5a3e26',0,-.08,0),...blocks(L,.28,.04,0,(u,w,i)=>k.box(w,.05,1.74,i%2?'#6b4a2a':'#5a3e26',u,0,0)),
     k.box(L,.12,.12,'#4a3422',0,.1,-.85),k.box(L,.12,.12,'#4a3422',0,.1,.85),k.box(.7,2,1.4,'#8a7a5a',0,-1.1,0)],
   // een lage haag
-  block:k=>[k.box(.96,.42,.6,'#2f4a22',0,.21,0),k.ball(.3,'#3a5a2a',-.25,.42,0,[1,.7,1]),k.ball(.3,'#355226',.25,.44,0,[1,.7,1])]}
+  block:k=>[k.box(.96,.42,.6,'#2f4a22',0,.21,0),k.ball(.3,'#3a5a2a',-.25,.42,0,[1,.7,1]),k.ball(.3,'#355226',.25,.44,0,[1,.7,1])]},
+
+ // ---------- Zonnetempel: zandsteen, obelisken, pylonpoorten en een trappiramide (Zandstorm) ----------
+ temple:{n:'Zonnetempel',mat:'stone',band:[1.62,.08,2.22,.42],flag:[0,2.35,1.17],label:3.2,
+  base:k=>island(k,'#b8925a','#8a6a40'),
+  // een zandstenen muur met een kroonlijst, een blauwe band en hiërogliefen aan de buitenkant, een gouden band binnen
+  wall:(k,L)=>[k.box(L,.55,.4,'#d8b880',0,.275,0),k.box(L,.1,.48,'#c09a60',0,.6,0),k.box(L,.08,.02,'#2a4a8a',0,.42,-.21),k.box(L,.05,.02,'#e8b84a',0,.3,.21),
+    ...along(L,.6,.2,(u,i)=>k.box(.08,i%2?.08:.14,.02,'#5a3a1a',u,.24,-.215))],
+  // een obelisk met een gouden punt
+  corner:k=>[k.box(.8,.4,.8,'#c09a60',0,.2,0),k.cyl(.22,.34,2.6,'#d8b880',0,1.7,0,4),k.cone(.24,.35,'#e8b84a',0,3.17,0,false,4),k.light(0,3.2,0,'#ffd080',1.2)],
+  // een pylonpoort met een gevleugelde zonneschijf; hier komt de vijand binnen, dus rode banieren
+  gate:(k,role)=>{const a=[k.box(.55,1.9,.7,'#d8b880',-1.08,.95,0),k.box(.55,1.9,.7,'#d8b880',1.08,.95,0),k.box(.6,.12,.75,'#c09a60',-1.08,1.95,0),k.box(.6,.12,.75,'#c09a60',1.08,1.95,0),
+      k.box(2.7,.35,.5,'#c09a60',0,1.72,0),k.ball(.13,'#e8b84a',0,1.72,-.27,[1,1,.3]),k.box(.7,.08,.02,'#2a4a8a',-.42,1.74,-.26),k.box(.7,.08,.02,'#2a4a8a',.42,1.74,-.26)];
+    if(role==='in')a.push(k.box(.3,.8,.03,'#a8401a',-1.08,1.1,-.37),k.box(.3,.8,.03,'#a8401a',1.08,1.1,-.37));
+    a.push(k.light(-1.08,1.4,.4,'#ffa040',1),k.light(1.08,1.4,.4,'#ffa040',1));return a;},
+  // een trappiramide met een gouden top
+  hq:k=>[k.box(1.6,.4,2.2,'#d8b880',0,.2,0),k.box(1.25,.4,1.8,'#d0ae74',0,.6,0),k.box(.9,.4,1.3,'#d8b880',0,1.0,0),k.cone(.62,.6,'#e8b84a',0,1.5,0,false,4,Math.PI/4),
+    k.box(.06,.4,.35,'#1a1410',-.81,.2,0),k.cyl(.035,.035,2.1,'#5a3a1a',0,1.55,.8,6)],
+  // de ingang van een graftombe, met jakhalsbeelden en vuurschalen
+  factory:k=>[k.ball(1.0,'#c09a60',0,.2,0,[1,.9,1.3]),k.box(.12,.9,.9,'#d8b880',.85,.45,0),k.box(.1,.75,.65,'#1a1008',.9,.38,0),
+    ...[-.7,.7].flatMap(z=>[k.box(.2,.5,.2,'#2a2a2a',.95,.25,z),k.ball(.1,'#2a2a2a',1.0,.58,z),k.cone(.03,.12,'#2a2a2a',1.0,.7,z+.04)]),
+    ...[-1.1,1.1].flatMap(z=>[k.cyl(.04,.05,.8,'#5a3a1a',.4,.4,z,6),k.cyl(.15,.1,.12,'#3a2a1a',.4,.85,z,8),k.fire(.4,1.0,z,.4)])],
+  lamp:k=>[k.cyl(.05,.07,1.2,'#c09a60',0,.6,0,6),k.cyl(.14,.08,.14,'#3a2a1a',0,1.25,0,8),k.lit.cone(.08,.18,'#ffb050',0,1.42,0,false,6),k.light(0,1.45,0,null,1.4)],
+  bridge:(k,L)=>[k.box(L,.5,1.8,'#c09a60',0,-.26,0),k.box(L,.25,.16,'#d8b880',0,.12,-.83),k.box(L,.25,.16,'#d8b880',0,.12,.83),k.box(.7,2,1.4,'#a8844e',0,-1.4,0)],
+  block:k=>[k.box(.96,.5,.96,'#d8b880',0,.25,0)],
+  // de kern midden in de vesting: een gouden ankh op een sokkel; wat hier aankomt kost levens
+  core:k=>[k.cyl(.45,.55,.3,'#c09a60',0,.15,0,8),k.box(.18,.9,.18,'#e8b84a',0,.75,0),k.box(.6,.14,.14,'#e8b84a',0,1.0,0),k.lit.ring(.2,.06,'#ffd060',0,1.32,0,0),k.light(0,1.2,0,'#ffd060',2.5)]},
+
+ // ---------- Piratenschip: de vesting is een dek met een reling, masten en een kapiteinshut (Kaapvaart) ----------
+ ship:{n:'Piratenschip',mat:'plain',band:[1.52,.1,2.22,.3],flag:[0,2.35,1.17],label:3.1,
+  base:k=>[...island(k,'#3a2414','#1a0e06'),k.box(14.5,.12,14.5,'#c8a050',6.5,-.35,6.5)],
+  // een houten reling met geschutspoorten en kanonnen naar buiten
+  wall:(k,L)=>[k.box(L,.45,.22,'#5a3a1e',0,.22,0),k.box(L,.08,.32,'#6b4a2a',0,.5,0),
+    ...along(L,2.2,.6,u=>[k.box(.22,.16,.02,'#15171a',u,.25,-.12),k.box(.1,.1,.3,'#2a2d31',u,.25,-.26)])],
+  // een mast met een zeil, een kraaiennest en een piratenvlag; tonnen aan de voet
+  corner:k=>[k.cyl(.08,.1,3.2,'#6b4a2a',0,1.6,0,8),k.box(.08,.08,1.6,'#6b4a2a',0,2.6,0),k.box(.03,1.0,1.4,'#efe6d0',.06,2.05,0),
+    k.cyl(.25,.2,.2,'#6b4a2a',0,2.9,0,8),k.box(.02,.3,.45,'#15171a',0,3.35,.23),k.ball(.05,'#f2f2f2',.02,3.37,.2),
+    k.cyl(.18,.18,.4,'#7a5a3a',.35,.2,.35,10),k.cyl(.18,.18,.4,'#7a5a3a',-.1,.2,.4,10)],
+  // een opening in de reling met touwpalen en scheepslantaarns
+  gate:(k,role)=>{const a=[];for(const u of[-.9,.9])a.push(k.cyl(.07,.08,1.2,'#6b4a2a',u,.6,0,8),k.ball(.09,'#c79a2a',u,1.22,0),k.lit.box(.1,.14,.1,'#ffc070',u,1.0,.15),k.light(u,1.0,.2,'#ffc070',.9));
+    if(role==='in')a.push(k.box(.02,.3,.45,'#c8281e',-.9,1.45,.23));return a;},
+  // de kapiteinshut achterop, met verlichte ramen en een stuurrad
+  hq:k=>[k.box(1.5,1.1,2.2,'#6b4a2a',0,.55,0),k.box(1.6,.1,2.3,'#3a2414',0,1.15,0),k.box(1.52,.06,2.22,'#c79a2a',0,.95,0),
+    ...[-.6,0,.6].map(z=>k.lit.box(.04,.22,.3,'#ffc070',-.76,.65,z)),k.lit.box(.14,.2,.14,'#ffc070',.4,1.32,-.7),
+    k.ring(.25,.03,'#c79a2a',-.3,1.55,0,0,Math.PI/2),k.cyl(.03,.03,.3,'#6b4a2a',-.3,1.3,0,6),k.cyl(.035,.035,1.2,'#6b4a2a',0,2,.8,6)],
+  // een kade met kruitvaten, kisten, een kanon en de zwarte vlag
+  factory:k=>[k.box(1.4,.06,2.4,'#5a3a1e',0,.03,0),...[[-.3,-.7],[.2,-.8],[-.4,.3]].map(([x,z])=>k.cyl(.2,.2,.45,'#7a5a3a',x,.25,z,10)),k.cyl(.2,.2,.45,'#7a5a3a',-.4,.7,.3,10),
+    k.box(.4,.4,.4,'#8a6a3a',.3,.2,.6),k.box(.5,.12,.3,'#6b4a2a',.4,.12,-.1),k.rod(.08,.6,'#2a2d31',.55,.3,-.1),
+    k.cyl(.03,.03,1.8,'#6b4a2a',-.6,.9,1.0,6),k.box(.02,.4,.6,'#15171a',-.6,1.6,1.3),k.cyl(.04,.05,.9,'#6b4a2a',.8,.45,.9,6),k.fire(.8,1.0,.9,.35)],
+  lamp:k=>[k.cyl(.04,.05,1.4,'#6b4a2a',0,.7,0,6),k.box(.04,.04,.3,'#6b4a2a',0,1.4,.12),k.box(.14,.2,.14,'#15171a',0,1.25,.27),k.lit.box(.1,.14,.1,'#ffc070',0,1.25,.27),k.light(0,1.25,.3,null,1.3)],
+  // een loopplank met touwen
+  bridge:(k,L)=>[k.box(L,.1,1.4,'#7a5a3a',0,-.05,0),...along(L,.35,.15,u=>k.box(.06,.04,1.4,'#5a3a1e',u,.02,0)),
+    ...along(L,1.5,.2,u=>[k.box(.06,.6,.06,'#6b4a2a',u,.3,-.7),k.box(.06,.6,.06,'#6b4a2a',u,.3,.7)]),k.box(L,.03,.03,'#c8b48a',0,.56,-.7),k.box(L,.03,.03,'#c8b48a',0,.56,.7)],
+  block:k=>[k.box(.8,.5,.8,'#8a6a3a',0,.25,0),k.box(.82,.04,.82,'#5a3e26',0,.5,0)]},
+
+ // ---------- Luchthaven: een zwevend eiland met koperen relingen, propellertorens en een klokkentoren (Hemelrijk) ----------
+ skyport:{n:'Luchthaven',mat:'plain',band:[1.42,.1,2.12,.6],flag:[0,2.35,1.17],label:3.4,
+  // het eiland zweeft: eronder hangt een rotspunt
+  base:k=>[...island(k,'#6a5a48','#4a3e30'),k.cone(9.5,9,'#5a4a3a',6.5,-6.2,6.5,true,9),k.cone(1.8,3,'#5a4a3a',15.1,-3.2,9.4,true,7),k.cone(1.8,3,'#5a4a3a',-2,-3.2,3.8,true,7)],
+  // een koperen reling: luchtig, je kijkt erdoorheen
+  wall:(k,L)=>[k.box(L,.12,.3,'#5a5a5e',0,.06,0),k.box(L,.06,.08,'#c8963a',0,.7,0),k.box(L,.04,.05,'#b8683a',0,.4,0),...along(L,1,.1,u=>k.cyl(.04,.05,.7,'#c8963a',u,.35,0,6))],
+  // een koperen toren met een propeller erbovenop
+  corner:k=>[k.cyl(.35,.45,2.2,'#b8683a',0,1.1,0,8),...[.6,1.4,2.0].map(y=>k.cyl(.38,.38,.08,'#c8963a',0,y,0,8)),k.cone(.45,.5,'#c8963a',0,2.45,0,false,8),
+    k.cyl(.06,.06,.2,'#5a5a5e',0,2.75,0,6),k.box(1.4,.04,.14,'#7a5a3a',0,2.86,0),k.box(.14,.04,1.4,'#7a5a3a',0,2.86,0),k.lit.ball(.08,'#ffe8a0',0,1.8,-.36)],
+  // een boog met een tandwiel; alle vier de poorten zijn gelijk, want de vijand komt uit elke richting
+  gate:(k,role)=>[k.box(.25,1.7,.3,'#b8683a',-.95,.85,0),k.box(.25,1.7,.3,'#b8683a',.95,.85,0),k.box(2.2,.18,.3,'#c8963a',0,1.75,0),k.ring(.3,.06,'#c8963a',0,2.12,0,0),
+    k.lit.ball(.07,'#ffe8a0',-.95,1.55,.18),k.lit.ball(.07,'#ffe8a0',.95,1.55,.18),k.light(0,1.6,.2,'#ffe8a0',1.2)],
+  // een klokkentoren met een verlichte wijzerplaat
+  hq:k=>[k.box(1.4,.9,2.1,'#d8c8a0',0,.45,0),k.box(.9,1.4,.9,'#d8c8a0',0,1.6,-.4),k.lit.ball(.3,'#fff6d8',-.46,1.9,-.4,[.1,1,1]),
+    k.box(.02,.2,.03,'#3a2e24',-.48,1.95,-.4),k.box(.02,.03,.16,'#3a2e24',-.48,1.9,-.35),k.cone(.75,.6,'#b8683a',0,2.6,-.4,false,4,Math.PI/4),k.cyl(.035,.035,1.8,'#5a5a5e',0,1.7,.8,6)],
+  // een meermast met een klein luchtschip en een stoomketel
+  factory:k=>[k.cyl(.08,.1,2.2,'#5a5a5e',-.5,1.1,0,6),k.ball(.45,'#8a8a90',.3,1.8,0,[2.2,.8,.8]),k.box(.5,.15,.2,'#7a5a3a',.3,1.35,0),k.box(.04,.4,.06,'#7a5a3a',-.7,1.8,0),
+    k.cyl(.3,.35,.7,'#b8683a',.6,.35,-.8,10),k.cyl(.07,.07,.6,'#5a5a5e',.6,1.0,-.8,6),k.fire(.6,1.4,-.8,.35)],
+  lamp:k=>[k.cyl(.035,.05,1.5,'#5a5a5e',0,.75,0,6),k.lit.ball(.1,'#ffe8a0',0,1.55,0),k.cone(.12,.1,'#5a5a5e',0,1.68,0,false,6),k.light(0,1.55,0,null,1.4)],
+  // een hangbrug van planken en touw, zonder pijlers: eronder is alleen lucht
+  bridge:(k,L)=>[k.box(L,.06,1.3,'#7a5a3a',0,-.03,0),...blocks(L,.24,.06,0,(u,w,i)=>k.box(w,.04,1.34,i%2?'#8a6a48':'#6b4a2a',u,.01,0)),
+    ...along(L,1.4,.2,u=>[k.box(.05,.6,.05,'#6b4a2a',u,.3,-.7),k.box(.05,.6,.05,'#6b4a2a',u,.3,.7)]),k.box(L,.03,.03,'#c8b48a',0,.58,-.7),k.box(L,.03,.03,'#c8b48a',0,.58,.7)],
+  block:k=>[k.box(.8,.5,.8,'#b8683a',0,.25,0),k.box(.84,.06,.84,'#c8963a',0,.5,0)]}
 };
 })(typeof module!=='undefined'&&module.exports?module.exports:(window.ERME=window.ERME||{}));
