@@ -14,7 +14,7 @@ services:
       # Wachtwoord van de webadmin op /admin (minstens 10 tekens). Leeg = webadmin uit.
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     volumes:
-      - speldata:/data
+      - ermetddata:/data
 
   # De Cloudflare Tunnel. Belt zelf uit naar Cloudflare, dus er hoeven geen poorten open in je router.
   # Welk adres naar het spel gaat, stel je in het Cloudflare-dashboard in (Public Hostname: ermetd.terpstack.dev naar http://ermetd:3000).
@@ -28,4 +28,6 @@ services:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Zet TUNNEL_TOKEN in .env. Zie de README onder Online zetten met een Cloudflare Tunnel.}
 
 volumes:
-  speldata:
+  ermetddata:
+    # Vaste naam, los van de map waarin docker compose draait.
+    name: ermetddata

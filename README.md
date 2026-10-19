@@ -292,7 +292,7 @@ Voorwaarde: het domein `terpstack.dev` staat in je Cloudflare-account.
 
    Na een paar seconden staat het spel op <https://ermetd.terpstack.dev>, en op de computer zelf op <http://localhost:3000>. In het dashboard staat de tunnel dan op **Healthy**. Werkt het niet: `docker compose logs ermetdtunnel`.
 
-De database staat in het Docker-volume `speldata` en blijft bewaard bij `docker compose down` en bij een update. Een update: `git pull` en dan weer `docker compose up -d --build`.
+De database staat in het Docker-volume `ermetddata` en blijft bewaard bij `docker compose down` en bij een update. Een update: `git pull` en dan weer `docker compose up -d --build`.
 
 Het spel is alleen bereikbaar zolang de computer aanstaat en niet slaapt. Zet het startgoud in de webadmin op 260 voordat anderen meespelen.
 
