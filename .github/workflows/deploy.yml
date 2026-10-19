@@ -1,0 +1,48 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]      # een merge naar main is een push naar main
+  workflow_dispatch:      # ook handmatig te starten vanuit het Actions-tabblad
+
+permissions:
+  contents: read
+
+# Nooit twee deploys tegelijk; een nieuwe wacht tot de vorige klaar is
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DEPLOY_DIR: /opt/ermetd   # pas aan naar de map van de repo op je server
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    timeout-minutes: 20
+
+    steps:
+      - name: Repo bijwerken
+        working-directory: ${{ env.DEPLOY_DIR }}
+        run: |
+          set -euo pipefail
+          # Ophalen met het tijdelijke token van deze run; er hoeft geen wachtwoord of key op de server
+          git fetch --prune \
+            "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" \
+            main
+          # Server exact gelijk maken aan main (lokale wijzigingen in getrackte bestanden gaan weg,
+          # niet-getrackte bestanden zoals .env blijven staan)
+          git reset --hard FETCH_HEAD
+          echo "Nu op commit: $(git rev-parse --short HEAD)"
+
+      - name: Docker Compose herstarten
+        working-directory: ${{ env.DEPLOY_DIR }}
+        run: |
+          set -euo pipefail
+          docker compose pull --ignore-buildable
+          docker compose up -d --build --remove-orphans
+          docker compose ps
+
+      - name: Oude images opruimen
+        if: success()
+        run: docker image prune -f
