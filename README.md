@@ -280,7 +280,7 @@ Voorwaarde: het domein `terpstack.dev` staat in je Cloudflare-account.
    | Subdomain | `ermetd` |
    | Domain | `terpstack.dev` |
    | Service type | `HTTP` |
-   | URL | `spel:3000` |
+   | URL | `ermetd:3000` |
 
    Staat er al een DNS-record `ermetd` (bijvoorbeeld van een eerdere tunnel), verwijder dat dan eerst onder **DNS → Records**.
 3. **Instellingen.** `cp .env.example .env` en vul `TUNNEL_TOKEN` (de tekst uit stap 1) en `ADMIN_PASSWORD` in.
@@ -290,7 +290,7 @@ Voorwaarde: het domein `terpstack.dev` staat in je Cloudflare-account.
    docker compose up -d --build
    ```
 
-   Na een paar seconden staat het spel op <https://ermetd.terpstack.dev>, en op de computer zelf op <http://localhost:3000>. In het dashboard staat de tunnel dan op **Healthy**. Werkt het niet: `docker compose logs tunnel`.
+   Na een paar seconden staat het spel op <https://ermetd.terpstack.dev>, en op de computer zelf op <http://localhost:3000>. In het dashboard staat de tunnel dan op **Healthy**. Werkt het niet: `docker compose logs ermetdtunnel`.
 
 De database staat in het Docker-volume `speldata` en blijft bewaard bij `docker compose down` en bij een update. Een update: `git pull` en dan weer `docker compose up -d --build`.
 
